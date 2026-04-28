@@ -1,0 +1,38 @@
+from fastapi import APIRouter, HTTPException
+from datetime import date
+
+from core.database import supabase
+
+router = APIRouter()
+
+
+@router.get("/")
+def list_players(status: str | None = None):
+    query = supabase.table("players").select("id, name, position, status")
+    if status:
+        query = query.eq("status", status)
+    result = query.order("name").execute()
+    return result.data
+
+
+@router.get("/{player_id}")
+def get_player(player_id: int, stats_date: date | None = None):
+    player_result = (
+        supabase.table("players")
+        .select("id, name, position, status, name_variants")
+        .eq("id", player_id)
+        .maybe_single()
+        .execute()
+    )
+    if not player_result.data:
+        raise HTTPException(status_code=404, detail="선수를 찾을 수 없습니다.")
+    player = dict(player_result.data)
+
+    stats_query = supabase.table("player_stats_daily").select("*").eq("player_id", player_id)
+    if stats_date:
+        stats_query = stats_query.eq("date", stats_date.isoformat())
+    else:
+        stats_query = stats_query.order("date", desc=True).limit(30)
+    player["stats"] = stats_query.execute().data
+
+    return player

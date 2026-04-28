@@ -20,6 +20,7 @@ dist/
 coverage/
 
 # 크롤링 원시 데이터 (저작권)
+data/
 data/raw/
 data/html/
 data/news_raw/
@@ -41,8 +42,9 @@ corpus/
 # 안전한 샘플만 허용
 !data/samples/
 
-# 모델 가중치
-models/
+# 모델 가중치 (학습 결과물)
+training/models/
+backend/models/classifier_koelectra/
 checkpoints/
 runs/
 wandb/
@@ -73,3 +75,6 @@ supabase/.temp/
 Thumbs.db
 *.log
 logs/
+CLAUDE.md
+.serena
+.claude

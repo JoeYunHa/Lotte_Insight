@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     openai_api_key: str
     openai_model: str = "gpt-4o-mini"
     crawl_user_agent: str = "LotteInsightBot/1.0"
+    kbo_crawl_interval_hours: int = 2
     app_env: str = "development"
     log_level: str = "INFO"
 
