@@ -1,0 +1,75 @@
+# Environment
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+
+# Node / Next.js
+node_modules/
+dist/
+.next/
+.vercel/
+coverage/
+
+# 크롤링 원시 데이터 (저작권)
+data/raw/
+data/html/
+data/news_raw/
+data/news_cleaned/
+data/cache/
+data/downloads/
+article_bodies/
+scraped_html/
+doc/
+
+# 학습 데이터 (원문 포함 가능성)
+data/processed/
+data/training/
+datasets/
+corpus/
+*.jsonl
+*.parquet
+
+# 안전한 샘플만 허용
+!data/samples/
+
+# 모델 가중치
+models/
+checkpoints/
+runs/
+wandb/
+mlruns/
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.bin
+*.pkl
+
+# HuggingFace 캐시
+.cache/
+.huggingface/
+transformers_cache/
+
+# DB
+*.sqlite
+*.sqlite3
+*.db
+supabase/.branches/
+supabase/.temp/
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+*.log
+logs/
