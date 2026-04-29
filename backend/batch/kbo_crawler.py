@@ -19,6 +19,7 @@ import re
 from datetime import date
 from urllib.robotparser import RobotFileParser
 
+import requests as http
 from bs4 import BeautifulSoup
 from playwright.sync_api import Page, sync_playwright
 
@@ -36,19 +37,6 @@ _URLS = {
     "hitter_basic2":  f"{_KBO_BASE}/Record/Player/HitterBasic/Basic2.aspx",
     "pitcher_basic1": f"{_KBO_BASE}/Record/Player/PitcherBasic/Basic1.aspx",
 }
-
-# 선수명만 추출할 보충 stats 페이지 (stat_map 불필요)
-_SUPPLEMENT_URLS = [
-    f"{_KBO_BASE}/Record/Player/HitterBasic/Basic3.aspx",
-    f"{_KBO_BASE}/Record/Player/PitcherBasic/Basic2.aspx",
-    f"{_KBO_BASE}/Record/Player/PitcherBasic/Basic3.aspx",
-]
-
-# 1군 등록선수 현황 후보 URL — 사이트 구조 변경 대비 복수 관리
-_ACTIVE_ROSTER_URLS = [
-    f"{_KBO_BASE}/Team/Roster/ActiveRoster.aspx",
-    f"{_KBO_BASE}/TeamInfo/Player.aspx",
-]
 
 # ddlTeam 셀렉터 후보 — 페이지마다 name 속성이 다를 수 있음
 _TEAM_SELECTORS = [
@@ -210,19 +198,33 @@ def _load_player_map() -> dict[str, int]:
     return name_map
 
 
+_REGISTER_URL = f"{_KBO_BASE}/Player/Register.aspx"
+
+# Register.aspx POST 필드명 (진단 스크립트로 확인)
+_REG_TEAM_FIELD = (
+    "ctl00$ctl00$ctl00$cphContents$cphContents$cphContents$hfSearchTeam"
+)
+_REG_DATE_FIELD = (
+    "ctl00$ctl00$ctl00$cphContents$cphContents$cphContents$hfSearchDate"
+)
+_REG_EVENT_TARGET = (
+    "ctl00$ctl00$ctl00$cphContents$cphContents$cphContents$btnCalendarSelect"
+)
+
 # ── 선수 명단 ─────────────────────────────────────────────────────────────────
+
 
 def _try_select_team(page, url: str) -> str | None:
     """
-    url을 열고 팀 드롭다운에서 롯데를 선택한 뒤 HTML을 반환한다.
-    셀렉터를 순서대로 시도하여 처음 성공한 것을 사용한다.
-    모든 셀렉터 실패 시 None 반환.
+    stats 페이지(url)를 열고 SELECT 드롭다운으로 롯데(LT)를 선택한 뒤 HTML을 반환한다.
+    드롭다운 선택에 실패하면 None을 반환한다. run()의 일간 기록 수집에서 사용.
     """
     if not _can_fetch(url):
         logger.warning(f"robots.txt 금지: {url}")
         return None
     try:
-        page.goto(url, wait_until="networkidle", timeout=_NAV_TIMEOUT)
+        page.goto(url, wait_until="domcontentloaded", timeout=_NAV_TIMEOUT)
+        page.wait_for_selector("table tbody tr", timeout=_SEL_TIMEOUT)
     except Exception as e:
         logger.error(f"페이지 이동 실패 ({url}): {e}")
         return None
@@ -230,83 +232,155 @@ def _try_select_team(page, url: str) -> str | None:
     for selector in _TEAM_SELECTORS:
         try:
             page.select_option(selector, _LOTTE_CODE)
-            page.wait_for_load_state("networkidle", timeout=_NAV_TIMEOUT)
-            page.wait_for_selector("table tbody", timeout=_SEL_TIMEOUT)
-            logger.debug(f"셀렉터 성공: {selector}  url={url}")
+            try:
+                page.wait_for_load_state("networkidle", timeout=10_000)
+            except Exception:
+                pass
+            page.wait_for_selector("table tbody tr", timeout=_SEL_TIMEOUT)
+            logger.debug(f"드롭다운 성공: {selector}")
             return page.content()
         except Exception:
             continue
 
-    logger.warning(f"팀 드롭다운 셀렉터 모두 실패: {url}")
+    logger.warning(f"팀 드롭다운 선택 실패: {url}")
     return None
 
 
-def _parse_names_only(html: str) -> list[str]:
-    """playerId 링크를 가진 <a> 태그에서 선수명만 추출한다."""
+
+
+def _extract_update_panel(text: str) -> str:
+    """
+    ASP.NET UpdatePanel AJAX 응답(파이프 구분 포맷)에서 updatePanel 섹션 HTML을 추출한다.
+    일반 HTML 응답이면 그대로 반환한다.
+
+    포맷: <length>|<type>|<id>|<content>|...
+    """
+    if "|updatePanel|" not in text:
+        return text
+    parts: list[str] = []
+    pos = 0
+    while pos < len(text):
+        pipe1 = text.find("|", pos)
+        if pipe1 < 0:
+            break
+        try:
+            length = int(text[pos:pipe1])
+        except ValueError:
+            break
+        pipe2 = text.find("|", pipe1 + 1)
+        if pipe2 < 0:
+            break
+        rtype = text[pipe1 + 1:pipe2]
+        pipe3 = text.find("|", pipe2 + 1)
+        if pipe3 < 0:
+            break
+        content_start = pipe3 + 1
+        if rtype == "updatePanel":
+            parts.append(text[content_start:content_start + length])
+        pos = content_start + length + 1  # trailing |
+    return "\n".join(parts) if parts else text
+
+
+_STAFF_SECTIONS = {"감독", "코치"}
+
+
+def _parse_register_names(html: str) -> list[str]:
+    """
+    Register.aspx HTML에서 선수 이름 목록을 추출한다.
+
+    테이블 구조: 테이블마다 헤더 행(행0)의 두 번째 셀이 섹션명을 나타낸다.
+      감독 / 코치          → 건너뜀
+      투수 / 포수 / 내야수 / 외야수 → 파싱
+    데이터 행의 colspan > 1 이면 빈 안내 행(당일 등록 없음 등) → 건너뜀.
+    """
     soup = BeautifulSoup(html, "lxml")
     names: list[str] = []
-    for a in soup.select("table tbody a[href*='playerId']"):
-        name = a.get_text(strip=True)
-        if name:
-            names.append(name)
+
+    for table in soup.find_all("table"):
+        rows = table.find_all("tr")
+        if not rows:
+            continue
+
+        # 헤더 행으로 섹션 타입 판별
+        header_cells = rows[0].find_all(["td", "th"])
+        if len(header_cells) < 2:
+            continue
+        section = header_cells[1].get_text(strip=True)
+        if section in _STAFF_SECTIONS:
+            continue
+
+        for tr in rows[1:]:
+            cells = tr.find_all(["td", "th"])
+            if len(cells) < 2:
+                continue
+            if int(cells[0].get("colspan", 1)) > 1:
+                continue  # "당일 등록된 선수가 없습니다" 등 안내 행
+            if not cells[0].get_text(strip=True).isdigit():
+                continue
+            a_tag = cells[1].find("a")
+            name = a_tag.get_text(strip=True) if a_tag else cells[1].get_text(strip=True)
+            if name:
+                names.append(name)
+
     return names
-
-
-def _fetch_active_roster_page(page) -> list[str]:
-    """
-    1군 등록선수 현황 페이지에서 롯데 선수명을 파싱한다.
-    후보 URL과 팀 셀렉터를 순서대로 시도하여 첫 성공 결과를 반환.
-    모두 실패하면 빈 리스트 반환.
-    """
-    for url in _ACTIVE_ROSTER_URLS:
-        html = _try_select_team(page, url)
-        if html:
-            names = _parse_names_only(html)
-            if names:
-                logger.info(f"등록선수 현황 성공: {url}  → {len(names)}명")
-                return names
-            logger.warning(f"등록선수 현황 파싱 결과 없음: {url}")
-
-    logger.error("등록선수 현황 수집 전체 실패 — stats 페이지로만 보완")
-    return []
 
 
 def fetch_roster() -> list[str]:
     """
-    KBO 사이트에서 현재 롯데 1군 엔트리 선수 이름 목록을 반환한다.
+    KBO Register.aspx에 requests로 직접 POST하여 롯데 엔트리를 반환한다.
     DB 연결 불필요 — 수집·라벨링 스크립트에서 키워드 생성용으로 사용.
 
-    수집 전략:
-      1순위: 등록선수 현황 페이지 (_ACTIVE_ROSTER_URLS) — 미출장 선수 포함
-      2순위: stats 페이지 6개 (_URLS + _SUPPLEMENT_URLS) — 등록 페이지 실패 보완
+    fnSearchChange('LT')의 동작을 재현:
+      1. GET으로 __VIEWSTATE 등 폼 토큰 획득
+      2. POST: __EVENTTARGET=btnCalendarSelect, hfSearchTeam=LT
     """
-    names: set[str] = set()
+    if not _can_fetch(_REGISTER_URL):
+        logger.warning(f"robots.txt 금지: {_REGISTER_URL}")
+        return []
 
-    with sync_playwright() as pw:
-        browser = pw.chromium.launch(headless=True)
-        page = browser.new_page(user_agent=settings.crawl_user_agent)
+    session = http.Session()
+    session.headers.update({
+        "User-Agent": settings.crawl_user_agent,
+        "Referer": _REGISTER_URL,
+    })
 
-        # 1순위: 등록선수 현황
-        roster_names = _fetch_active_roster_page(page)
-        names.update(roster_names)
+    try:
+        # 1. 초기 GET — ViewState / EventValidation / 날짜 필드 획득
+        resp = session.get(_REGISTER_URL, timeout=30)
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, "lxml")
 
-        # 2순위: stats 페이지 전체 (기존 3개 + 보충 3개)
-        all_stat_urls = list(_URLS.values()) + _SUPPLEMENT_URLS
-        stat_count_before = len(names)
-        for url in all_stat_urls:
-            html = _try_select_team(page, url)
-            if html:
-                for name in _parse_names_only(html):
-                    names.add(name)
+        def _hidden(name: str) -> str:
+            el = soup.find("input", {"name": name})
+            return el.get("value", "") if el else ""
 
-        browser.close()
+        search_date = _hidden(_REG_DATE_FIELD) or date.today().strftime("%Y%m%d")
 
-    stat_added = len(names) - len(roster_names)
-    logger.info(
-        f"KBO 엔트리 수집 완료: 총 {len(names)}명 "
-        f"(등록 현황 {len(roster_names)}명 + stats 보완 {stat_added}명)"
-    )
-    return sorted(names)
+        # 2. POST — 롯데(LT) 팀 선택 (fnSearchChange 동작 재현)
+        post_data = {
+            "__VIEWSTATE":          _hidden("__VIEWSTATE"),
+            "__VIEWSTATEGENERATOR": _hidden("__VIEWSTATEGENERATOR"),
+            "__EVENTVALIDATION":    _hidden("__EVENTVALIDATION"),
+            "__EVENTTARGET":        _REG_EVENT_TARGET,
+            "__EVENTARGUMENT":      "",
+            _REG_TEAM_FIELD:        _LOTTE_CODE,
+            _REG_DATE_FIELD:        search_date,
+        }
+        resp2 = session.post(_REGISTER_URL, data=post_data, timeout=30)
+        resp2.raise_for_status()
+        resp2.encoding = resp2.apparent_encoding
+
+        # UpdatePanel 부분 응답이면 HTML 섹션만 추출
+        html = _extract_update_panel(resp2.text)
+        print(f"      응답 {len(resp2.text):,}자 (UpdatePanel: {'예' if html != resp2.text else '아니오'})")
+
+        names = _parse_register_names(html)
+        logger.info(f"KBO 엔트리 수집 완료: 총 {len(names)}명 (Register.aspx)")
+        return sorted(names)
+
+    except Exception as e:
+        logger.error(f"Register.aspx 수집 실패: {e}")
+        return []
 
 
 # ── 메인 ─────────────────────────────────────────────────────────────────────

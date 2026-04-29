@@ -66,8 +66,11 @@ def collect_by_player(
     """
     선수별로 네이버 뉴스를 검색한다 (Naver API 최대 100건/쿼리).
     각 행에는 검색에 사용된 선수명(_search_player)이 임시 키로 기록된다.
+
+    seen URL 집합은 선수별로 초기화한다. 동일 기사가 여러 선수 검색에서
+    반환될 경우 각 선수 관점의 행으로 각각 수집되며, 이후 DB 저장 단계에서
+    article 단위 중복은 upsert로 처리된다.
     """
-    seen: set[str] = set()
     rows: list[dict] = []
 
     for player in roster:
@@ -79,15 +82,16 @@ def collect_by_player(
             print(f"실패 ({e})")
             continue
 
+        seen_this_player: set[str] = set()
         added = 0
         for item in items:
             row = item_to_row(item)
             url = row.pop("_url")
-            if not url or url in seen:
+            if not url or url in seen_this_player:
                 continue
             if days_cutoff and row["published_at"] < days_cutoff:
                 continue
-            seen.add(url)
+            seen_this_player.add(url)
             row["_search_player"] = player
             rows.append(row)
             added += 1
@@ -141,7 +145,8 @@ def main():
     # 1. 엔트리 수집
     print("[1/5] KBO 엔트리 수집 (Playwright) ...")
     roster = _get_roster(args.player)
-    print(f"      선수 {len(roster)}명 (선수당 Naver API 최대 100건)\n")
+    print(f"      선수 {len(roster)}명: {', '.join(roster)}")
+    print(f"      (선수당 Naver API 최대 100건)\n")
 
     # 2. 선수별 뉴스 수집
     print("[2/5] 선수별 뉴스 수집")
