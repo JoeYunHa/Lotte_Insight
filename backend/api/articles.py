@@ -2,6 +2,7 @@ from fastapi import APIRouter, Query, HTTPException
 from datetime import date
 
 from core.database import supabase
+from core.time_utils import utc_day_bounds
 
 router = APIRouter()
 
@@ -21,9 +22,8 @@ def list_articles(
     )
 
     if article_date:
-        query = query.gte("published_at", f"{article_date}T00:00:00+00:00").lte(
-            "published_at", f"{article_date}T23:59:59+00:00"
-        )
+        start_at, end_at = utc_day_bounds(article_date)
+        query = query.gte("published_at", start_at).lte("published_at", end_at)
 
     if player_id:
         ap_result = (

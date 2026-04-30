@@ -1,193 +1,195 @@
-"""
-선수 단위 뉴스 수집 파이프라인.
-
-KBO 사이트에서 현재 롯데 엔트리를 수집하고,
-선수별로 네이버 뉴스를 검색하여 라벨링 데이터를 생성한다.
-
-팀 파이프라인(collect_for_labeling.py)과의 차이:
-  - 검색 키워드 = 선수 이름
-  - detected_players에 검색 선수가 항상 포함 보장
-  - GPT 라벨링 시 "검색 선수: {이름}" 컨텍스트 제공
-  - is_lotte_related 기본값 true (롯데 선수로 검색된 결과)
-
-출력: training/data/labeled_players.csv
-
-사용:
-    cd lotte-insight
-    python training/collect_players.py
-    python training/collect_players.py --days 60
-    python training/collect_players.py --no-label
-    python training/collect_players.py --overwrite
-    python training/collect_players.py --player 전준우   # 특정 선수만
-"""
+"""Collect player-focused news data for labeling."""
 
 import argparse
 import sys
-import time
-from datetime import datetime, timedelta
-from pathlib import Path
-
-import requests
 
 from collect_utils import (
-    DATA_DIR,
+    BASEBALL_KEYWORDS,
+    NON_BASEBALL_KEYWORDS,
     auto_label,
-    fetch_naver,
-    item_to_row,
+    build_days_cutoff,
+    collect_news_by_keywords,
     print_stats,
     write_csv,
 )
+from settings import LABELED_PLAYERS_CSV, NAVER_DISPLAY_LIMIT, REPO_ROOT, TEAM_ALIASES, TEAM_NAME_KO
 
-OUTPUT_CSV = DATA_DIR / "labeled_players.csv"
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+_PHOTO_PREFIXES = ("[사진]", "[포토]")
 
 
 def _get_roster(player_filter: str | None) -> list[str]:
     try:
-        from batch.kbo_crawler import fetch_roster
+        from backend.batch.kbo_crawler import fetch_roster
+
         roster = fetch_roster()
-        print(f"  KBO 엔트리 {len(roster)}명 수집 완료")
-    except Exception as e:
-        print(f"  [오류] KBO 엔트리 수집 실패: {e}")
+        print(f"  KBO 로스터 {len(roster)}명 수집 완료")
+    except Exception as exc:
+        print(f"  [오류] KBO 로스터 수집 실패: {exc}")
         sys.exit(1)
 
     if player_filter:
-        roster = [p for p in roster if p == player_filter]
+        roster = [player for player in roster if player == player_filter]
         if not roster:
-            print(f"  [오류] '{player_filter}' 선수를 엔트리에서 찾을 수 없습니다.")
+            print(f"  [오류] '{player_filter}' 선수를 로스터에서 찾을 수 없습니다.")
             sys.exit(1)
 
     return roster
 
 
-def collect_by_player(
-    roster: list[str],
-    days_cutoff: str | None,
-) -> list[dict]:
-    """
-    선수별로 네이버 뉴스를 검색한다 (Naver API 최대 100건/쿼리).
-    각 행에는 검색에 사용된 선수명(_search_player)이 임시 키로 기록된다.
+def collect_by_player(roster: list[str], days_cutoff: str | None) -> list[dict]:
+    def enrich_row(keyword: str, _row: dict) -> dict:
+        return {"_search_player": keyword.removeprefix(f"{TEAM_NAME_KO} ")}
 
-    seen URL 집합은 선수별로 초기화한다. 동일 기사가 여러 선수 검색에서
-    반환될 경우 각 선수 관점의 행으로 각각 수집되며, 이후 DB 저장 단계에서
-    article 단위 중복은 upsert로 처리된다.
-    """
-    rows: list[dict] = []
+    keywords = [f"{TEAM_NAME_KO} {player}" for player in roster]
+    return collect_news_by_keywords(
+        keywords,
+        days_cutoff=days_cutoff,
+        per_keyword_dedupe=True,
+        row_enricher=enrich_row,
+        display=NAVER_DISPLAY_LIMIT,
+    )
 
-    for player in roster:
-        keyword = f"롯데 {player}"
-        print(f"  '{keyword}' ...", end=" ", flush=True)
-        try:
-            items = fetch_naver(keyword, display=100)
-        except requests.RequestException as e:
-            print(f"실패 ({e})")
-            continue
 
-        seen_this_player: set[str] = set()
-        added = 0
-        for item in items:
-            row = item_to_row(item)
-            url = row.pop("_url")
-            if not url or url in seen_this_player:
-                continue
-            if days_cutoff and row["published_at"] < days_cutoff:
-                continue
-            seen_this_player.add(url)
-            row["_search_player"] = player
-            rows.append(row)
-            added += 1
-
-        print(f"{added}건 추가 (누계 {len(rows)}건)")
-        time.sleep(0.3)
-
-    rows.sort(key=lambda r: r["published_at"], reverse=True)
+def _assign_query_player(rows: list[dict]) -> list[dict]:
+    """Move _search_player to query_player audit field; keep it out of detected_players."""
+    for row in rows:
+        row["query_player"] = row.get("_search_player", "")
     return rows
 
 
-_LOTTE_KEYWORDS = {"롯데", "자이언츠", "사직", "LT"}
+def _filter_photo_captions(rows: list[dict]) -> list[dict]:
+    """Exclude photo/photo-caption rows — they carry no labelable text."""
+    before = len(rows)
+    filtered = [row for row in rows if not row.get("title", "").startswith(_PHOTO_PREFIXES)]
+    removed = before - len(filtered)
+    if removed:
+        print(f"      [포토/사진 제외] {removed}건 제거 -> {len(filtered)}건")
+    return filtered
+
+
+def _has_any(text: str, keywords: tuple[str, ...]) -> bool:
+    lowered = text.lower()
+    return any(kw.lower() in lowered for kw in keywords)
+
+
+def _filter_baseball_context(rows: list[dict]) -> list[dict]:
+    """Reject articles with no baseball signal — catches off-topic name collisions."""
+    before = len(rows)
+    filtered = [
+        row
+        for row in rows
+        if not (
+            _has_any(f"{row.get('title', '')} {row.get('description_snippet', '')}", NON_BASEBALL_KEYWORDS)
+            and not _has_any(f"{row.get('title', '')} {row.get('description_snippet', '')}", BASEBALL_KEYWORDS)
+        )
+    ]
+    removed = before - len(filtered)
+    if removed:
+        print(f"      [비야구 문맥 제외] {removed}건 제거 -> {len(filtered)}건")
+    return filtered
+
+
+def _validate_before_write(rows: list[dict]) -> list[dict]:
+    """Final gate: reject non-baseball rows; warn on ghost detected_players."""
+    valid: list[dict] = []
+    rejected = 0
+    ghost_players = 0
+    for row in rows:
+        text = f"{row.get('title', '')} {row.get('description_snippet', '')}"
+        if _has_any(text, NON_BASEBALL_KEYWORDS) and not _has_any(text, BASEBALL_KEYWORDS):
+            rejected += 1
+            continue
+        players = [p for p in row.get("detected_players", "").split(";") if p.strip()]
+        if players and not any(p in text for p in players):
+            ghost_players += 1
+        valid.append(row)
+    if rejected:
+        print(f"      [검증] 비야구 기사 {rejected}건 제거")
+    if ghost_players:
+        print(f"      [경고] detected_players가 본문에 없는 행: {ghost_players}건 (수동 검토 권장)")
+    return valid
 
 
 def _filter_lotte_related(rows: list[dict], labeled: bool) -> list[dict]:
-    """
-    수집된 행에서 롯데와 무관한 기사를 제거한다.
-
-    labeled=True  : GPT가 설정한 is_lotte_related 값을 기준으로 판단
-    labeled=False : 제목 + description에 롯데 관련 키워드 포함 여부로 판단
-                    (--no-label 모드에서 "롯데 {선수명}" 검색을 통과한 타팀
-                     동명이인 기사를 2차로 걸러냄)
-    """
     before = len(rows)
     if labeled:
-        filtered = [r for r in rows if str(r.get("is_lotte_related", "true")).lower() == "true"]
+        filtered = [row for row in rows if str(row.get("is_lotte_related", "true")).lower() == "true"]
+        method = "GPT is_lotte_related"
     else:
-        def _has_lotte(row: dict) -> bool:
-            text = row.get("title", "") + " " + row.get("description_snippet", "")
-            return any(kw in text for kw in _LOTTE_KEYWORDS)
-        filtered = [r for r in rows if _has_lotte(r)]
+        filtered = [
+            row
+            for row in rows
+            if any(alias in f"{row.get('title', '')} {row.get('description_snippet', '')}" for alias in TEAM_ALIASES)
+        ]
+        method = "키워드"
 
     removed = before - len(filtered)
-    method = "GPT is_lotte_related" if labeled else "키워드"
-    print(f"      [{method}] {removed}건 제외 → 잔여 {len(filtered)}건")
+    print(f"      [{method}] {removed}건 제외 -> {len(filtered)}건")
     return filtered
 
 
 def main():
     parser = argparse.ArgumentParser(description="선수 단위 뉴스 수집 + GPT 라벨링")
-    parser.add_argument("--days",      type=int,  default=None, help="최근 N일 이내 기사만")
-    parser.add_argument("--no-label",  action="store_true",     help="라벨링 건너뜀 (수집만)")
-    parser.add_argument("--overwrite", action="store_true",     help="CSV 초기화")
-    parser.add_argument("--player",    type=str,  default=None, help="특정 선수만 수집 (이름 정확히)")
+    parser.add_argument("--days", type=int, default=None, help="최근 N일 이내 기사만")
+    parser.add_argument("--no-label", action="store_true", help="라벨링 건너뜀")
+    parser.add_argument("--overwrite", action="store_true", help="CSV 초기화")
+    parser.add_argument("--player", type=str, default=None, help="특정 선수만 수집")
     args = parser.parse_args()
 
-    cutoff = None
-    if args.days:
-        cutoff = (datetime.now() - timedelta(days=args.days)).strftime("%Y-%m-%dT%H:%M:%S")
+    cutoff = build_days_cutoff(args.days)
 
-    # 1. 엔트리 수집
-    print("[1/5] KBO 엔트리 수집 (Playwright) ...")
+    print("[1/6] KBO 로스터 수집 (Playwright) ...")
     roster = _get_roster(args.player)
     print(f"      선수 {len(roster)}명: {', '.join(roster)}")
-    print(f"      (선수당 Naver API 최대 100건)\n")
+    print(f"      (선수당 Naver API 최대 {NAVER_DISPLAY_LIMIT}건)\n")
 
-    # 2. 선수별 뉴스 수집
-    print("[2/5] 선수별 뉴스 수집")
+    print("[2/6] 선수별 뉴스 수집")
     rows = collect_by_player(roster, cutoff)
     print(f"      수집 완료: {len(rows)}건\n")
 
-    # 3. GPT 라벨링
+    print("[3/6] 전처리 필터링")
+    rows = _assign_query_player(rows)
+    rows = _filter_photo_captions(rows)
+    rows = _filter_baseball_context(rows)
+    print(f"      전처리 후: {len(rows)}건\n")
+
     if not args.no_label:
-        print("[3/5] GPT 자동 라벨링")
+        print("[4/6] GPT 자동 라벨링")
 
         def extra_ctx(row: dict) -> str:
-            return f"검색 선수: {row['_search_player']} (롯데 자이언츠 소속)"
+            return f"검색 선수: {row['query_player']} ({TEAM_NAME_KO} 자이언츠 소속)"
 
         def ensure_players(row: dict) -> list[str]:
-            return [row["_search_player"]]
+            # Scan against full roster so all mentioned players are detected,
+            # not just the search keyword that found this article.
+            return roster
 
-        rows = auto_label(
-            rows,
-            extra_context_fn=extra_ctx,
-            ensure_players_fn=ensure_players,
-        )
+        rows = auto_label(rows, extra_context_fn=extra_ctx, ensure_players_fn=ensure_players)
         print_stats(rows)
     else:
-        print("[3/5] 라벨링 건너뜀 (--no-label)")
+        print("[4/6] 라벨링 건너뜀 (--no-label)")
         for row in rows:
-            row["detected_players"] = row["_search_player"]
+            text = f"{row.get('title', '')} {row.get('description_snippet', '')}"
+            row["detected_players"] = ";".join(p for p in roster if p in text)
             row["is_lotte_related"] = "true"
 
-    # 4. 롯데 관련성 보정
-    print("\n[4/5] 롯데 관련성 보정")
+    print("\n[5/6] 관련성 보정 및 검증")
     rows = _filter_lotte_related(rows, labeled=not args.no_label)
+    rows = _validate_before_write(rows)
 
-    # 5. CSV 저장 (_search_player는 내부용 임시 키, CSV에 기록하지 않음)
-    print(f"\n[5/5] CSV 저장 → {OUTPUT_CSV}")
-    saved = write_csv(rows, OUTPUT_CSV, append=not args.overwrite)
+    print(f"\n[6/6] CSV 저장: {LABELED_PLAYERS_CSV}")
+    saved = write_csv(rows, LABELED_PLAYERS_CSV, append=not args.overwrite)
     print(f"      {saved}건 저장 완료")
 
     if not args.no_label:
-        low_conf = [r for r in rows if r.get("confidence_score") and float(r["confidence_score"]) < 0.7]
-        if low_conf:
-            print(f"\n검수 권장: confidence < 0.7 항목 {len(low_conf)}건")
+        low_confidence = [
+            row for row in rows if row.get("confidence_score") and float(row["confidence_score"]) < 0.7
+        ]
+        if low_confidence:
+            print(f"\n검토 권장: confidence < 0.7 항목 {len(low_confidence)}건")
 
 
 if __name__ == "__main__":

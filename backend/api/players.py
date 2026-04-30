@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from datetime import date
 
+from core.config import settings
 from core.database import supabase
 
 router = APIRouter()
@@ -32,7 +33,9 @@ def get_player(player_id: int, stats_date: date | None = None):
     if stats_date:
         stats_query = stats_query.eq("date", stats_date.isoformat())
     else:
-        stats_query = stats_query.order("date", desc=True).limit(30)
+        stats_query = (
+            stats_query.order("date", desc=True).limit(settings.player_stats_history_limit)
+        )
     player["stats"] = stats_query.execute().data
 
     return player

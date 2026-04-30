@@ -38,6 +38,7 @@ datasets/
 corpus/
 *.jsonl
 *.parquet
+artifacts
 
 # 안전한 샘플만 허용
 !data/samples/

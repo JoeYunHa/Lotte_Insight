@@ -146,19 +146,35 @@ def classify(title: str, description_snippet: str = "") -> dict:
         )
         enc = {k: v.to(_device) for k, v in enc.items()}
 
+        _SIGMOID_THRESHOLD = 0.3
+
         with torch.no_grad():
             logits = _model(**enc).logits[0]
-            probs = torch.softmax(logits, dim=-1).cpu().numpy()
+            probs = torch.sigmoid(logits).cpu().numpy()
 
-        top_idx = int(probs.argmax())
-        top_conf = float(probs[top_idx])
-        label = _le_classes[top_idx]
+        active = sorted(
+            [(i, float(p)) for i, p in enumerate(probs) if p >= _SIGMOID_THRESHOLD],
+            key=lambda x: x[1],
+            reverse=True,
+        )
 
-        secondary = [
-            _le_classes[i]
-            for i, p in enumerate(probs)
-            if i != top_idx and p >= 0.15
-        ]
+        if not active:
+            label = "ETC"
+            top_idx = _le_classes.index("ETC") if "ETC" in _le_classes else int(probs.argmax())
+            top_conf = float(probs[top_idx])
+            secondary: list[str] = []
+        else:
+            top_idx, top_conf = active[0]
+            label = _le_classes[top_idx]
+
+            # ETC cleanup: prefer non-ETC when other labels are active
+            if label == "ETC":
+                non_etc = [(i, p) for i, p in active if _le_classes[i] != "ETC"]
+                if non_etc:
+                    top_idx, top_conf = non_etc[0]
+                    label = _le_classes[top_idx]
+
+            secondary = [_le_classes[i] for i, _ in active if i != top_idx]
 
         return {"label": label, "confidence": round(top_conf, 4), "secondary_labels": secondary}
 

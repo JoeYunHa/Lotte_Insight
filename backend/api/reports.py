@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from datetime import date
 
+from core.config import settings
 from core.database import supabase
 
 router = APIRouter()
@@ -9,7 +10,7 @@ router = APIRouter()
 # ── 팀 리포트 ─────────────────────────────────────────────────────────────────
 
 @router.get("/team")
-def list_team_reports(limit: int = 30):
+def list_team_reports(limit: int = settings.report_list_limit):
     result = (
         supabase.table("team_daily_report")
         .select("*")
@@ -37,7 +38,7 @@ def get_team_report(report_date: date):
 # ── 선수 리포트 ───────────────────────────────────────────────────────────────
 
 @router.get("/players/{player_id}")
-def list_player_reports(player_id: int, limit: int = 30):
+def list_player_reports(player_id: int, limit: int = settings.report_list_limit):
     result = (
         supabase.table("player_daily_report")
         .select("*")
