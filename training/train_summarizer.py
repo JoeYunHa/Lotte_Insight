@@ -49,15 +49,6 @@ SUMMARY_REQUIRED_COLUMNS = {
 }
 
 
-def _split_names(raw: str) -> list[str]:
-    names: list[str] = []
-    for part in str(raw or "").split(";"):
-        name = part.strip()
-        if name and name not in names:
-            names.append(name)
-    return names[:3]
-
-
 def build_source_text(row: dict) -> str:
     parts = [f"title: {str(row.get('title', '')).strip()}"]
 
@@ -81,15 +72,7 @@ def build_source_text(row: dict) -> str:
 
 
 def build_target_text(row: dict) -> str:
-    # topic_label is already in source_text — omitting here reduces target length
-    # and lowers truncation risk under max_target_len.
-    payload = {
-        "event_summary": str(row.get("event_summary", "") or "").strip(),
-        "key_players": _split_names(row.get("key_players", "")),
-        "lotte_stance": str(row.get("lotte_stance", "neutral") or "neutral").strip().lower(),
-        "game_ref": str(row.get("game_ref", "false") or "false").strip().lower() == "true",
-    }
-    return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+    return str(row.get("event_summary", "") or "").strip()
 
 
 def load_data() -> pd.DataFrame:
@@ -171,49 +154,42 @@ def tokenize_dataset(
     return SummaryDataset(model_inputs)
 
 
+def _char_f1(pred: str, ref: str) -> float:
+    pred_chars = set(pred)
+    ref_chars = set(ref)
+    if not pred_chars or not ref_chars:
+        return 0.0
+    common = pred_chars & ref_chars
+    precision = len(common) / len(pred_chars)
+    recall = len(common) / len(ref_chars)
+    if precision + recall == 0.0:
+        return 0.0
+    return 2 * precision * recall / (precision + recall)
+
+
 def compute_metrics(eval_pred):
     predictions, labels = eval_pred
     if isinstance(predictions, tuple):
         predictions = predictions[0]
 
     labels = np.where(labels != -100, labels, 0)
-
     pred_texts = tokenizer_for_metrics.batch_decode(predictions, skip_special_tokens=True)
     label_texts = tokenizer_for_metrics.batch_decode(labels, skip_special_tokens=True)
 
     exact_match = 0
-    valid_json = 0
-    event_summary_match = 0
+    char_f1_total = 0.0
 
     for pred_text, label_text in zip(pred_texts, label_texts, strict=False):
         pred_text = pred_text.strip()
         label_text = label_text.strip()
-
         if pred_text == label_text:
             exact_match += 1
-
-        try:
-            pred_json = json.loads(pred_text)
-            valid_json += 1
-        except json.JSONDecodeError:
-            pred_json = None
-
-        try:
-            label_json = json.loads(label_text)
-        except json.JSONDecodeError:
-            label_json = None
-
-        # Count match only when both sides parse successfully,
-        # to avoid "" == "" false positives when truncation breaks JSON on either side.
-        if pred_json is not None and label_json is not None:
-            if pred_json.get("event_summary", "") == label_json.get("event_summary", ""):
-                event_summary_match += 1
+        char_f1_total += _char_f1(pred_text, label_text)
 
     total = max(len(pred_texts), 1)
     return {
         "exact_match": exact_match / total,
-        "valid_json_rate": valid_json / total,
-        "event_summary_match": event_summary_match / total,
+        "char_f1": char_f1_total / total,
     }
 
 
