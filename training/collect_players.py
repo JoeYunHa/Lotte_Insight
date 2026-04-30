@@ -9,6 +9,7 @@ from collect_utils import (
     auto_label,
     build_days_cutoff,
     collect_news_by_keywords,
+    is_mlb_giants_article,
     print_stats,
     write_csv,
 )
@@ -123,6 +124,7 @@ def _filter_lotte_related(rows: list[dict], labeled: bool) -> list[dict]:
             row
             for row in rows
             if any(alias in f"{row.get('title', '')} {row.get('description_snippet', '')}" for alias in TEAM_ALIASES)
+            and not is_mlb_giants_article(row)
         ]
         method = "키워드"
 

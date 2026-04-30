@@ -118,16 +118,31 @@ def _keyword_classify(text: str) -> dict:
     return {"label": "ETC", "confidence": 0.5, "secondary_labels": []}
 
 
+def _build_auxiliary_text(description_snippet: str, event_summary: str = "") -> str:
+    parts: list[str] = []
+
+    snippet = description_snippet[:120].strip()
+    if snippet:
+        parts.append(snippet)
+
+    summary = event_summary.strip()
+    if summary:
+        parts.append(f"요약: {summary}")
+
+    return " [요약정보] ".join(parts)
+
+
 # ── public API ────────────────────────────────────────────────────────────────
 
-def classify(title: str, description_snippet: str = "") -> dict:
+def classify(title: str, description_snippet: str = "", event_summary: str = "") -> dict:
     """
     Returns:
         {"label": str, "confidence": float, "secondary_labels": list[str]}
     """
     _load_model()
 
-    text = (title + " " + description_snippet).strip()
+    auxiliary_text = _build_auxiliary_text(description_snippet, event_summary)
+    text = (title + " " + auxiliary_text).strip()
 
     if _model is None or _tokenizer is None:
         return _keyword_classify(text)
@@ -135,13 +150,12 @@ def classify(title: str, description_snippet: str = "") -> dict:
     try:
         import torch
 
-        snippet = description_snippet[:120].strip()
         enc = _tokenizer(
             title,
-            snippet,
+            auxiliary_text,
             truncation="only_second",
             padding="max_length",
-            max_length=128,
+            max_length=256,
             return_tensors="pt",
         )
         enc = {k: v.to(_device) for k, v in enc.items()}

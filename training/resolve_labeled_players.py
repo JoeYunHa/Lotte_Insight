@@ -53,17 +53,16 @@ INTERVIEW_PATTERNS = (
 )
 
 CLUB_PATTERNS = (
-    "구단",
-    "팬",
-    "사직구장",
     "마케팅",
     "행사",
     "티켓",
-    "유니폼",
     "굿즈",
     "시구",
     "먹거리",
-    "콘텐츠",
+    "팬미팅",
+    "은퇴식",
+    "창단",
+    "김장",
 )
 
 PERFORMANCE_PATTERNS = (
@@ -91,6 +90,8 @@ NON_BASEBALL_PATTERNS = (
     "롯데칠성",
     "롯데건설",
     "롯데컬처웍스",
+    "롯데시네마",
+    "롯데쇼핑",
     "이자비용",
     "금리",
     "증권",
@@ -122,7 +123,7 @@ def resolve_etc_row(row: dict[str, str], clean_players: list[str]) -> tuple[str,
         return "resolved", "CLUB_OPERATION", "club_pattern"
     if contains_any(text, PERFORMANCE_PATTERNS):
         return "resolved", "PERFORMANCE_ANALYSIS", "performance_pattern"
-    if clean_players or row.get("query_player"):
+    if clean_players:
         return "resolved", "PLAYER_RELATED", "player_context"
     return "manual_review", "", "unresolved_etc"
 
@@ -163,6 +164,12 @@ def resolve_review_row(row: dict[str, str]) -> tuple[dict[str, str], bool]:
         if action == "resolved":
             resolved["resolution_secondary_labels"] = "PLAYER_RELATED" if label != "PLAYER_RELATED" and clean_players else ""
             return resolved, True
+        return resolved, False
+
+    text = f"{row.get('title', '')} {row.get('description_snippet', '')}"
+    if contains_any(text, NON_BASEBALL_PATTERNS):
+        resolved["resolution_action"] = "drop"
+        resolved["resolution_reason"] = "non_baseball_orig"
         return resolved, False
 
     resolved["resolution_action"] = "resolved"
@@ -240,6 +247,17 @@ def main() -> None:
             continue
         resolved_rows.append(row)
 
+    # 모든 resolved 행에 대해 비야구 패턴 최종 필터 (orig 행 포함)
+    non_baseball_dropped = 0
+    filtered_rows: list[dict[str, str]] = []
+    for row in resolved_rows:
+        text = f"{row.get('title', '')} {row.get('description_snippet', '')}"
+        if contains_any(text, NON_BASEBALL_PATTERNS):
+            non_baseball_dropped += 1
+        else:
+            filtered_rows.append(row)
+    resolved_rows = filtered_rows
+
     base_fieldnames = list(cleaned_rows[0].keys()) if cleaned_rows else []
     review_fieldnames = list(review_log_rows[0].keys()) if review_log_rows else base_fieldnames + RESOLUTION_COLUMNS
 
@@ -249,6 +267,7 @@ def main() -> None:
 
     print(f"Source rows: {len(source_rows)}")
     print(f"Reviewed rows: {len(review_rows)}")
+    print(f"Non-baseball dropped (final pass): {non_baseball_dropped}")
     print(f"Resolved output: {len(resolved_rows)} -> {args.resolved_output}")
     print(f"Manual review remaining: {len(manual_review_rows)} -> {args.manual_review_output}")
     print(f"Review log rows: {len(review_log_rows)} -> {args.review_log_output}")

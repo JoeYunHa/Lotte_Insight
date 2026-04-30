@@ -1,7 +1,10 @@
-import json
+"""OpenAI API utilities for training data labeling."""
+
+from __future__ import annotations
+
 import sys
 
-import requests
+from openai import OpenAI
 
 from settings import (
     OPENAI_API_KEY,
@@ -10,39 +13,33 @@ from settings import (
     OPENAI_TIMEOUT_SECONDS,
 )
 
+_client: OpenAI | None = None
+
+
+def _get_client() -> OpenAI:
+    global _client
+    if _client is None:
+        _client = OpenAI(api_key=OPENAI_API_KEY, timeout=OPENAI_TIMEOUT_SECONDS)
+    return _client
+
 
 def require_openai_api_key() -> None:
     if not OPENAI_API_KEY:
-        print("[ERROR] OPENAI_API_KEY 환경변수가 없습니다.")
+        print("[ERROR] OPENAI_API_KEY environment variable is missing.")
         sys.exit(1)
 
 
-def chat_json(
-    system_prompt: str,
-    user_content: str,
-    *,
-    max_tokens: int,
-    temperature: float = OPENAI_TEMPERATURE,
-) -> dict:
-    require_openai_api_key()
-
-    response = requests.post(
-        "https://api.openai.com/v1/chat/completions",
-        headers={
-            "Authorization": f"Bearer {OPENAI_API_KEY}",
-            "Content-Type": "application/json",
-        },
-        json={
-            "model": OPENAI_MODEL,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_content},
-            ],
-            "max_tokens": max_tokens,
-            "temperature": temperature,
-            "response_format": {"type": "json_object"},
-        },
-        timeout=OPENAI_TIMEOUT_SECONDS,
+def chat_json(system_prompt: str, user_content: str, max_tokens: int = 500) -> dict:
+    """Call OpenAI chat completion and return parsed JSON response."""
+    response = _get_client().chat.completions.create(
+        model=OPENAI_MODEL,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_content},
+        ],
+        max_tokens=max_tokens,
+        temperature=OPENAI_TEMPERATURE,
+        response_format={"type": "json_object"},
     )
-    response.raise_for_status()
-    return json.loads(response.json()["choices"][0]["message"]["content"])
+    import json
+    return json.loads(response.choices[0].message.content)

@@ -41,14 +41,14 @@ class ArticleDataset(Dataset):
     def __init__(
         self,
         titles: list[str],
-        descriptions: list[str],
+        auxiliary_texts: list[str],
         labels: list[list[float]],
         tokenizer,
-        max_len: int = 128,
+        max_len: int = 256,
     ):
         self.encodings = tokenizer(
             titles,
-            descriptions,
+            auxiliary_texts,
             truncation="only_second",
             padding="max_length",
             max_length=max_len,
@@ -91,6 +91,20 @@ def encode_multihot(labels: list[str]) -> list[float]:
     return encoded
 
 
+def build_auxiliary_text(description_snippet: str, event_summary: str = "") -> str:
+    parts: list[str] = []
+
+    description = str(description_snippet or "").strip()
+    if description:
+        parts.append(description)
+
+    summary = str(event_summary or "").strip()
+    if summary:
+        parts.append(f"요약: {summary}")
+
+    return " [요약정보] ".join(parts)
+
+
 def load_data() -> tuple[list[str], list[str], list[list[float]], list[str]]:
     csv_files = [LABELED_TITLES_CSV, LABELED_PLAYERS_CSV]
     frames = []
@@ -101,6 +115,8 @@ def load_data() -> tuple[list[str], list[str], list[list[float]], list[str]]:
             continue
 
         dataframe = pd.read_csv(path, encoding="utf-8-sig")
+        if "event_summary" not in dataframe.columns:
+            dataframe["event_summary"] = ""
         before = len(dataframe)
         dataframe = dataframe[dataframe["is_lotte_related"].astype(str).str.lower() == "true"].copy()
         removed = before - len(dataframe)
@@ -116,6 +132,7 @@ def load_data() -> tuple[list[str], list[str], list[list[float]], list[str]]:
     dataframe["description_snippet"] = (
         dataframe["description_snippet"].fillna("").astype(str).str[:ARTICLE_SNIPPET_LENGTH].str.strip()
     )
+    dataframe["event_summary"] = dataframe["event_summary"].fillna("").astype(str).str.strip()
     dataframe["label_set"] = dataframe.apply(
         lambda row: normalize_label_set(row.get("primary_label", ""), row.get("secondary_labels", "")),
         axis=1,
@@ -123,7 +140,14 @@ def load_data() -> tuple[list[str], list[str], list[list[float]], list[str]]:
     dataframe = dataframe[dataframe["label_set"].map(bool)].reset_index(drop=True)
 
     titles = dataframe["title"].tolist()
-    descriptions = dataframe["description_snippet"].tolist()
+    auxiliary_texts = [
+        build_auxiliary_text(description, summary)
+        for description, summary in zip(
+            dataframe["description_snippet"].tolist(),
+            dataframe["event_summary"].tolist(),
+            strict=False,
+        )
+    ]
     multilabels = [encode_multihot(label_set) for label_set in dataframe["label_set"]]
     primary_labels = [
         label if label in VALID_LABEL_SET else label_set[0]
@@ -131,6 +155,8 @@ def load_data() -> tuple[list[str], list[str], list[list[float]], list[str]]:
     ]
 
     print(f"\nTotal usable rows: {len(titles)}")
+    with_summary = sum(1 for value in dataframe["event_summary"].tolist() if value)
+    print(f"  Rows with event_summary        {with_summary:>4}")
     label_totals = np.array(multilabels, dtype=np.float32).sum(axis=0)
     for index, label in enumerate(VALID_LABELS):
         print(f"  {label:<25} {int(label_totals[index]):>4} positives")
@@ -138,7 +164,7 @@ def load_data() -> tuple[list[str], list[str], list[list[float]], list[str]]:
     avg_labels = float(np.array(multilabels, dtype=np.float32).sum(axis=1).mean()) if multilabels else 0.0
     print(f"  Avg labels/article          {avg_labels:.2f}")
 
-    return titles, descriptions, multilabels, primary_labels
+    return titles, auxiliary_texts, multilabels, primary_labels
 
 
 def compute_pos_weights(multilabels: list[list[float]]) -> torch.Tensor:
@@ -154,32 +180,58 @@ def compute_pos_weights(multilabels: list[list[float]]) -> torch.Tensor:
     return torch.tensor(weights, dtype=torch.float)
 
 
-def predict_from_logits(logits: torch.Tensor, threshold: float = DEFAULT_PREDICTION_THRESHOLD) -> np.ndarray:
+def predict_from_logits(
+    logits: torch.Tensor,
+    thresholds: dict[str, float] | None = None,
+) -> np.ndarray:
     probs = torch.sigmoid(logits)
-    preds = (probs >= threshold).to(torch.int64)
+    etc_index = VALID_LABELS.index("ETC")
 
-    # Ensure every sample keeps at least one label prediction.
+    threshold_vec = torch.tensor(
+        [thresholds.get(label, DEFAULT_PREDICTION_THRESHOLD) if thresholds else DEFAULT_PREDICTION_THRESHOLD
+         for label in VALID_LABELS],
+        dtype=torch.float,
+        device=logits.device,
+    )
+    preds = (probs >= threshold_vec).to(torch.int64)
+
+    # ETC as fallback: if nothing predicted, assign ETC instead of forcing argmax.
     empty_mask = preds.sum(dim=1) == 0
     if empty_mask.any():
-        top_indices = probs[empty_mask].argmax(dim=1)
-        preds[empty_mask] = 0
-        preds[empty_mask, top_indices] = 1
-
-    # ETC should only be active when no other label is selected.
-    etc_index = VALID_LABELS.index("ETC")
-    other_positive_mask = preds[:, :etc_index].sum(dim=1) + preds[:, etc_index + 1 :].sum(dim=1) > 0
-    preds[other_positive_mask, etc_index] = 0
-
-    # If all labels were cleared by ETC suppression, restore the top scoring non-ETC label.
-    empty_after_cleanup = preds.sum(dim=1) == 0
-    if empty_after_cleanup.any():
-        non_etc_probs = probs[empty_after_cleanup].clone()
-        non_etc_probs[:, etc_index] = -1.0
-        top_indices = non_etc_probs.argmax(dim=1)
-        preds[empty_after_cleanup] = 0
-        preds[empty_after_cleanup, top_indices] = 1
+        preds[empty_mask, etc_index] = 1
 
     return preds.cpu().numpy()
+
+
+def find_optimal_thresholds(y_true: np.ndarray, logits_all: np.ndarray) -> dict[str, float]:
+    """Search per-label thresholds on the validation set to maximise per-label F1."""
+    probs = 1.0 / (1.0 + np.exp(-logits_all))
+    thresholds: dict[str, float] = {}
+    print("\nPer-label optimal thresholds:")
+    for i, label in enumerate(VALID_LABELS):
+        best_t, best_f1 = DEFAULT_PREDICTION_THRESHOLD, 0.0
+        for t in np.arange(0.10, 0.91, 0.05):
+            preds = (probs[:, i] >= t).astype(int)
+            score = f1_score(y_true[:, i], preds, zero_division=0)
+            if score > best_f1:
+                best_f1, best_t = score, float(round(t, 2))
+        thresholds[label] = best_t
+        print(f"  {label:<25} t={best_t:.2f}  F1={best_f1:.4f}")
+    return thresholds
+
+
+def _collect_logits(model, loader, device) -> tuple[np.ndarray, np.ndarray]:
+    model.eval()
+    all_logits: list[np.ndarray] = []
+    all_true: list[np.ndarray] = []
+    with torch.no_grad():
+        for batch in loader:
+            labels_batch = batch.pop("labels").to(device)
+            batch = {key: value.to(device) for key, value in batch.items()}
+            logits = model(**batch).logits
+            all_logits.append(logits.cpu().numpy())
+            all_true.append(labels_batch.cpu().numpy().astype(np.int64))
+    return np.vstack(all_logits), np.vstack(all_true)
 
 
 def train(
@@ -193,11 +245,11 @@ def train(
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"\nDevice: {device}")
 
-    titles, descriptions, multilabels, primary_labels = load_data()
+    titles, auxiliary_texts, multilabels, primary_labels = load_data()
 
-    tr_t, va_t, tr_d, va_d, tr_l, va_l = train_test_split(
+    tr_t, va_t, tr_aux, va_aux, tr_l, va_l = train_test_split(
         titles,
-        descriptions,
+        auxiliary_texts,
         multilabels,
         test_size=DEFAULT_VALIDATION_SPLIT,
         random_state=seed,
@@ -209,15 +261,15 @@ def train(
     model = AutoModelForSequenceClassification.from_pretrained(
         PRETRAINED,
         num_labels=len(VALID_LABELS),
-        problem_type="multi_label_classification",
     ).to(device)
 
-    train_ds = ArticleDataset(tr_t, tr_d, tr_l, tokenizer)
-    val_ds = ArticleDataset(va_t, va_d, va_l, tokenizer)
-    train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(val_ds, batch_size=batch_size)
+    pin = device.type == "cuda"
+    train_ds = ArticleDataset(tr_t, tr_aux, tr_l, tokenizer)
+    val_ds = ArticleDataset(va_t, va_aux, va_l, tokenizer)
+    train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True, num_workers=2, pin_memory=pin)
+    val_loader = DataLoader(val_ds, batch_size=DEFAULT_EVAL_BATCH_SIZE, num_workers=2, pin_memory=pin)
 
-    pos_weights = compute_pos_weights(multilabels).to(device)
+    pos_weights = compute_pos_weights(tr_l).to(device)
     loss_fn = nn.BCEWithLogitsLoss(pos_weight=pos_weights)
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=0.01)
@@ -236,6 +288,7 @@ def train(
         total_loss = 0.0
 
         for batch in train_loader:
+            optimizer.zero_grad()
             labels_batch = batch.pop("labels").to(device)
             batch = {key: value.to(device) for key, value in batch.items()}
             logits = model(**batch).logits
@@ -244,7 +297,6 @@ def train(
             nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             optimizer.step()
             scheduler.step()
-            optimizer.zero_grad()
             total_loss += loss.item()
 
         avg_loss = total_loss / len(train_loader)
@@ -275,15 +327,28 @@ def train(
             print("  Best validation macro-F1 updated, model saved")
 
     print(f"\nTraining complete - best val macro F1: {best_f1:.4f}")
-    return best_f1
+
+    # Load best checkpoint and find per-label optimal thresholds on val set.
+    best_model = AutoModelForSequenceClassification.from_pretrained(str(MODEL_DIR)).to(device)
+    val_logits, val_true = _collect_logits(best_model, val_loader, device)
+    thresholds = find_optimal_thresholds(val_true, val_logits)
+    with (MODEL_DIR / "label_thresholds.json").open("w", encoding="utf-8") as f:
+        json.dump(thresholds, f, ensure_ascii=False, indent=2)
+    print(f"  Thresholds saved → {MODEL_DIR / 'label_thresholds.json'}")
+
+    return best_f1, va_t, va_aux, va_l
 
 
-def evaluate():
+def evaluate(titles=None, auxiliary_texts=None, multilabels=None):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    titles, descriptions, multilabels, _ = load_data()
-    tokenizer, model, labels = _load(MODEL_DIR, device)
+    if titles is None:
+        titles, auxiliary_texts, multilabels, _ = load_data()
+        print("  [Note] Evaluating on full dataset (train+val combined)")
+    tokenizer, model, labels, thresholds = _load(MODEL_DIR, device)
+    if thresholds:
+        print("  Using per-label thresholds from label_thresholds.json")
 
-    dataset = ArticleDataset(titles, descriptions, multilabels, tokenizer)
+    dataset = ArticleDataset(titles, auxiliary_texts, multilabels, tokenizer)
     loader = DataLoader(dataset, batch_size=DEFAULT_EVAL_BATCH_SIZE)
 
     model.eval()
@@ -293,7 +358,7 @@ def evaluate():
             labels_batch = batch.pop("labels")
             batch = {key: value.to(device) for key, value in batch.items()}
             logits = model(**batch).logits
-            all_preds.append(predict_from_logits(logits))
+            all_preds.append(predict_from_logits(logits, thresholds))
             all_true.append(labels_batch.numpy().astype(np.int64))
 
     y_pred = np.vstack(all_preds)
@@ -320,7 +385,12 @@ def _load(model_dir, device):
     with (model_dir / "label_encoder.json").open(encoding="utf-8") as file:
         labels = json.load(file)
     model = AutoModelForSequenceClassification.from_pretrained(str(model_dir)).to(device)
-    return tokenizer, model, labels
+    thresholds_path = model_dir / "label_thresholds.json"
+    thresholds: dict[str, float] | None = None
+    if thresholds_path.exists():
+        with thresholds_path.open(encoding="utf-8") as file:
+            thresholds = json.load(file)
+    return tokenizer, model, labels, thresholds
 
 
 def main():
@@ -335,9 +405,9 @@ def main():
         evaluate()
         return
 
-    best_f1 = train(epochs=args.epochs, lr=args.lr, batch_size=args.batch)
-    print("\nFinal full-data evaluation")
-    evaluate()
+    best_f1, va_t, va_aux, va_l = train(epochs=args.epochs, lr=args.lr, batch_size=args.batch)
+    print("\nFinal validation-set evaluation (best checkpoint)")
+    evaluate(va_t, va_aux, va_l)
     if best_f1 < DEFAULT_MIN_MACRO_F1:
         print(f"\n[WARN] macro F1 {best_f1:.4f} < target {DEFAULT_MIN_MACRO_F1:.2f}")
         print("  Recommend: more data, threshold tuning, or label cleanup")

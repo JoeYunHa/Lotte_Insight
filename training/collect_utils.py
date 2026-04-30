@@ -29,6 +29,9 @@ from settings import (
     OPENAI_LABEL_MAX_TOKENS,
     OPENAI_LABEL_MAX_WORKERS,
     OPENAI_MODEL,
+    OPENAI_SUMMARY_BATCH_SIZE,
+    OPENAI_SUMMARY_MAX_TOKENS,
+    OPENAI_SUMMARY_MAX_WORKERS,
 )
 
 CSV_HEADERS = [
@@ -44,6 +47,11 @@ CSV_HEADERS = [
     "confidence_note",
     "detected_players",
     "is_lotte_related",
+    "event_summary",
+    "key_players",
+    "lotte_stance",
+    "game_ref",
+    "game_context",
 ]
 
 LEGACY_CSV_HEADERS = [
@@ -89,6 +97,31 @@ Return:
       "primary_label": "MATCH_RELATED",
       "secondary_labels": ["INTERVIEW"],
       "is_lotte_related": true
+    }
+  ]
+}"""
+
+SUMMARY_SYSTEM_PROMPT = """You generate structured Korean article summaries for Lotte Giants news.
+
+Return compact JSON only.
+
+Rules:
+- Use only the provided title, description snippet, article date, label, and game context.
+- Do not invent facts that are not directly supported by the inputs.
+- `event_summary` must be one Korean sentence, typically 30-80 characters.
+- `key_players` must include 0-3 player names actually supported by the inputs.
+- `lotte_stance` must be one of: positive, negative, neutral.
+- `game_ref` is true only when the summary meaningfully uses the game context.
+
+Return:
+{
+  "items": [
+    {
+      "index": 0,
+      "event_summary": "롯데가 ...",
+      "key_players": ["선수1"],
+      "lotte_stance": "positive",
+      "game_ref": true
     }
   ]
 }"""
@@ -144,6 +177,26 @@ NON_BASEBALL_KEYWORDS = (
 
 INJURY_KEYWORDS = ("부상", "재활", "말소", "복귀", "엔트리", "등록", "결장", "수술")
 TRANSACTION_KEYWORDS = ("영입", "방출", "트레이드", "계약", "fa", "입단", "이적", "재계약")
+
+
+# Removed a previously corrupted keyword block.
+
+
+LOTTE_SIGNAL_KEYWORDS = ("롯데", "사직", "부산", "kbo", "프로야구")
+MLB_GIANTS_EXPLICIT_KEYWORDS = (
+    "샌프란시스코",
+    "샌프 자이언츠",
+    "sf 자이언츠",
+    "san francisco giants",
+    "oracle park",
+)
+MLB_GIANTS_CONTEXT_KEYWORDS = (
+    "mlb",
+    "메이저리그",
+    "빅리그",
+    "내셔널리그",
+    "nl 서부",
+)
 
 
 def clean_html(text: str) -> str:
@@ -322,6 +375,8 @@ def collect_news_by_keywords(
             url = row.pop("_url")
             if not url:
                 continue
+            if is_mlb_giants_article(row):
+                continue
             if days_cutoff and row["published_at"] < days_cutoff:
                 continue
             if row["title"] in skip_titles:
@@ -356,6 +411,25 @@ def collect_news_by_keywords(
 def _contains_any(text: str, keywords: tuple[str, ...]) -> bool:
     lowered = text.lower()
     return any(keyword.lower() in lowered for keyword in keywords)
+
+
+def is_mlb_giants_article(row: dict, ensure_players: list[str] | None = None) -> bool:
+    text = f"{row.get('title', '')} {row.get('description_snippet', '')}".strip()
+    if not text:
+        return False
+
+    has_lotte_signal = _contains_any(text, LOTTE_SIGNAL_KEYWORDS)
+    has_lotte_player = any(player in text for player in (ensure_players or []))
+    if has_lotte_signal or has_lotte_player:
+        return False
+
+    if _contains_any(text, MLB_GIANTS_EXPLICIT_KEYWORDS):
+        return True
+
+    lowered = text.lower()
+    has_giants = "자이언츠" in lowered or "giants" in lowered
+    has_mlb_context = _contains_any(text, MLB_GIANTS_CONTEXT_KEYWORDS)
+    return has_giants and has_mlb_context
 
 
 def _detect_players_local(row: dict, ensure_players: list[str] | None = None) -> list[str]:
@@ -404,6 +478,16 @@ def _rule_label_row(row: dict, ensure_players: list[str] | None = None) -> dict 
             False,
             confidence_score=RULE_CONFIDENCE_SCORE,
             detected_players=detected_players,
+        )
+
+    if is_mlb_giants_article(row, ensure_players=ensure_players):
+        return _normalize_result(
+            "ETC",
+            [],
+            False,
+            confidence_score=RULE_CONFIDENCE_SCORE,
+            detected_players=detected_players,
+            confidence_note="excluded_mlb_giants",
         )
 
     has_baseball = _contains_any(text, BASEBALL_KEYWORDS)
@@ -457,7 +541,27 @@ def _build_batch_payload(batch: list[tuple[int, dict, str]]) -> str:
     return "\n".join(lines)
 
 
-def _parse_batch_response(response: dict, expected_indexes: set[int]) -> dict[int, dict]:
+def _build_summary_batch_payload(batch: list[tuple[int, dict]]) -> str:
+    lines = ["Summarize each item and return JSON with an `items` array."]
+    for output_index, row in batch:
+        lines.append(f"\n[index={output_index}]")
+        lines.append(f"title: {row.get('title', '')}")
+        description = row.get("description_snippet", "")
+        if description:
+            lines.append(f"description: {description}")
+        published_at = row.get("published_at", "")
+        if published_at:
+            lines.append(f"published_at: {published_at}")
+        primary_label = row.get("primary_label", "")
+        if primary_label:
+            lines.append(f"topic_label: {primary_label}")
+        game_context = row.get("game_context", "")
+        if game_context:
+            lines.append(f"game_context: {game_context}")
+    return "\n".join(lines)
+
+
+def _parse_batch_response(response: dict, expected_indexes: set[int]) -> tuple[dict[int, dict], set[int]]:
     items = response.get("items")
     if not isinstance(items, list):
         raise ValueError("Missing items array in GPT response")
@@ -472,11 +576,11 @@ def _parse_batch_response(response: dict, expected_indexes: set[int]) -> dict[in
 
     missing = expected_indexes - set(parsed)
     if missing:
-        raise ValueError(f"Incomplete GPT batch response. Missing indexes: {sorted(missing)}")
-    return parsed
+        print(f"  [WARN] GPT partial response - missing {len(missing)} of {len(expected_indexes)} indexes: {sorted(missing)}")
+    return parsed, missing
 
 
-def call_label_gpt_batch(batch: list[tuple[int, dict, str]]) -> dict[int, dict]:
+def call_label_gpt_batch(batch: list[tuple[int, dict, str]]) -> tuple[dict[int, dict], set[int]]:
     response = chat_json(
         LABELING_SYSTEM_PROMPT,
         _build_batch_payload(batch),
@@ -485,16 +589,62 @@ def call_label_gpt_batch(batch: list[tuple[int, dict, str]]) -> dict[int, dict]:
     return _parse_batch_response(response, {output_index for output_index, _row, _extra in batch})
 
 
+def call_summary_gpt_batch(batch: list[tuple[int, dict]]) -> tuple[dict[int, dict], set[int]]:
+    response = chat_json(
+        SUMMARY_SYSTEM_PROMPT,
+        _build_summary_batch_payload(batch),
+        max_tokens=OPENAI_SUMMARY_MAX_TOKENS,
+    )
+    return _parse_batch_response(response, {output_index for output_index, _row in batch})
+
+
 def safe_label(result: dict, row: dict, ensure_players: list[str] | None = None, *, source: str) -> dict:
     detected_players = _detect_players_local(row, ensure_players=ensure_players)
     confidence = RULE_CONFIDENCE_SCORE if source == "rule" else GPT_CONFIDENCE_SCORE
-    return _normalize_result(
+    normalized = _normalize_result(
         str(result.get("primary_label", "ETC")),
         result.get("secondary_labels") or [],
         bool(result.get("is_lotte_related", True)),
         confidence_score=confidence,
         detected_players=detected_players,
     )
+    if is_mlb_giants_article(row, ensure_players=ensure_players):
+        normalized["is_lotte_related"] = "false"
+        normalized["confidence_note"] = (
+            f"{normalized.get('confidence_note', '')};excluded_mlb_giants"
+        ).strip(";")
+    return normalized
+
+
+def _normalize_summary_result(result: dict, row: dict) -> dict:
+    key_players = result.get("key_players") or []
+    if not isinstance(key_players, list):
+        key_players = []
+
+    normalized_players: list[str] = []
+    for player in key_players:
+        player_name = str(player or "").strip()
+        if player_name and player_name not in normalized_players:
+            normalized_players.append(player_name)
+        if len(normalized_players) >= 3:
+            break
+
+    stance = str(result.get("lotte_stance", "neutral")).strip().lower()
+    if stance not in {"positive", "negative", "neutral"}:
+        stance = "neutral"
+
+    game_ref = str(bool(result.get("game_ref", False))).lower()
+    event_summary = str(result.get("event_summary", "") or "").strip()
+    if not event_summary:
+        fallback = f"{row.get('title', '')} {row.get('description_snippet', '')}".strip()
+        event_summary = fallback[:80].strip()
+
+    return {
+        "event_summary": event_summary,
+        "key_players": ";".join(normalized_players),
+        "lotte_stance": stance,
+        "game_ref": game_ref,
+    }
 
 
 def _iter_batches(items: list[tuple[int, dict, str]], batch_size: int) -> list[list[tuple[int, dict, str]]]:
@@ -502,16 +652,56 @@ def _iter_batches(items: list[tuple[int, dict, str]], batch_size: int) -> list[l
 
 
 def _label_batch(batch: list[tuple[int, dict, str]], ensure_map: dict[int, list[str]]) -> list[tuple[int, dict]]:
-    parsed = call_label_gpt_batch(batch)
+    parsed, missing = call_label_gpt_batch(batch)
     labeled: list[tuple[int, dict]] = []
     for output_index, row, _extra_context in batch:
-        labeled.append(
-            (
-                output_index,
-                safe_label(parsed[output_index], row, ensure_players=ensure_map.get(output_index), source="gpt"),
+        if output_index in parsed:
+            labeled.append(
+                (
+                    output_index,
+                    safe_label(parsed[output_index], row, ensure_players=ensure_map.get(output_index), source="gpt"),
+                )
             )
-        )
+        else:
+            # GPT가 이 인덱스를 누락 — 배치 전체 실패 대신 해당 행만 0점으로 표시
+            labeled.append(
+                (
+                    output_index,
+                    _normalize_result(
+                        "ETC",
+                        [],
+                        True,
+                        confidence_score=0.0,
+                        detected_players=_detect_players_local(row, ensure_players=ensure_map.get(output_index)),
+                        confidence_note="gpt_missing_index",
+                    ),
+                )
+            )
     return labeled
+
+
+def _summary_batch(batch: list[tuple[int, dict]]) -> list[tuple[int, dict]]:
+    parsed, _missing = call_summary_gpt_batch(batch)
+    summarized: list[tuple[int, dict]] = []
+    for output_index, row in batch:
+        if output_index in parsed:
+            summarized.append((output_index, _normalize_summary_result(parsed[output_index], row)))
+        else:
+            summarized.append(
+                (
+                    output_index,
+                    _normalize_summary_result(
+                        {
+                            "event_summary": "",
+                            "key_players": [],
+                            "lotte_stance": "neutral",
+                            "game_ref": False,
+                        },
+                        row,
+                    ),
+                )
+            )
+    return summarized
 
 
 def auto_label(
@@ -584,7 +774,98 @@ def auto_label(
                 print(f"  GPT progress {completed:>4}/{len(gpt_candidates)}  success {ok}  fail {fail}")
                 time.sleep(AUTO_LABEL_SLEEP_SECONDS)
 
+    for output_index, row in enumerate(rows):
+        ensure_players = ensure_map.get(output_index)
+        if is_mlb_giants_article(row, ensure_players=ensure_players):
+            rows[output_index]["is_lotte_related"] = "false"
+            rows[output_index]["confidence_note"] = (
+                f"{rows[output_index].get('confidence_note', '')};excluded_mlb_giants"
+            ).strip(";")
+
     print(f"Auto labeling complete - success {ok} / fail {fail}")
+    return rows
+
+
+def build_game_context_for_row(row: dict) -> str:
+    published_at = str(row.get("published_at", "") or "").strip()
+    if not published_at:
+        return "해당 날짜 경기 없음"
+
+    try:
+        parsed = datetime.fromisoformat(published_at.replace("Z", "+00:00"))
+    except ValueError:
+        try:
+            parsed = datetime.strptime(published_at[:19], "%Y-%m-%dT%H:%M:%S")
+        except ValueError:
+            return "해당 날짜 경기 없음"
+
+    from collect_game_results import format_game_context, lookup_game
+
+    game = lookup_game(parsed.date(), hour=parsed.hour)
+    return format_game_context(game)
+
+
+def add_structured_summaries(
+    rows: list[dict],
+    *,
+    overwrite: bool = False,
+    game_context_fn: Callable[[dict], str] | None = None,
+) -> list[dict]:
+    require_openai_api_key()
+
+    candidates: list[tuple[int, dict]] = []
+    for index, row in enumerate(rows):
+        if game_context_fn:
+            row["game_context"] = game_context_fn(row)
+        else:
+            row["game_context"] = row.get("game_context", "") or build_game_context_for_row(row)
+
+        has_summary = bool(str(row.get("event_summary", "") or "").strip())
+        if overwrite or not has_summary:
+            candidates.append((index, row))
+
+    if not candidates:
+        print("Structured summaries already exist for all rows.")
+        return rows
+
+    print(
+        f"\nStructured summary generation start - {len(candidates)} rows "
+        f"(model: {OPENAI_MODEL}, workers: {OPENAI_SUMMARY_MAX_WORKERS})"
+    )
+
+    batches = _iter_batches(candidates, OPENAI_SUMMARY_BATCH_SIZE)
+    completed = 0
+    fail = 0
+    with ThreadPoolExecutor(max_workers=OPENAI_SUMMARY_MAX_WORKERS) as executor:
+        future_map = {executor.submit(_summary_batch, batch): batch for batch in batches}
+        for future in as_completed(future_map):
+            batch = future_map[future]
+            completed += len(batch)
+            try:
+                summarized_batch = future.result()
+                for output_index, summarized in summarized_batch:
+                    rows[output_index].update(summarized)
+            except Exception as exc:
+                fail += len(batch)
+                for output_index, row in batch:
+                    rows[output_index].update(
+                        _normalize_summary_result(
+                            {
+                                "event_summary": "",
+                                "key_players": [],
+                                "lotte_stance": "neutral",
+                                "game_ref": False,
+                            },
+                            row,
+                        )
+                    )
+                    rows[output_index]["confidence_note"] = (
+                        f"{rows[output_index].get('confidence_note', '')};summary_failed:{exc}"
+                    ).strip(";")
+            print(f"  Summary progress {completed:>4}/{len(candidates)}  fail {fail}")
+            time.sleep(AUTO_LABEL_SLEEP_SECONDS)
+
+    print(f"Structured summary generation complete - rows {len(candidates)} / fail {fail}")
     return rows
 
 
@@ -633,6 +914,11 @@ def _load_existing_rows(out_csv) -> tuple[list[dict], list[str]]:
     return rows, fieldnames
 
 
+def load_csv_rows(out_csv) -> list[dict]:
+    rows, _fieldnames = _load_existing_rows(out_csv)
+    return rows
+
+
 def write_csv(rows: list[dict], out_csv, append: bool) -> int:
     out_csv.parent.mkdir(parents=True, exist_ok=True)
 
@@ -674,6 +960,16 @@ def write_csv(rows: list[dict], out_csv, append: bool) -> int:
     return len(rows)
 
 
+def rewrite_csv(rows: list[dict], out_csv) -> int:
+    out_csv.parent.mkdir(parents=True, exist_ok=True)
+    with out_csv.open("w", encoding="utf-8-sig", newline="") as file:
+        writer = csv.DictWriter(file, fieldnames=CSV_HEADERS, extrasaction="ignore")
+        writer.writeheader()
+        for row in rows:
+            writer.writerow(_normalize_csv_row(row))
+    return len(rows)
+
+
 def print_stats(rows: list[dict]) -> None:
     counts: Counter[str] = Counter()
     low_confidence_count = 0
@@ -702,12 +998,17 @@ __all__ = [
     "build_days_cutoff",
     "clean_html",
     "collect_news_by_keywords",
+    "add_structured_summaries",
+    "build_game_context_for_row",
     "fetch_naver",
     "fetch_naver_all",
     "item_to_row",
+    "is_mlb_giants_article",
+    "load_csv_rows",
     "load_existing_label_counts",
     "load_existing_titles",
     "parse_pub_date",
     "print_stats",
+    "rewrite_csv",
     "write_csv",
 ]
