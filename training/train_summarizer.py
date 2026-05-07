@@ -9,6 +9,7 @@ import math
 
 import numpy as np
 import pandas as pd
+from rouge_score import rouge_scorer as _rouge_scorer_lib
 from sklearn.model_selection import train_test_split
 from transformers import (
     AutoModelForSeq2SeqLM,
@@ -177,8 +178,11 @@ def compute_metrics(eval_pred):
     pred_texts = tokenizer_for_metrics.batch_decode(predictions, skip_special_tokens=True)
     label_texts = tokenizer_for_metrics.batch_decode(labels, skip_special_tokens=True)
 
+    scorer = _rouge_scorer_lib.RougeScorer(["rougeL"], use_stemmer=False)
+
     exact_match = 0
     char_f1_total = 0.0
+    rouge_l_total = 0.0
 
     for pred_text, label_text in zip(pred_texts, label_texts, strict=False):
         pred_text = pred_text.strip()
@@ -186,11 +190,14 @@ def compute_metrics(eval_pred):
         if pred_text == label_text:
             exact_match += 1
         char_f1_total += _char_f1(pred_text, label_text)
+        if label_text:
+            rouge_l_total += scorer.score(label_text, pred_text)["rougeL"].fmeasure
 
     total = max(len(pred_texts), 1)
     return {
         "exact_match": exact_match / total,
         "char_f1": char_f1_total / total,
+        "rouge_l": rouge_l_total / total,
     }
 
 
