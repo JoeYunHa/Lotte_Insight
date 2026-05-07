@@ -173,6 +173,7 @@ def compute_metrics(eval_pred):
         predictions = predictions[0]
 
     labels = np.where(labels != -100, labels, 0)
+    predictions = np.clip(predictions, 0, tokenizer_for_metrics.vocab_size - 1)
     pred_texts = tokenizer_for_metrics.batch_decode(predictions, skip_special_tokens=True)
     label_texts = tokenizer_for_metrics.batch_decode(labels, skip_special_tokens=True)
 
