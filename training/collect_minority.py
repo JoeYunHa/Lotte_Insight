@@ -5,26 +5,91 @@ from __future__ import annotations
 import argparse
 from collections import Counter
 
-from collect_for_labeling import build_keywords, filter_photo_captions, filter_rows_by_primary_labels
+from collect_for_labeling import build_keywords, filter_photo_captions
 from collect_utils import (
+    BASEBALL_KEYWORDS,
+    NON_BASEBALL_KEYWORDS,
     apply_label_cap,
     auto_label,
     build_days_cutoff,
     collect_news_by_keywords,
+    is_mlb_giants_article,
     load_existing_label_counts,
     load_existing_titles,
     print_stats,
     write_csv,
 )
-from settings import LABELED_TITLES_CSV, NAVER_DISPLAY_LIMIT
+from settings import LABELED_TITLES_CSV, NAVER_DISPLAY_LIMIT, TEAM_ALIASES
 
-# 라벨별 수집 설정: days=조회 기간, count=수집 목표, cap=CSV 누적 상한
+# 라벨별 수집 설정
+# direct=True: GPT 라벨 필터 없이 수집 키워드 기반으로 라벨 직접 부여
+#   - INTERVIEW·CLUB_OPERATION은 경기 내용과 겹쳐 GPT가 항상 고우선순위 라벨을 선택하므로
+#     키워드 특이도(specificity)에 의존한 직접 부여 방식을 사용한다.
+# direct=False: GPT 라벨링 후 primary/secondary 필터 적용 (기존 방식)
 MINORITY_CONFIG: dict[str, dict] = {
-    "INTERVIEW":            {"days": 30,  "count": 200, "cap": 200},
-    "CLUB_OPERATION":       {"days": 90,  "count": 150, "cap": 150},
-    "TRANSACTION_CONTRACT": {"days": 180, "count": 200, "cap": 200},
-    "PERFORMANCE_ANALYSIS": {"days": 60,  "count": 200, "cap": 250},
+    "INTERVIEW":            {"days": 365, "count": 200, "cap": 200, "direct": True},
+    "CLUB_OPERATION":       {"days": 365, "count": 150, "cap": 150, "direct": True},
+    "TRANSACTION_CONTRACT": {"days": 365, "count": 200, "cap": 200, "direct": False},
+    "PERFORMANCE_ANALYSIS": {"days": 180, "count": 200, "cap": 250, "direct": False},
 }
+
+
+def _has_any(text: str, keywords: tuple) -> bool:
+    lowered = text.lower()
+    return any(kw.lower() in lowered for kw in keywords)
+
+
+def _direct_assign(rows: list[dict], target_label: str) -> list[dict]:
+    """GPT 라벨링 없이 기본 필터만 적용하고 target_label을 직접 부여한다.
+
+    통과 조건:
+    - 비야구 키워드 단독 존재 시 제외
+    - MLB 자이언츠 기사 제외
+    - 롯데 관련 키워드 없으면 제외
+    """
+    result: list[dict] = []
+    for row in rows:
+        text = f"{row.get('title', '')} {row.get('description_snippet', '')}"
+        if _has_any(text, NON_BASEBALL_KEYWORDS) and not _has_any(text, BASEBALL_KEYWORDS):
+            continue
+        if is_mlb_giants_article(row):
+            continue
+        if not any(alias in text for alias in TEAM_ALIASES):
+            continue
+        row = dict(row)
+        row["primary_label"] = target_label
+        row["secondary_labels"] = ""
+        row["confidence_score"] = "1.0"
+        row["confidence_note"] = "direct_keyword"
+        row["is_lotte_related"] = "true"
+        result.append(row)
+    return result
+
+
+def _filter_and_promote(rows: list[dict], target_label: str) -> list[dict]:
+    """primary 또는 secondary에 target_label이 있는 행만 유지.
+
+    secondary에만 있는 경우 primary를 target_label로 승격한다.
+    GPT가 이미 해당 라벨을 인정했으므로 학습 데이터 품질이 유지된다.
+    """
+    result: list[dict] = []
+    promoted = 0
+    for row in rows:
+        primary = row.get("primary_label", "")
+        secondary_raw = row.get("secondary_labels", "") or ""
+        secondaries = [s.strip() for s in secondary_raw.split(";") if s.strip()]
+
+        if primary == target_label:
+            result.append(row)
+        elif target_label in secondaries:
+            row = dict(row)
+            row["primary_label"] = target_label
+            result.append(row)
+            promoted += 1
+
+    if promoted:
+        print(f"  secondary→primary 승격: {promoted}건")
+    return result
 
 
 def _run_label(
@@ -66,9 +131,13 @@ def _run_label(
     if not rows or dry_run:
         return rows
 
-    rows = auto_label(rows)
-    rows = filter_rows_by_primary_labels(rows, [label])
-    print(f"  라벨 필터 후: {len(rows)}건")
+    if cfg.get("direct"):
+        rows = _direct_assign(rows, label)
+        print(f"  직접 부여 후: {len(rows)}건")
+    else:
+        rows = auto_label(rows)
+        rows = _filter_and_promote(rows, label)
+        print(f"  라벨 필터 후: {len(rows)}건")
 
     rows, discarded = apply_label_cap(rows, existing_counts, cap)
     if discarded:
@@ -98,8 +167,8 @@ def main() -> None:
     parser.add_argument(
         "--per-keyword",
         type=int,
-        default=NAVER_DISPLAY_LIMIT,
-        help="키워드당 최대 수집 건수",
+        default=300,
+        help="키워드당 최대 수집 건수 (기본=300, 100 초과 시 페이지네이션 자동 적용)",
     )
     parser.add_argument("--dry-run", action="store_true", help="수집만 수행, 라벨링·저장 건너뜀")
     parser.add_argument("--overwrite", action="store_true", help="기존 CSV 덮어쓰기")

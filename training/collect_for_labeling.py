@@ -5,13 +5,16 @@ from __future__ import annotations
 import argparse
 
 from collect_utils import (
+    add_structured_summaries,
     apply_label_cap,
     auto_label,
     build_days_cutoff,
     collect_news_by_keywords,
+    load_csv_rows,
     load_existing_label_counts,
     load_existing_titles,
     print_stats,
+    rewrite_csv,
     write_csv,
 )
 from settings import (
@@ -110,7 +113,28 @@ def main() -> None:
     )
     parser.add_argument("--no-label", action="store_true", help="Skip GPT labeling")
     parser.add_argument("--overwrite", action="store_true", help="Overwrite the output CSV")
+    parser.add_argument(
+        "--add-summaries",
+        action="store_true",
+        help="기존 CSV에서 event_summary 없는 행에 GPT 요약을 채운다 (새 수집 없이 단독 실행 가능)",
+    )
     args = parser.parse_args()
+
+    # --add-summaries 단독 실행: 기존 CSV event_summary 백필 후 종료
+    if args.add_summaries:
+        if not LABELED_TITLES_CSV.exists():
+            print(f"[ERROR] {LABELED_TITLES_CSV} 없음")
+            return
+        rows = load_csv_rows(LABELED_TITLES_CSV)
+        missing = sum(1 for r in rows if not str(r.get("event_summary", "")).strip())
+        print(f"기존 CSV: {len(rows)}행  event_summary 없음: {missing}행")
+        if missing == 0:
+            print("모든 행에 event_summary 있음 — 종료")
+            return
+        rows = add_structured_summaries(rows)
+        saved = rewrite_csv(rows, LABELED_TITLES_CSV)
+        print(f"백필 완료: {saved}행 저장")
+        return
 
     cutoff = build_days_cutoff(args.days)
     per_keyword = max(1, min(args.per_keyword, NAVER_MAX_START))

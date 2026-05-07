@@ -40,7 +40,7 @@ def _get_roster(player_filter: str | None) -> list[str]:
     return roster
 
 
-def collect_by_player(roster: list[str], days_cutoff: str | None) -> list[dict]:
+def collect_by_player(roster: list[str], days_cutoff: str | None, per_keyword: int = NAVER_DISPLAY_LIMIT) -> list[dict]:
     def enrich_row(keyword: str, _row: dict) -> dict:
         return {"_search_player": keyword.removeprefix(f"{TEAM_NAME_KO} ")}
 
@@ -48,6 +48,7 @@ def collect_by_player(roster: list[str], days_cutoff: str | None) -> list[dict]:
     return collect_news_by_keywords(
         keywords,
         days_cutoff=days_cutoff,
+        per_keyword_limit=per_keyword,
         per_keyword_dedupe=True,
         row_enricher=enrich_row,
         display=NAVER_DISPLAY_LIMIT,
@@ -139,17 +140,25 @@ def main():
     parser.add_argument("--no-label", action="store_true", help="라벨링 건너뜀")
     parser.add_argument("--overwrite", action="store_true", help="CSV 초기화")
     parser.add_argument("--player", type=str, default=None, help="특정 선수만 수집")
+    parser.add_argument(
+        "--per-keyword",
+        type=int,
+        default=NAVER_DISPLAY_LIMIT,
+        help=f"선수당 최대 수집 건수 (기본={NAVER_DISPLAY_LIMIT}, 최대 1000, 100 초과 시 페이지네이션)",
+    )
     args = parser.parse_args()
 
     cutoff = build_days_cutoff(args.days)
 
+    per_keyword = max(1, min(args.per_keyword, 1000))
+
     print("[1/6] KBO 로스터 수집 (Playwright) ...")
     roster = _get_roster(args.player)
     print(f"      선수 {len(roster)}명: {', '.join(roster)}")
-    print(f"      (선수당 Naver API 최대 {NAVER_DISPLAY_LIMIT}건)\n")
+    print(f"      (선수당 최대 {per_keyword}건)\n")
 
     print("[2/6] 선수별 뉴스 수집")
-    rows = collect_by_player(roster, cutoff)
+    rows = collect_by_player(roster, cutoff, per_keyword=per_keyword)
     print(f"      수집 완료: {len(rows)}건\n")
 
     print("[3/6] 전처리 필터링")
