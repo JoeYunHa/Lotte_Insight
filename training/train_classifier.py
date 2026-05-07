@@ -28,6 +28,7 @@ from settings import (
     DEFAULT_TRAIN_SEED,
     DEFAULT_TRAIN_WARMUP_RATIO,
     DEFAULT_VALIDATION_SPLIT,
+    FALLBACK_ONLY_LABELS,
     LABEL_MIN_THRESHOLDS,
     LABELED_PLAYERS_CSV,
     LABELED_TITLES_CSV,
@@ -192,7 +193,12 @@ def predict_from_logits(
     )
     preds = (probs >= threshold_vec).to(torch.int64)
 
-    # ETC as fallback: if nothing predicted, assign ETC instead of forcing argmax.
+    # Suppress direct prediction for fallback-only labels (e.g. ETC).
+    for label in FALLBACK_ONLY_LABELS:
+        if label in VALID_LABELS:
+            preds[:, VALID_LABELS.index(label)] = 0
+
+    # ETC as fallback: assign only when nothing else fires.
     empty_mask = preds.sum(dim=1) == 0
     if empty_mask.any():
         preds[empty_mask, etc_index] = 1
@@ -206,6 +212,10 @@ def find_optimal_thresholds(y_true: np.ndarray, logits_all: np.ndarray) -> dict[
     thresholds: dict[str, float] = {}
     print("\nPer-label optimal thresholds:")
     for i, label in enumerate(VALID_LABELS):
+        if label in FALLBACK_ONLY_LABELS:
+            thresholds[label] = 1.0  # never fires directly; assigned via fallback
+            print(f"  {label:<25} t=fallback  (residual — direct prediction suppressed)")
+            continue
         min_t = LABEL_MIN_THRESHOLDS.get(label, 0.0)
         best_t = max(DEFAULT_PREDICTION_THRESHOLD, min_t)
         best_f1 = 0.0
