@@ -28,6 +28,7 @@ from settings import (
     DEFAULT_TRAIN_SEED,
     DEFAULT_TRAIN_WARMUP_RATIO,
     DEFAULT_VALIDATION_SPLIT,
+    LABEL_MIN_THRESHOLDS,
     LABELED_PLAYERS_CSV,
     LABELED_TITLES_CSV,
     MODEL_DIR,
@@ -141,12 +142,8 @@ def load_data() -> tuple[list[str], list[str], list[list[float]], list[str]]:
 
     titles = dataframe["title"].tolist()
     auxiliary_texts = [
-        build_auxiliary_text(description, summary)
-        for description, summary in zip(
-            dataframe["description_snippet"].tolist(),
-            dataframe["event_summary"].tolist(),
-            strict=False,
-        )
+        build_auxiliary_text(description)
+        for description in dataframe["description_snippet"].tolist()
     ]
     multilabels = [encode_multihot(label_set) for label_set in dataframe["label_set"]]
     primary_labels = [
@@ -209,8 +206,12 @@ def find_optimal_thresholds(y_true: np.ndarray, logits_all: np.ndarray) -> dict[
     thresholds: dict[str, float] = {}
     print("\nPer-label optimal thresholds:")
     for i, label in enumerate(VALID_LABELS):
-        best_t, best_f1 = DEFAULT_PREDICTION_THRESHOLD, 0.0
+        min_t = LABEL_MIN_THRESHOLDS.get(label, 0.0)
+        best_t = max(DEFAULT_PREDICTION_THRESHOLD, min_t)
+        best_f1 = 0.0
         for t in np.arange(0.10, 0.91, 0.05):
+            if round(t, 2) < round(min_t, 2):
+                continue
             preds = (probs[:, i] >= t).astype(int)
             score = f1_score(y_true[:, i], preds, zero_division=0)
             if score > best_f1:
@@ -264,10 +265,11 @@ def train(
     ).to(device)
 
     pin = device.type == "cuda"
+    num_workers = 2 if device.type == "cuda" else 0
     train_ds = ArticleDataset(tr_t, tr_aux, tr_l, tokenizer)
     val_ds = ArticleDataset(va_t, va_aux, va_l, tokenizer)
-    train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True, num_workers=2, pin_memory=pin)
-    val_loader = DataLoader(val_ds, batch_size=DEFAULT_EVAL_BATCH_SIZE, num_workers=2, pin_memory=pin)
+    train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=pin)
+    val_loader = DataLoader(val_ds, batch_size=DEFAULT_EVAL_BATCH_SIZE, num_workers=num_workers, pin_memory=pin)
 
     pos_weights = compute_pos_weights(tr_l).to(device)
     loss_fn = nn.BCEWithLogitsLoss(pos_weight=pos_weights)
