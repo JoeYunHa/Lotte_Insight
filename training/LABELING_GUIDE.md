@@ -53,7 +53,6 @@ Each article should have one primary label and may have multiple secondary label
 | Label                  | Definition                                                                                                                                           | Typical Title Signals                                                            | Examples                                    |
 | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- | ------------------------------------------- |
 | `MATCH_RELATED`        | Articles mainly about a specific game, game result, lineup, starting pitcher, bullpen, batting order, win/loss, or game review                       | 경기, 승리, 패배, 선발, 불펜, 타선, 라인업, 연승, 연패, 끝내기, 역전, 완봉, 이닝 | "롯데, 삼성 꺾고 3연승"                     |
-| `PLAYER_RELATED`       | Articles mainly focused on a specific player, excluding injury/roster and pure performance-analysis cases                                            | 선수명, 활약, 복귀, 주전 경쟁, 기대주, 베테랑, 신인, 외국인 선수                 | "윤동희, 롯데 외야의 중심으로 성장"         |
 | `INJURY_ROSTER`        | Articles mainly about injury, rehabilitation, return from injury, roster registration, roster removal, call-up, demotion, or Futures League movement | 부상, 재활, 복귀, 말소, 등록, 콜업, 1군 합류, 2군행, 엔트리, 퓨처스              | "나승엽, 부상 회복 후 1군 복귀"             |
 | `INTERVIEW`            | Articles mainly centered on direct comments from a manager, coach, player, or official                                                               | 인터뷰, 밝혔다, 말했다, 전했다, 설명했다, 강조했다, 따옴표 인용                  | "김태형 감독 '선발진 안정이 중요하다'"      |
 | `PERFORMANCE_ANALYSIS` | Articles mainly interpreting statistics, records, rankings, trends, or performance metrics                                                           | 타율, ERA, OPS, WHIP, 홈런, 기록, 성적, 지표, 순위, 분석, 반등, 부진, 상승세     | "롯데 타선 OPS 리그 하위권, 반등 가능성은?" |
@@ -75,7 +74,6 @@ INJURY_ROSTER
 → MATCH_RELATED
 → PERFORMANCE_ANALYSIS
 → INTERVIEW
-→ PLAYER_RELATED
 → CLUB_OPERATION
 → ETC
 ```
@@ -86,14 +84,6 @@ INJURY_ROSTER
 
 라벨 간 혼동이 잦은 조합을 아래에 명시한다. 우선순위 규칙(Section 5)과 함께 참고한다.
 
-### PLAYER_RELATED vs PERFORMANCE_ANALYSIS
-
-선수명이 제목에 포함되어 있더라도, 기사의 중심이 지표 해석이나 성적 분석이면 `PERFORMANCE_ANALYSIS`를 부여한다.
-
-### PLAYER_RELATED vs INJURY_ROSTER
-
-선수명이 포함되어 있어도 부상·말소·콜업이 명시되면 `INJURY_ROSTER`를 우선 부여한다.
-
 ### INTERVIEW vs MATCH_RELATED
 
 경기 후 감독·선수 코멘트가 제목의 중심이면 `INTERVIEW`를 우선 부여한다.
@@ -102,10 +92,6 @@ INJURY_ROSTER
 ### INTERVIEW vs PERFORMANCE_ANALYSIS
 
 발언 내용이 성적·지표를 언급하더라도 인용 구조가 중심이면 `INTERVIEW`를 부여한다.
-
-### TRANSACTION_CONTRACT vs PLAYER_RELATED
-
-영입·방출·트레이드·계약이 명시되면 `TRANSACTION_CONTRACT`를 우선 부여한다.
 
 ### INJURY_ROSTER vs TRANSACTION_CONTRACT
 

@@ -78,7 +78,6 @@ Valid labels:
 - MATCH_RELATED
 - PERFORMANCE_ANALYSIS
 - INTERVIEW
-- PLAYER_RELATED
 - CLUB_OPERATION
 - ETC
 
@@ -506,20 +505,18 @@ def _rule_label_row(row: dict, ensure_players: list[str] | None = None) -> dict 
         return None
 
     if _contains_any(text, INJURY_KEYWORDS):
-        secondary = ["PLAYER_RELATED"] if detected_players else []
         return _normalize_result(
             "INJURY_ROSTER",
-            secondary,
+            [],
             True,
             confidence_score=RULE_CONFIDENCE_SCORE,
             detected_players=detected_players,
         )
 
     if _contains_any(text, TRANSACTION_KEYWORDS):
-        secondary = ["PLAYER_RELATED"] if detected_players else []
         return _normalize_result(
             "TRANSACTION_CONTRACT",
-            secondary,
+            [],
             True,
             confidence_score=RULE_CONFIDENCE_SCORE,
             detected_players=detected_players,

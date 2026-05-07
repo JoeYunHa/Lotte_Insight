@@ -54,7 +54,6 @@ The fixed label order is defined in [label_schema.py](/C:/Users/yunha/Desktop/lo
   MATCH_RELATED,
   PERFORMANCE_ANALYSIS,
   INTERVIEW,
-  PLAYER_RELATED,
   CLUB_OPERATION,
   ETC,
 ]
@@ -336,7 +335,6 @@ Example `label_encoder.json`:
   "MATCH_RELATED",
   "PERFORMANCE_ANALYSIS",
   "INTERVIEW",
-  "PLAYER_RELATED",
   "CLUB_OPERATION",
   "ETC"
 ]

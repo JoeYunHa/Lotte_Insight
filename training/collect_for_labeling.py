@@ -101,7 +101,7 @@ def main() -> None:
         "--focus-labels",
         type=str,
         default="",
-        help="Comma-separated labels to prioritize, e.g. CLUB_OPERATION,INTERVIEW,PLAYER_RELATED",
+        help="Comma-separated labels to prioritize, e.g. CLUB_OPERATION,INTERVIEW,PERFORMANCE_ANALYSIS",
     )
     parser.add_argument(
         "--focus-only",

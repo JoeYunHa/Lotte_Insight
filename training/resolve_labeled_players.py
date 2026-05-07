@@ -123,8 +123,6 @@ def resolve_etc_row(row: dict[str, str], clean_players: list[str]) -> tuple[str,
         return "resolved", "CLUB_OPERATION", "club_pattern"
     if contains_any(text, PERFORMANCE_PATTERNS):
         return "resolved", "PERFORMANCE_ANALYSIS", "performance_pattern"
-    if clean_players:
-        return "resolved", "PLAYER_RELATED", "player_context"
     return "manual_review", "", "unresolved_etc"
 
 
@@ -162,7 +160,7 @@ def resolve_review_row(row: dict[str, str]) -> tuple[dict[str, str], bool]:
         resolved["resolution_primary_label"] = label
         resolved["resolution_reason"] = reason
         if action == "resolved":
-            resolved["resolution_secondary_labels"] = "PLAYER_RELATED" if label != "PLAYER_RELATED" and clean_players else ""
+            resolved["resolution_secondary_labels"] = ""
             return resolved, True
         return resolved, False
 
