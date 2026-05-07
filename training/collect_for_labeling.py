@@ -20,6 +20,7 @@ from collect_utils import (
 from settings import (
     DEFAULT_LABELING_COUNT,
     FOCUS_LABEL_KEYWORDS,
+    GAME_RESULTS_CSV,
     LABELED_TITLES_CSV,
     NAVER_DISPLAY_LIMIT,
     NAVER_MAX_START,
@@ -125,6 +126,11 @@ def main() -> None:
         if not LABELED_TITLES_CSV.exists():
             print(f"[ERROR] {LABELED_TITLES_CSV} 없음")
             return
+        if not GAME_RESULTS_CSV.exists():
+            print(f"[WARN] game_results.csv 없음: {GAME_RESULTS_CSV}")
+            print("       game_context가 '해당 날짜 경기 없음'으로 채워집니다.")
+            print("       먼저 collect_game_results.py를 실행하세요.")
+            print()
         rows = load_csv_rows(LABELED_TITLES_CSV)
         missing = sum(1 for r in rows if not str(r.get("event_summary", "")).strip())
         print(f"기존 CSV: {len(rows)}행  event_summary 없음: {missing}행")

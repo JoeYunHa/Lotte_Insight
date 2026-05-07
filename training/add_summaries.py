@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 
 from collect_utils import add_structured_summaries, load_csv_rows, rewrite_csv
-from settings import LABELED_PLAYERS_CSV, LABELED_TITLES_CSV
+from settings import GAME_RESULTS_CSV, LABELED_PLAYERS_CSV, LABELED_TITLES_CSV
 
 
 def _select_csv(dataset: str):
@@ -30,6 +30,17 @@ def main() -> None:
         help="Regenerate summaries even when event_summary is already present",
     )
     args = parser.parse_args()
+
+    if not GAME_RESULTS_CSV.exists():
+        print(f"[WARN] game_results.csv 없음: {GAME_RESULTS_CSV}")
+        print("       game_context가 '해당 날짜 경기 없음'으로 채워집니다.")
+        print("       먼저 collect_game_results.py를 실행하세요.")
+        print()
+    else:
+        import csv
+        with GAME_RESULTS_CSV.open(encoding="utf-8-sig") as f:
+            row_count = sum(1 for _ in csv.reader(f)) - 1
+        print(f"game_results.csv: {row_count}경기 로드됨")
 
     target_csv = _select_csv(args.dataset)
     rows = load_csv_rows(target_csv)
