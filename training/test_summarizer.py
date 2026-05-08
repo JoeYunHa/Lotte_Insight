@@ -229,9 +229,10 @@ def main():
         print(f"[{i}] 제목:    {article['title']}")
         print(f"     라벨:    {article.get('primary_label', '-')}")
 
-        event_summary = parsed.get("event_summary", "")
-        key_players = [p for p in (parsed.get("key_players") or []) if p and p != "nan"]
-        lotte_stance = parsed.get("lotte_stance", "")
+        event_summary = parsed.get("event_summary", "") if parsed else ""
+        event_summary = event_summary or result["raw"]
+        key_players = [p for p in (parsed.get("key_players") or []) if p and p != "nan"] if parsed else []
+        lotte_stance = parsed.get("lotte_stance", "") if parsed else ""
 
         if event_summary:
             print(f"     요약:    {event_summary}")
