@@ -16,6 +16,7 @@ from core.config import settings
 from core.database import supabase
 from models.classifier import classify
 from models.player_extractor import extract_players
+from models.summarizer import summarize as summarize_article
 from services.player_catalog import list_player_names
 
 logger = logging.getLogger(__name__)
@@ -91,6 +92,12 @@ def _label_and_link_players(items: list[dict]):
             continue
         article_id = result.data[0]["id"]
 
+        pub_str = item.get("pubDate", "")
+        try:
+            published_at = datetime.strptime(pub_str, "%a, %d %b %Y %H:%M:%S %z").strftime("%Y-%m-%d")
+        except (ValueError, TypeError):
+            published_at = ""
+
         label_result = classify(title, description)
         supabase.table("article_labels").upsert(
             {
@@ -100,6 +107,16 @@ def _label_and_link_players(items: list[dict]):
             },
             on_conflict="article_id",
         ).execute()
+
+        summary_result = summarize_article(
+            title=title,
+            description_snippet=description,
+            primary_label=label_result["label"],
+            published_at=published_at,
+        )
+        event_summary = summary_result.get("event_summary", "")
+        if event_summary:
+            supabase.table("articles").update({"event_summary": event_summary}).eq("id", article_id).execute()
 
         player_ids = extract_players(title)
         if player_ids:

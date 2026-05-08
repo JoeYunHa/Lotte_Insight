@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     report_list_limit: int = 30
     player_report_max_tokens: int = 400
     player_report_temperature: float = 0.3
+    redis_url: str = ""
     app_env: str = "development"
     log_level: str = "INFO"
 

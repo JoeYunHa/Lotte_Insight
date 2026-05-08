@@ -44,6 +44,7 @@ python-dateutil==2.9.0.post0
 python-dotenv==1.2.2
 PyYAML==6.0.3
 realtime==2.29.0
+redis[hiredis]>=5.0.0
 requests==2.33.1
 rich==14.3.4
 six==1.17.0

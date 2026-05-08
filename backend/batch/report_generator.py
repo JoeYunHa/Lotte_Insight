@@ -25,11 +25,22 @@ def _get_openai() -> OpenAI:
 PLAYER_SYSTEM_PROMPT = (
     f"당신은 KBO {settings.team_name_ko} 자이언츠 전문 야구 분석가입니다. "
     "선수를 위한 선수별 인사이트 리포트를 200자 이내로 작성합니다. "
-    "제공된 기사 제목 목록과 기록 수치만 사용하고, 추측성 발언은 하지 마세요."
+    "제공된 기사 요약과 기록 수치만 사용하고, 추측성 발언은 하지 마세요."
 )
 
 
-def _build_team_report(today: date) -> dict:
+def _build_team_report(today: date) -> dict | None:
+    existing = (
+        supabase.table("team_daily_report")
+        .select("id")
+        .eq("date", today.isoformat())
+        .maybe_single()
+        .execute()
+    )
+    if existing.data:
+        logger.info("팀 리포트 이미 존재 — skip: %s", today)
+        return None
+
     start_at, end_at = utc_day_bounds(today)
     articles_result = (
         supabase.table("articles")
@@ -84,20 +95,37 @@ def _build_team_report(today: date) -> dict:
 
 
 def _build_player_report(player_id: int, player_name: str, today: date) -> dict | None:
+    existing = (
+        supabase.table("player_daily_report")
+        .select("id")
+        .eq("player_id", player_id)
+        .eq("date", today.isoformat())
+        .maybe_single()
+        .execute()
+    )
+    if existing.data:
+        logger.info("선수 리포트 이미 존재 — skip: %s %s", player_name, today)
+        return None
+
     since = today - timedelta(days=settings.report_recent_days)
 
     article_result = (
         supabase.table("article_players")
-        .select("articles(title, published_at)")
+        .select("articles(title, published_at, event_summary)")
         .eq("player_id", player_id)
         .execute()
     )
-    titles = [
-        row["articles"]["title"]
+    recent_articles = [
+        row["articles"]
         for row in article_result.data
         if row.get("articles")
         and row["articles"].get("published_at", "") >= f"{since.isoformat()}T00:00:00"
     ][: settings.player_report_article_limit]
+
+    titles = [
+        art.get("event_summary") or art["title"]
+        for art in recent_articles
+    ]
 
     stats_result = (
         supabase.table("player_stats_daily")
@@ -121,7 +149,7 @@ def _build_player_report(player_id: int, player_name: str, today: date) -> dict 
 
     user_prompt = (
         f"선수명: {player_name}\n\n"
-        f"최근 기사 제목:\n{titles_text}\n\n"
+        f"최근 기사 요약:\n{titles_text}\n\n"
         f"최근 기록: {stats_text}"
     )
 
@@ -153,7 +181,8 @@ def run() -> dict:
     logger.info("Report generation started: %s", today)
 
     team_report = _build_team_report(today)
-    supabase.table("team_daily_report").upsert(team_report, on_conflict="date").execute()
+    if team_report:
+        supabase.table("team_daily_report").upsert(team_report, on_conflict="date").execute()
 
     players_result = supabase.table("players").select("id, name").eq("status", "active").execute()
     saved = 0
@@ -166,8 +195,9 @@ def run() -> dict:
             ).execute()
             saved += 1
 
-    logger.info("Report generation completed: team=1 players=%s", saved)
-    return {"team": 1, "players": saved}
+    team_saved = 1 if team_report else 0
+    logger.info("Report generation completed: team=%s players=%s", team_saved, saved)
+    return {"team": team_saved, "players": saved}
 
 
 if __name__ == "__main__":
