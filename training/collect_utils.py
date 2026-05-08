@@ -597,21 +597,31 @@ def _parse_batch_response(response: dict, expected_indexes: set[int]) -> tuple[d
 
 
 def call_label_gpt_batch(batch: list[tuple[int, dict, str]]) -> tuple[dict[int, dict], set[int]]:
+    seq_to_actual = {seq: actual for seq, (actual, _, _) in enumerate(batch)}
+    seq_batch = [(seq, row, extra) for seq, (_, row, extra) in enumerate(batch)]
     response = chat_json(
         LABELING_SYSTEM_PROMPT,
-        _build_batch_payload(batch),
+        _build_batch_payload(seq_batch),
         max_tokens=OPENAI_LABEL_MAX_TOKENS,
     )
-    return _parse_batch_response(response, {output_index for output_index, _row, _extra in batch})
+    seq_parsed, seq_missing = _parse_batch_response(response, set(seq_to_actual.keys()))
+    actual_parsed = {seq_to_actual[s]: v for s, v in seq_parsed.items()}
+    actual_missing = {seq_to_actual[s] for s in seq_missing}
+    return actual_parsed, actual_missing
 
 
 def call_summary_gpt_batch(batch: list[tuple[int, dict]]) -> tuple[dict[int, dict], set[int]]:
+    seq_to_actual = {seq: actual for seq, (actual, _) in enumerate(batch)}
+    seq_batch = [(seq, row) for seq, (_, row) in enumerate(batch)]
     response = chat_json(
         SUMMARY_SYSTEM_PROMPT,
-        _build_summary_batch_payload(batch),
+        _build_summary_batch_payload(seq_batch),
         max_tokens=OPENAI_SUMMARY_MAX_TOKENS,
     )
-    return _parse_batch_response(response, {output_index for output_index, _row in batch})
+    seq_parsed, seq_missing = _parse_batch_response(response, set(seq_to_actual.keys()))
+    actual_parsed = {seq_to_actual[s]: v for s, v in seq_parsed.items()}
+    actual_missing = {seq_to_actual[s] for s in seq_missing}
+    return actual_parsed, actual_missing
 
 
 def safe_label(result: dict, row: dict, ensure_players: list[str] | None = None, *, source: str) -> dict:
