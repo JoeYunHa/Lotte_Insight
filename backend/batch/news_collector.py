@@ -1,14 +1,8 @@
 """
-Collect Lotte Giants news articles from Naver Search API.
-
-- `description` is used only as classifier context.
-- Articles are upserted by `source_url` to avoid duplicates.
+Collect Lotte Giants news articles from the Naver Search API.
 """
 
 import logging
-import re
-from datetime import datetime, timezone
-from urllib.parse import urlparse
 
 import requests
 
@@ -17,23 +11,13 @@ from core.database import supabase
 from models.classifier import classify
 from models.player_extractor import extract_players
 from models.summarizer import summarize as summarize_article
+from services.article_utils import NormalizedNewsItem, normalize_naver_news_item
 from services.player_catalog import list_player_names
 
 logger = logging.getLogger(__name__)
 
 NAVER_NEWS_URL = "https://openapi.naver.com/v1/search/news.json"
 BASE_KEYWORDS = [f"{settings.team_name_ko} 자이언츠"]
-
-
-def _clean_html(text: str) -> str:
-    return re.sub(r"<[^>]+>", "", text).strip()
-
-
-def _source_name(url: str) -> str:
-    try:
-        return urlparse(url).netloc.replace("www.", "")
-    except Exception:
-        return ""
 
 
 def _fetch_news(keyword: str, display: int = 100) -> list[dict]:
@@ -47,29 +31,28 @@ def _fetch_news(keyword: str, display: int = 100) -> list[dict]:
     return response.json().get("items", [])
 
 
-def _upsert_articles(items: list[dict]) -> int:
-    rows = []
+def _normalized_items(items: list[dict]) -> list[NormalizedNewsItem]:
+    normalized_items: list[NormalizedNewsItem] = []
     for item in items:
-        title = _clean_html(item.get("title", ""))
-        link = item.get("originallink") or item.get("link", "")
-        if not title or not link:
-            continue
-
-        pub_str = item.get("pubDate", "")
-        try:
-            published_at = datetime.strptime(pub_str, "%a, %d %b %Y %H:%M:%S %z").isoformat()
-        except (ValueError, TypeError):
-            published_at = datetime.now(timezone.utc).isoformat()
-
-        rows.append(
-            {
-                "source_url": link,
-                "source_name": _source_name(link),
-                "title": title,
-                "published_at": published_at,
-            }
+        normalized = normalize_naver_news_item(
+            item,
+            description_snippet_length=settings.article_description_snippet_length,
         )
+        if normalized is not None:
+            normalized_items.append(normalized)
+    return normalized_items
 
+
+def _upsert_articles(items: list[NormalizedNewsItem]) -> int:
+    rows = [
+        {
+            "source_url": item.link,
+            "source_name": item.source_name,
+            "title": item.title,
+            "published_at": item.published_at,
+        }
+        for item in items
+    ]
     if not rows:
         return 0
 
@@ -77,28 +60,20 @@ def _upsert_articles(items: list[dict]) -> int:
     return len(result.data)
 
 
-def _label_and_link_players(items: list[dict]):
+def _label_and_link_players(items: list[NormalizedNewsItem]) -> None:
     for item in items:
-        title = _clean_html(item.get("title", ""))
-        description = _clean_html(item.get("description", ""))[
-            : settings.article_description_snippet_length
-        ]
-        link = item.get("originallink") or item.get("link", "")
-        if not link:
-            continue
-
-        result = supabase.table("articles").select("id").eq("source_url", link).limit(1).execute()
+        result = (
+            supabase.table("articles")
+            .select("id")
+            .eq("source_url", item.link)
+            .limit(1)
+            .execute()
+        )
         if not result.data:
             continue
         article_id = result.data[0]["id"]
 
-        pub_str = item.get("pubDate", "")
-        try:
-            published_at = datetime.strptime(pub_str, "%a, %d %b %Y %H:%M:%S %z").strftime("%Y-%m-%d")
-        except (ValueError, TypeError):
-            published_at = ""
-
-        label_result = classify(title, description)
+        label_result = classify(item.title, item.description_snippet)
         supabase.table("article_labels").upsert(
             {
                 "article_id": article_id,
@@ -109,18 +84,26 @@ def _label_and_link_players(items: list[dict]):
         ).execute()
 
         summary_result = summarize_article(
-            title=title,
-            description_snippet=description,
+            title=item.title,
+            description_snippet=item.description_snippet,
             primary_label=label_result["label"],
-            published_at=published_at,
+            published_at=item.published_date,
         )
         event_summary = summary_result.get("event_summary", "")
         if event_summary:
-            supabase.table("articles").update({"event_summary": event_summary}).eq("id", article_id).execute()
+            (
+                supabase.table("articles")
+                .update({"event_summary": event_summary})
+                .eq("id", article_id)
+                .execute()
+            )
 
-        player_ids = extract_players(title)
+        player_ids = extract_players(item.title)
         if player_ids:
-            player_rows = [{"article_id": article_id, "player_id": player_id} for player_id in player_ids]
+            player_rows = [
+                {"article_id": article_id, "player_id": player_id}
+                for player_id in player_ids
+            ]
             supabase.table("article_players").upsert(
                 player_rows,
                 on_conflict="article_id,player_id",
@@ -152,8 +135,9 @@ def run() -> int:
             seen.add(url)
             unique_items.append(item)
 
-    _upsert_articles(unique_items)
-    _label_and_link_players(unique_items)
+    normalized_items = _normalized_items(unique_items)
+    _upsert_articles(normalized_items)
+    _label_and_link_players(normalized_items)
 
     logger.info("News collection completed: %s items", len(unique_items))
     return len(unique_items)

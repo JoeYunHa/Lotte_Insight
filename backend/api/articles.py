@@ -1,8 +1,11 @@
-from fastapi import APIRouter, Query, HTTPException
 from datetime import date
 
-from core.database import supabase
-from core.time_utils import utc_day_bounds
+from fastapi import APIRouter, HTTPException, Query
+
+from services.article_repository import (
+    get_article as get_article_record,
+    list_articles as list_article_records,
+)
 
 router = APIRouter()
 
@@ -15,53 +18,18 @@ def list_articles(
     limit: int = Query(default=20, le=100),
     offset: int = 0,
 ):
-    query = supabase.table("articles").select(
-        "id, source_url, source_name, title, published_at, author_name, "
-        "article_labels(label, confidence), "
-        "article_players(player_id, players(name))"
+    return list_article_records(
+        article_date=article_date,
+        label=label,
+        player_id=player_id,
+        limit=limit,
+        offset=offset,
     )
-
-    if article_date:
-        start_at, end_at = utc_day_bounds(article_date)
-        query = query.gte("published_at", start_at).lte("published_at", end_at)
-
-    if player_id:
-        ap_result = (
-            supabase.table("article_players")
-            .select("article_id")
-            .eq("player_id", player_id)
-            .execute()
-        )
-        article_ids = [r["article_id"] for r in ap_result.data]
-        if not article_ids:
-            return []
-        query = query.in_("id", article_ids)
-
-    if label:
-        al_result = (
-            supabase.table("article_labels")
-            .select("article_id")
-            .eq("label", label)
-            .execute()
-        )
-        label_ids = [r["article_id"] for r in al_result.data]
-        if not label_ids:
-            return []
-        query = query.in_("id", label_ids)
-
-    result = query.order("published_at", desc=True).range(offset, offset + limit - 1).execute()
-    return result.data
 
 
 @router.get("/{article_id}")
 def get_article(article_id: int):
-    result = (
-        supabase.table("articles")
-        .select("*, article_labels(*), article_players(*, players(*))")
-        .eq("id", article_id)
-        .maybe_single()
-        .execute()
-    )
-    if not result.data:
+    article = get_article_record(article_id)
+    if not article:
         raise HTTPException(status_code=404, detail="기사를 찾을 수 없습니다.")
-    return result.data
+    return article

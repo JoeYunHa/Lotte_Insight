@@ -6,7 +6,7 @@
 import { useState } from 'react'
 import { ArticleCard } from './ArticleCard'
 import { LABEL_META, ALL_LABELS } from '@/lib/label-config'
-import { computeLabelCounts } from '@/lib/api'
+import { computeLabelCounts } from '@/lib/selectors'
 import type { Article, LabelKey } from '@/lib/types'
 
 type FilterKey = 'ALL' | LabelKey

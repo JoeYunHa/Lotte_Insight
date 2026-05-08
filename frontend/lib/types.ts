@@ -28,21 +28,29 @@ export interface Article {
   lotte_stance?: LotteStance | null
   key_players?: string[] | null  // player names from KoBART key_players field
   confidence?: number | null
+  article_players?: Array<{     // Supabase join: article_players(player_id, players(name))
+    player_id: number
+    players: { name: string } | null
+  }> | null
 }
 
 // players table
 export interface Player {
   id: string
   name: string
-  name_variants: string[]
+  name_variants?: string[]
   position: string
   status: PlayerStatus
   number?: string | null
 }
 
+export interface PlayerDetail extends Player {
+  stats?: PlayerStatDaily[]
+}
+
 // player_stats_daily table
 export interface PlayerStatDaily {
-  player_id: string
+  player_id: number
   date: string                   // 'YYYY-MM-DD'
   avg?: number | null
   ops?: number | null

@@ -8,8 +8,7 @@ from datetime import date, timedelta
 from openai import OpenAI
 
 from core.config import settings
-from core.database import supabase
-from core.time_utils import utc_day_bounds
+from services import report_repository
 
 logger = logging.getLogger(__name__)
 _openai_client: OpenAI | None = None
@@ -22,55 +21,28 @@ def _get_openai() -> OpenAI:
     return _openai_client
 
 
-PLAYER_SYSTEM_PROMPT = (
-    f"당신은 KBO {settings.team_name_ko} 자이언츠 전문 야구 분석가입니다. "
-    "선수를 위한 선수별 인사이트 리포트를 200자 이내로 작성합니다. "
-    "제공된 기사 요약과 기록 수치만 사용하고, 추측성 발언은 하지 마세요."
-)
 
-
-def _build_team_report(today: date) -> dict | None:
-    existing = (
-        supabase.table("team_daily_report")
-        .select("id")
-        .eq("date", today.isoformat())
-        .maybe_single()
-        .execute()
-    )
-    if existing.data:
-        logger.info("팀 리포트 이미 존재 — skip: %s", today)
-        return None
-
-    start_at, end_at = utc_day_bounds(today)
-    articles_result = (
-        supabase.table("articles")
-        .select("id, article_labels(label)")
-        .gte("published_at", start_at)
-        .lte("published_at", end_at)
-        .execute()
-    )
-
-    articles = articles_result.data
-    article_ids = [article["id"] for article in articles]
-
+def _summarize_label_counts(articles: list[dict]) -> dict[str, int]:
     label_counts: dict[str, int] = {}
     for article in articles:
         for label in article.get("article_labels") or []:
-            key = label["label"]
-            label_counts[key] = label_counts.get(key, 0) + 1
+            label_name = label["label"]
+            label_counts[label_name] = label_counts.get(label_name, 0) + 1
+    return label_counts
 
+
+def _summarize_player_mentions(mentions: list[dict]) -> dict[str, int]:
     player_mentions: dict[str, int] = {}
-    if article_ids:
-        mention_result = (
-            supabase.table("article_players")
-            .select("player_id, players(name)")
-            .in_("article_id", article_ids)
-            .execute()
-        )
-        for row in mention_result.data:
-            name = (row.get("players") or {}).get("name", "")
-            if name:
-                player_mentions[name] = player_mentions.get(name, 0) + 1
+    for row in mentions:
+        name = (row.get("players") or {}).get("name", "")
+        if name:
+            player_mentions[name] = player_mentions.get(name, 0) + 1
+    return player_mentions
+
+
+def _format_team_report(today: date, articles: list[dict], mentions: list[dict]) -> dict:
+    label_counts = _summarize_label_counts(articles)
+    player_mentions = _summarize_player_mentions(mentions)
 
     label_summary = ", ".join(
         f"{label} {count}건"
@@ -78,86 +50,81 @@ def _build_team_report(today: date) -> dict | None:
     ) or "없음"
     top_players = sorted(player_mentions.items(), key=lambda item: -item[1])[:5]
     player_summary = ", ".join(f"{name}({count})" for name, count in top_players) or "없음"
-
-    issue_summary = (
-        f"오늘 {settings.team_name_ko} 자이언츠 관련 기사 {len(articles)}건\n"
-        f"분류 현황: {label_summary}\n"
-        f"주요 언급 선수: {player_summary}"
-    )
     top_labels = [label for label, _ in sorted(label_counts.items(), key=lambda item: -item[1])[:3]]
 
     return {
         "date": today.isoformat(),
-        "issue_summary": issue_summary,
+        "issue_summary": (
+            f"오늘 {settings.team_name_ko} 자이언츠 관련 기사 {len(articles)}건\n"
+            f"분류 현황: {label_summary}\n"
+            f"주요 언급 선수: {player_summary}"
+        ),
         "article_count": len(articles),
         "top_labels": top_labels,
     }
 
 
-def _build_player_report(player_id: int, player_name: str, today: date) -> dict | None:
-    existing = (
-        supabase.table("player_daily_report")
-        .select("id")
-        .eq("player_id", player_id)
-        .eq("date", today.isoformat())
-        .maybe_single()
-        .execute()
-    )
-    if existing.data:
-        logger.info("선수 리포트 이미 존재 — skip: %s %s", player_name, today)
+def _build_team_report(today: date) -> dict | None:
+    if report_repository.report_exists("team_daily_report", today):
+        logger.info("Team report already exists, skipping: %s", today)
         return None
 
-    since = today - timedelta(days=settings.report_recent_days)
+    articles = report_repository.fetch_articles_for_day(today)
+    article_ids = [article["id"] for article in articles]
+    mentions = report_repository.fetch_player_mentions(article_ids)
+    return _format_team_report(today, articles, mentions)
 
-    article_result = (
-        supabase.table("article_players")
-        .select("articles(title, published_at, event_summary)")
-        .eq("player_id", player_id)
-        .execute()
+
+def _collect_recent_titles(player_id: int, since: date) -> list[str]:
+    article_rows = report_repository.fetch_recent_player_articles(
+        player_id,
+        since=since,
+        limit=settings.player_report_article_limit,
     )
-    recent_articles = [
-        row["articles"]
-        for row in article_result.data
+    return [
+        row["articles"].get("event_summary") or row["articles"]["title"]
+        for row in article_rows
         if row.get("articles")
-        and row["articles"].get("published_at", "") >= f"{since.isoformat()}T00:00:00"
-    ][: settings.player_report_article_limit]
-
-    titles = [
-        art.get("event_summary") or art["title"]
-        for art in recent_articles
     ]
 
-    stats_result = (
-        supabase.table("player_stats_daily")
-        .select("*")
-        .eq("player_id", player_id)
-        .order("date", desc=True)
-        .limit(1)
-        .execute()
-    )
-    stat_snapshot = stats_result.data[0] if stats_result.data else {}
 
-    if not titles and not stat_snapshot:
-        return None
-
-    titles_text = "\n".join(f"- {title}" for title in titles) or "관련 기사 없음"
-    stats_text = (
+def _format_stats_snapshot(stat_snapshot: dict) -> str:
+    if not stat_snapshot:
+        return "기록 없음"
+    return (
         f"타율 {stat_snapshot.get('avg', 'N/A')}, "
         f"OPS {stat_snapshot.get('ops', 'N/A')}, "
         f"ERA {stat_snapshot.get('era', 'N/A')}"
-    ) if stat_snapshot else "기록 없음"
+    )
 
-    user_prompt = (
+
+def _build_player_prompt(player_name: str, titles: list[str], stat_snapshot: dict) -> str:
+    titles_text = "\n".join(f"- {title}" for title in titles) or "관련 기사 없음"
+    stats_text = _format_stats_snapshot(stat_snapshot)
+    return (
         f"선수명: {player_name}\n\n"
         f"최근 기사 요약:\n{titles_text}\n\n"
         f"최근 기록: {stats_text}"
     )
 
+
+def _build_player_report(player_id: int, player_name: str, today: date) -> dict | None:
+    if report_repository.report_exists("player_daily_report", today, player_id=player_id):
+        logger.info("Player report already exists, skipping: %s %s", player_name, today)
+        return None
+
+    since = today - timedelta(days=settings.report_recent_days)
+    titles = _collect_recent_titles(player_id, since)
+    stat_snapshot = report_repository.fetch_latest_player_stats(player_id)
+    if not titles and not stat_snapshot:
+        return None
+
+    user_prompt = _build_player_prompt(player_name, titles, stat_snapshot)
     try:
         response = _get_openai().chat.completions.create(
             model=settings.openai_model,
             messages=[
-                {"role": "system", "content": PLAYER_SYSTEM_PROMPT},
+                {"role": "system", "content": settings.player_system_prompt.format(team_name_ko=settings.team_name_ko)},
                 {"role": "user", "content": user_prompt},
             ],
             max_tokens=settings.player_report_max_tokens,
@@ -182,17 +149,17 @@ def run() -> dict:
 
     team_report = _build_team_report(today)
     if team_report:
-        supabase.table("team_daily_report").upsert(team_report, on_conflict="date").execute()
+        report_repository.save_report("team_daily_report", team_report, on_conflict="date")
 
-    players_result = supabase.table("players").select("id, name").eq("status", "active").execute()
     saved = 0
-    for player in players_result.data:
+    for player in report_repository.list_active_players():
         report = _build_player_report(player["id"], player["name"], today)
         if report:
-            supabase.table("player_daily_report").upsert(
+            report_repository.save_report(
+                "player_daily_report",
                 report,
                 on_conflict="player_id,date",
-            ).execute()
+            )
             saved += 1
 
     team_saved = 1 if team_report else 0

@@ -3,15 +3,22 @@ Collect KBO player stats for the configured team and store them in player_stats_
 """
 
 import logging
-import os
 import re
 from datetime import date
-from types import SimpleNamespace
 from typing import TYPE_CHECKING
 from urllib.robotparser import RobotFileParser
 
 import requests as http
 from bs4 import BeautifulSoup
+
+try:
+    from core.bootstrap import load_player_name_to_id_map, load_settings, load_supabase
+except ModuleNotFoundError:
+    from backend.core.bootstrap import (
+        load_player_name_to_id_map,
+        load_settings,
+        load_supabase,
+    )
 
 if TYPE_CHECKING:
     from playwright.sync_api import Page
@@ -64,6 +71,7 @@ STAT_MAP = {
 }
 
 _robot_parser_instance: RobotFileParser | None = None
+settings = load_settings()
 
 REGISTER_URL = f"{KBO_BASE_URL}/Player/Register.aspx"
 REGISTER_TEAM_FIELD = "ctl00$ctl00$ctl00$cphContents$cphContents$cphContents$hfSearchTeam"
@@ -78,29 +86,6 @@ _REGISTER_URL = REGISTER_URL
 _REG_TEAM_FIELD = REGISTER_TEAM_FIELD
 _REG_DATE_FIELD = REGISTER_DATE_FIELD
 _REG_EVENT_TARGET = REGISTER_EVENT_TARGET
-
-
-def _load_settings():
-    try:
-        from core.config import settings as app_settings
-        return app_settings
-    except ModuleNotFoundError:
-        pass
-
-    try:
-        from backend.core.config import settings as app_settings
-        return app_settings
-    except ModuleNotFoundError:
-        pass
-
-    return SimpleNamespace(
-        crawl_user_agent=os.getenv("CRAWL_USER_AGENT", "LotteInsightBot/1.0"),
-        team_code=os.getenv("TEAM_CODE", "LT"),
-        team_name_ko=os.getenv("TEAM_NAME_KO", "롯데"),
-    )
-
-
-settings = _load_settings()
 
 
 def _robot_parser() -> RobotFileParser:
@@ -120,7 +105,12 @@ def _can_fetch(url: str) -> bool:
     return _robot_parser().can_fetch(settings.crawl_user_agent, url)
 
 
-def _select_team_and_get_html(page: "Page", url: str, *, wait_until: str = "networkidle") -> str | None:
+def _select_team_and_get_html(
+    page: "Page",
+    url: str,
+    *,
+    wait_until: str = "networkidle",
+) -> str | None:
     if not _can_fetch(url):
         logger.warning("Blocked by robots.txt: %s", url)
         return None
@@ -246,7 +236,11 @@ def _parse_register_names(html: str) -> list[str]:
             if not cells[0].get_text(strip=True).isdigit():
                 continue
             player_link = cells[1].find("a")
-            name = player_link.get_text(strip=True) if player_link else cells[1].get_text(strip=True)
+            name = (
+                player_link.get_text(strip=True)
+                if player_link
+                else cells[1].get_text(strip=True)
+            )
             if name:
                 names.append(name)
 
@@ -297,18 +291,13 @@ def fetch_roster() -> list[str]:
 
 
 def run(target_date: date | None = None) -> dict:
-    try:
-        from core.database import supabase
-        from services.player_catalog import player_name_to_id_map
-    except ModuleNotFoundError:
-        from backend.core.database import supabase
-        from backend.services.player_catalog import player_name_to_id_map
     from playwright.sync_api import sync_playwright
 
     today = target_date or date.today()
     logger.info("KBO stat collection started: %s", today)
 
-    player_map = player_name_to_id_map()
+    supabase = load_supabase()
+    player_map = load_player_name_to_id_map()
     merged: dict[str, dict] = {}
 
     with sync_playwright() as pw:
