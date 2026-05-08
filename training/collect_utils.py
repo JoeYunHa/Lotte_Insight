@@ -202,6 +202,25 @@ def clean_html(text: str) -> str:
     return re.sub(r"<[^>]+>", "", text).strip()
 
 
+_AGENCY_PREFIX_RE = re.compile(
+    r"^\s*[\[\(【]"
+    r"(?:연합뉴스|뉴시스|뉴스1|AFP|EPA|AP|로이터|Reuters|OSEN|스포츠조선|스포티비뉴스|MBC|SBS|KBS|YTN|채널A)"
+    r"[\]\)】]\s*",
+    re.IGNORECASE,
+)
+_REPORTER_SUFFIX_RE = re.compile(r"\s*[=|]?\s*[\w가-힣]{2,5}\s*(?:특파원|기자)\s*[=|]?\s*$")
+
+
+def clean_snippet(text: str) -> str:
+    """HTML 태그·통신사 prefix·기자명을 제거하고 정규화된 텍스트를 반환한다."""
+    if not text:
+        return text
+    text = clean_html(text)
+    text = _AGENCY_PREFIX_RE.sub("", text)
+    text = _REPORTER_SUFFIX_RE.sub("", text)
+    return text.strip()
+
+
 def parse_pub_date(raw: str) -> str:
     try:
         dt = datetime.strptime(raw, "%a, %d %b %Y %H:%M:%S %z")
@@ -542,10 +561,10 @@ def _build_summary_batch_payload(batch: list[tuple[int, dict]]) -> str:
     lines = ["Summarize each item and return JSON with an `items` array."]
     for output_index, row in batch:
         lines.append(f"\n[index={output_index}]")
-        lines.append(f"title: {row.get('title', '')}")
-        description = row.get("description_snippet", "")
+        lines.append(f"title: {clean_snippet(str(row.get('title', '')))}")
+        description = clean_snippet(str(row.get("description_snippet", "") or ""))
         if description:
-            lines.append(f"description: {description}")
+            lines.append(f"description: {description[:ARTICLE_SNIPPET_LENGTH]}")
         published_at = row.get("published_at", "")
         if published_at:
             lines.append(f"published_at: {published_at}")
@@ -994,6 +1013,7 @@ __all__ = [
     "auto_label",
     "build_days_cutoff",
     "clean_html",
+    "clean_snippet",
     "collect_news_by_keywords",
     "add_structured_summaries",
     "build_game_context_for_row",

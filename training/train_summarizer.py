@@ -20,16 +20,21 @@ from transformers import (
     Seq2SeqTrainingArguments,
 )
 
+from collect_utils import clean_snippet
 from settings import (
     ARTICLE_SNIPPET_LENGTH,
     DATA_DIR,
     DEFAULT_EVAL_BATCH_SIZE,
     DEFAULT_SUMMARIZER_BATCH_SIZE,
+    DEFAULT_SUMMARIZER_EARLY_STOPPING,
     DEFAULT_SUMMARIZER_EARLY_STOPPING_PATIENCE,
     DEFAULT_SUMMARIZER_EPOCHS,
+    DEFAULT_SUMMARIZER_GRAD_ACCUMULATION,
+    DEFAULT_SUMMARIZER_LENGTH_PENALTY,
     DEFAULT_SUMMARIZER_LR,
     DEFAULT_SUMMARIZER_MAX_SOURCE_LEN,
     DEFAULT_SUMMARIZER_MAX_TARGET_LEN,
+    DEFAULT_SUMMARIZER_NO_REPEAT_NGRAM,
     DEFAULT_SUMMARIZER_NUM_BEAMS,
     DEFAULT_SUMMARIZER_PRETRAINED,
     DEFAULT_SUMMARIZER_WEIGHT_DECAY,
@@ -49,11 +54,11 @@ SUMMARY_REQUIRED_COLUMNS = {
     "game_context": "",
 }
 
-
 def build_source_text(row: dict) -> str:
-    parts = [f"title: {str(row.get('title', '')).strip()}"]
+    parts = ["뉴스 요약:"]
+    parts.append(f"title: {clean_snippet(str(row.get('title', '')).strip())}")
 
-    description = str(row.get("description_snippet", "") or "").strip()
+    description = clean_snippet(str(row.get("description_snippet", "") or "").strip())
     if description:
         parts.append(f"description: {description[:ARTICLE_SNIPPET_LENGTH]}")
 
@@ -243,10 +248,13 @@ def train(
     epochs: int = DEFAULT_SUMMARIZER_EPOCHS,
     lr: float = DEFAULT_SUMMARIZER_LR,
     batch_size: int = DEFAULT_SUMMARIZER_BATCH_SIZE,
+    grad_accumulation: int = DEFAULT_SUMMARIZER_GRAD_ACCUMULATION,
     seed: int = DEFAULT_TRAIN_SEED,
     max_source_len: int = DEFAULT_SUMMARIZER_MAX_SOURCE_LEN,
     max_target_len: int = DEFAULT_SUMMARIZER_MAX_TARGET_LEN,
     num_beams: int = DEFAULT_SUMMARIZER_NUM_BEAMS,
+    length_penalty: float = DEFAULT_SUMMARIZER_LENGTH_PENALTY,
+    no_repeat_ngram_size: int = DEFAULT_SUMMARIZER_NO_REPEAT_NGRAM,
     early_stopping_patience: int = DEFAULT_SUMMARIZER_EARLY_STOPPING_PATIENCE,
 ):
     dataframe = load_data()
@@ -262,6 +270,10 @@ def train(
 
     tokenizer = AutoTokenizer.from_pretrained(pretrained)
     model = AutoModelForSeq2SeqLM.from_pretrained(pretrained)
+    model.generation_config.num_beams = num_beams
+    model.generation_config.length_penalty = length_penalty
+    model.generation_config.no_repeat_ngram_size = no_repeat_ngram_size
+    model.generation_config.early_stopping = DEFAULT_SUMMARIZER_EARLY_STOPPING
 
     global tokenizer_for_metrics
     tokenizer_for_metrics = tokenizer
@@ -282,7 +294,8 @@ def train(
     )
 
     data_collator = DataCollatorForSeq2Seq(tokenizer=tokenizer, model=model)
-    steps_per_epoch = max(1, math.ceil(len(train_dataset) / batch_size))
+    effective_batch = batch_size * grad_accumulation
+    steps_per_epoch = max(1, math.ceil(len(train_dataset) / effective_batch))
     warmup_steps = max(0, int(steps_per_epoch * epochs * DEFAULT_TRAIN_WARMUP_RATIO))
 
     training_args = build_training_args(
@@ -292,6 +305,7 @@ def train(
         learning_rate=lr,
         per_device_train_batch_size=batch_size,
         per_device_eval_batch_size=DEFAULT_EVAL_BATCH_SIZE,
+        gradient_accumulation_steps=grad_accumulation,
         weight_decay=DEFAULT_SUMMARIZER_WEIGHT_DECAY,
         warmup_steps=warmup_steps,
         predict_with_generate=True,
@@ -302,8 +316,8 @@ def train(
         logging_strategy="steps",
         logging_steps=10,
         load_best_model_at_end=True,
-        metric_for_best_model="eval_loss",
-        greater_is_better=False,
+        metric_for_best_model="eval_rouge_l",
+        greater_is_better=True,
         seed=seed,
         report_to=[],
     )
@@ -330,6 +344,8 @@ def train(
                 "max_source_len": max_source_len,
                 "max_target_len": max_target_len,
                 "num_beams": num_beams,
+                "length_penalty": length_penalty,
+                "no_repeat_ngram_size": no_repeat_ngram_size,
             },
             file,
             ensure_ascii=False,
@@ -391,10 +407,13 @@ def main():
     parser.add_argument("--epochs", type=int, default=DEFAULT_SUMMARIZER_EPOCHS)
     parser.add_argument("--lr", type=float, default=DEFAULT_SUMMARIZER_LR)
     parser.add_argument("--batch", type=int, default=DEFAULT_SUMMARIZER_BATCH_SIZE)
+    parser.add_argument("--grad-accumulation", type=int, default=DEFAULT_SUMMARIZER_GRAD_ACCUMULATION)
     parser.add_argument("--seed", type=int, default=DEFAULT_TRAIN_SEED)
     parser.add_argument("--max-source-len", type=int, default=DEFAULT_SUMMARIZER_MAX_SOURCE_LEN)
     parser.add_argument("--max-target-len", type=int, default=DEFAULT_SUMMARIZER_MAX_TARGET_LEN)
     parser.add_argument("--num-beams", type=int, default=DEFAULT_SUMMARIZER_NUM_BEAMS)
+    parser.add_argument("--length-penalty", type=float, default=DEFAULT_SUMMARIZER_LENGTH_PENALTY)
+    parser.add_argument("--no-repeat-ngram", type=int, default=DEFAULT_SUMMARIZER_NO_REPEAT_NGRAM)
     parser.add_argument("--early-stopping-patience", type=int, default=DEFAULT_SUMMARIZER_EARLY_STOPPING_PATIENCE)
     parser.add_argument("--eval-only", action="store_true")
     args = parser.parse_args()
@@ -413,10 +432,13 @@ def main():
         epochs=args.epochs,
         lr=args.lr,
         batch_size=args.batch,
+        grad_accumulation=args.grad_accumulation,
         seed=args.seed,
         max_source_len=args.max_source_len,
         max_target_len=args.max_target_len,
         num_beams=args.num_beams,
+        length_penalty=args.length_penalty,
+        no_repeat_ngram_size=args.no_repeat_ngram,
         early_stopping_patience=args.early_stopping_patience,
     )
 

@@ -15,10 +15,14 @@ import re
 import torch
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer, StoppingCriteria, StoppingCriteriaList
 
+from collect_utils import clean_snippet
 from settings import (
     ARTICLE_SNIPPET_LENGTH,
+    DEFAULT_SUMMARIZER_EARLY_STOPPING,
+    DEFAULT_SUMMARIZER_LENGTH_PENALTY,
     DEFAULT_SUMMARIZER_MAX_SOURCE_LEN,
     DEFAULT_SUMMARIZER_MAX_TARGET_LEN,
+    DEFAULT_SUMMARIZER_NO_REPEAT_NGRAM,
     DEFAULT_SUMMARIZER_NUM_BEAMS,
     SUMMARIZER_MODEL_DIR,
 )
@@ -114,8 +118,9 @@ def _regex_extract(text: str) -> dict:
 
 
 def build_source_text(row: dict) -> str:
-    parts = [f"title: {str(row.get('title', '')).strip()}"]
-    description = str(row.get("description_snippet", "") or "").strip()
+    parts = ["뉴스 요약:"]
+    parts.append(f"title: {clean_snippet(str(row.get('title', '')).strip())}")
+    description = clean_snippet(str(row.get("description_snippet", "") or "").strip())
     if description:
         parts.append(f"description: {description[:ARTICLE_SNIPPET_LENGTH]}")
     published_at = str(row.get("published_at", "") or "").strip()
@@ -136,6 +141,8 @@ def summarize(
     max_source_len: int = DEFAULT_SUMMARIZER_MAX_SOURCE_LEN,
     max_target_len: int = DEFAULT_SUMMARIZER_MAX_TARGET_LEN,
     num_beams: int = DEFAULT_SUMMARIZER_NUM_BEAMS,
+    length_penalty: float = DEFAULT_SUMMARIZER_LENGTH_PENALTY,
+    no_repeat_ngram_size: int = DEFAULT_SUMMARIZER_NO_REPEAT_NGRAM,
 ) -> list[dict]:
     model_path = model_dir or str(SUMMARIZER_MODEL_DIR)
     print(f"모델 로드 중: {model_path}")
@@ -165,8 +172,9 @@ def summarize(
                 **inputs,
                 max_new_tokens=max_target_len,
                 num_beams=num_beams,
-                no_repeat_ngram_size=3,
-                early_stopping=True,
+                length_penalty=length_penalty,
+                no_repeat_ngram_size=no_repeat_ngram_size,
+                early_stopping=DEFAULT_SUMMARIZER_EARLY_STOPPING,
                 stopping_criteria=stopping,
             )
 
@@ -187,6 +195,8 @@ def main():
     parser.add_argument("--model-dir", type=str, default=None, help="모델 디렉토리 경로")
     parser.add_argument("--beams", type=int, default=DEFAULT_SUMMARIZER_NUM_BEAMS, help="빔 수")
     parser.add_argument("--max-len", type=int, default=DEFAULT_SUMMARIZER_MAX_TARGET_LEN, help="최대 출력 토큰 수")
+    parser.add_argument("--length-penalty", type=float, default=DEFAULT_SUMMARIZER_LENGTH_PENALTY, help="길이 패널티")
+    parser.add_argument("--no-repeat-ngram", type=int, default=DEFAULT_SUMMARIZER_NO_REPEAT_NGRAM, help="반복 억제 n-gram 크기")
     parser.add_argument("--raw", action="store_true", help="파싱 없이 원본 출력 표시")
     args = parser.parse_args()
 
@@ -209,6 +219,8 @@ def main():
         model_dir=args.model_dir,
         num_beams=args.beams,
         max_target_len=args.max_len,
+        length_penalty=args.length_penalty,
+        no_repeat_ngram_size=args.no_repeat_ngram,
     )
 
     print("=" * 60)
