@@ -78,12 +78,24 @@ def build_source_text(row: dict) -> str:
 
 
 def build_target_text(row: dict) -> str:
-    return str(row.get("event_summary", "") or "").strip()
+    event_summary = str(row.get("event_summary", "") or "").strip()
+    lotte_stance = str(row.get("lotte_stance", "neutral") or "neutral").strip()
+    raw_kp = str(row.get("key_players", "") or "").strip()
+    if raw_kp and raw_kp.lower() != "nan":
+        key_players = [p.strip() for p in raw_kp.split(";") if p.strip()]
+    else:
+        key_players = []
+    return json.dumps(
+        {"event_summary": event_summary, "lotte_stance": lotte_stance, "key_players": key_players},
+        ensure_ascii=False,
+    )
 
 
-def load_data() -> pd.DataFrame:
+def load_data(data_dir: Path | None = None) -> pd.DataFrame:
+    base = data_dir or DATA_DIR
+    csv_paths = [base / "labeled_titles.csv", base / "labeled_players.csv"]
     frames: list[pd.DataFrame] = []
-    for path in [LABELED_TITLES_CSV, LABELED_PLAYERS_CSV]:
+    for path in csv_paths:
         if not path.exists():
             print(f"  Skipped: {path.name} not found")
             continue
@@ -101,7 +113,7 @@ def load_data() -> pd.DataFrame:
         frames.append(dataframe)
 
     if not frames:
-        raise FileNotFoundError(f"Structured summary training data not found under: {DATA_DIR}")
+        raise FileNotFoundError(f"Structured summary training data not found under: {base}")
 
     dataframe = pd.concat(frames, ignore_index=True)
     dataframe = dataframe.drop_duplicates(subset=["title"]).reset_index(drop=True)
@@ -113,11 +125,11 @@ def load_data() -> pd.DataFrame:
     print(f"  Rows with game_ref=true       {int(game_ref_count):>4}")
     target_char_lens = [len(text) for text in dataframe["target_text"].tolist()]
     avg_target_len = float(np.mean(target_char_lens)) if target_char_lens else 0.0
-    max_target_len = max(target_char_lens) if target_char_lens else 0
-    over_192 = sum(1 for length in target_char_lens if length > 192)
+    max_target_len_chars = max(target_char_lens) if target_char_lens else 0
+    over_256 = sum(1 for length in target_char_lens if length > 256)
     print(f"  Avg target chars              {avg_target_len:.1f}")
-    print(f"  Max target chars              {max_target_len}")
-    print(f"  Rows likely over 192 chars    {over_192}  (rough truncation risk estimate)")
+    print(f"  Max target chars              {max_target_len_chars}")
+    print(f"  Rows likely over 256 chars    {over_256}  (rough truncation risk estimate)")
     return dataframe
 
 
@@ -256,8 +268,13 @@ def train(
     length_penalty: float = DEFAULT_SUMMARIZER_LENGTH_PENALTY,
     no_repeat_ngram_size: int = DEFAULT_SUMMARIZER_NO_REPEAT_NGRAM,
     early_stopping_patience: int = DEFAULT_SUMMARIZER_EARLY_STOPPING_PATIENCE,
+    data_dir: Path | None = None,
+    output_dir: Path | None = None,
 ):
-    dataframe = load_data()
+    model_out = output_dir or SUMMARIZER_MODEL_DIR
+    model_out.mkdir(parents=True, exist_ok=True)
+
+    dataframe = load_data(data_dir)
     train_df, val_df = train_test_split(
         dataframe,
         test_size=DEFAULT_VALIDATION_SPLIT,
@@ -299,7 +316,7 @@ def train(
     warmup_steps = max(0, int(steps_per_epoch * epochs * DEFAULT_TRAIN_WARMUP_RATIO))
 
     training_args = build_training_args(
-        output_dir=str(SUMMARIZER_MODEL_DIR),
+        output_dir=str(model_out),
         overwrite_output_dir=True,
         num_train_epochs=epochs,
         learning_rate=lr,
@@ -335,9 +352,9 @@ def train(
 
     trainer.train()
     metrics = trainer.evaluate()
-    trainer.save_model(str(SUMMARIZER_MODEL_DIR))
-    tokenizer.save_pretrained(str(SUMMARIZER_MODEL_DIR))
-    with (SUMMARIZER_MODEL_DIR / "summarizer_config.json").open("w", encoding="utf-8") as file:
+    trainer.save_model(str(model_out))
+    tokenizer.save_pretrained(str(model_out))
+    with (model_out / "summarizer_config.json").open("w", encoding="utf-8") as file:
         json.dump(
             {
                 "pretrained": pretrained,
@@ -352,7 +369,7 @@ def train(
             indent=2,
         )
 
-    print(f"\nSaved summarizer model: {SUMMARIZER_MODEL_DIR}")
+    print(f"\nSaved summarizer model: {model_out}")
     print(json.dumps(metrics, ensure_ascii=False, indent=2))
     return metrics
 
@@ -362,9 +379,11 @@ def evaluate(
     max_source_len: int = DEFAULT_SUMMARIZER_MAX_SOURCE_LEN,
     max_target_len: int = DEFAULT_SUMMARIZER_MAX_TARGET_LEN,
     num_beams: int = DEFAULT_SUMMARIZER_NUM_BEAMS,
+    data_dir: Path | None = None,
+    output_dir: Path | None = None,
 ):
-    model_dir = pretrained_dir or str(SUMMARIZER_MODEL_DIR)
-    dataframe = load_data()
+    model_dir = pretrained_dir or str(output_dir or SUMMARIZER_MODEL_DIR)
+    dataframe = load_data(data_dir)
     tokenizer = AutoTokenizer.from_pretrained(model_dir)
     model = AutoModelForSeq2SeqLM.from_pretrained(model_dir)
 
@@ -379,9 +398,10 @@ def evaluate(
         max_target_len=max_target_len,
     )
 
+    eval_out = (output_dir or SUMMARIZER_MODEL_DIR) / "eval_tmp"
     data_collator = DataCollatorForSeq2Seq(tokenizer=tokenizer, model=model)
     training_args = build_training_args(
-        output_dir=str(SUMMARIZER_MODEL_DIR / "eval_tmp"),
+        output_dir=str(eval_out),
         per_device_eval_batch_size=DEFAULT_EVAL_BATCH_SIZE,
         predict_with_generate=True,
         generation_num_beams=num_beams,
@@ -415,15 +435,22 @@ def main():
     parser.add_argument("--length-penalty", type=float, default=DEFAULT_SUMMARIZER_LENGTH_PENALTY)
     parser.add_argument("--no-repeat-ngram", type=int, default=DEFAULT_SUMMARIZER_NO_REPEAT_NGRAM)
     parser.add_argument("--early-stopping-patience", type=int, default=DEFAULT_SUMMARIZER_EARLY_STOPPING_PATIENCE)
+    parser.add_argument("--data-dir", type=str, default=None, help="CSV 데이터 디렉토리 (Kaggle: /kaggle/input/<dataset>/)")
+    parser.add_argument("--output-dir", type=str, default=None, help="모델 저장 디렉토리 (Kaggle: /kaggle/working/summarizer_kobart/)")
     parser.add_argument("--eval-only", action="store_true")
     args = parser.parse_args()
 
+    data_dir = Path(args.data_dir) if args.data_dir else None
+    output_dir = Path(args.output_dir) if args.output_dir else None
+
     if args.eval_only:
         evaluate(
-            pretrained_dir=str(SUMMARIZER_MODEL_DIR),
+            pretrained_dir=args.output_dir,
             max_source_len=args.max_source_len,
             max_target_len=args.max_target_len,
             num_beams=args.num_beams,
+            data_dir=data_dir,
+            output_dir=output_dir,
         )
         return
 
@@ -440,6 +467,8 @@ def main():
         length_penalty=args.length_penalty,
         no_repeat_ngram_size=args.no_repeat_ngram,
         early_stopping_patience=args.early_stopping_patience,
+        data_dir=data_dir,
+        output_dir=output_dir,
     )
 
 

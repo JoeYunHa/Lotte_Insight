@@ -225,14 +225,16 @@ def main():
 
     print("=" * 60)
     for i, (article, result) in enumerate(zip(articles, results), 1):
-        parsed = result["parsed"] or {}
-        print(f"[{i}] 제목:    {article['title']}")
-        print(f"     라벨:    {article.get('primary_label', '-')}")
+        parsed = result["parsed"]
+        parse_ok = parsed is not None
 
-        event_summary = parsed.get("event_summary", "") if parsed else ""
-        event_summary = event_summary or result["raw"]
-        key_players = [p for p in (parsed.get("key_players") or []) if p and p != "nan"] if parsed else []
-        lotte_stance = parsed.get("lotte_stance", "") if parsed else ""
+        event_summary = parsed.get("event_summary", "") if parse_ok else ""
+        key_players = [p for p in (parsed.get("key_players") or []) if p and p != "nan"] if parse_ok else []
+        lotte_stance = parsed.get("lotte_stance", "") if parse_ok else ""
+
+        status = "JSON OK" if parse_ok else "JSON 파싱 실패"
+        print(f"[{i}] 제목:    {article['title']}")
+        print(f"     라벨:    {article.get('primary_label', '-')}  [{status}]")
 
         if event_summary:
             print(f"     요약:    {event_summary}")
@@ -244,8 +246,8 @@ def main():
         if lotte_stance:
             print(f"     분위기:  {lotte_stance}")
 
-        if args.raw:
-            print(f"     [RAW] {result['raw'][:200]}")
+        if args.raw or not parse_ok:
+            print(f"     [RAW] {result['raw'][:300]}")
         print()
 
 
