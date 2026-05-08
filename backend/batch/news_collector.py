@@ -2,6 +2,7 @@
 Collect Lotte Giants news articles from the Naver Search API.
 """
 
+import json
 import logging
 
 import requests
@@ -60,28 +61,43 @@ def _upsert_articles(items: list[NormalizedNewsItem]) -> int:
     return len(result.data)
 
 
+def _get_article_id_map(items: list[NormalizedNewsItem]) -> dict[str, int]:
+    urls = [item.link for item in items]
+    if not urls:
+        return {}
+    result = (
+        supabase.table("articles")
+        .select("id, source_url")
+        .in_("source_url", urls)
+        .execute()
+    )
+    return {row["source_url"]: row["id"] for row in result.data}
+
+
 def _label_and_link_players(items: list[NormalizedNewsItem]) -> None:
+    id_map = _get_article_id_map(items)
+
+    label_rows: list[dict] = []
+    summary_updates: list[tuple[int, str]] = []
+    player_rows: list[dict] = []
+
     for item in items:
-        result = (
-            supabase.table("articles")
-            .select("id")
-            .eq("source_url", item.link)
-            .limit(1)
-            .execute()
-        )
-        if not result.data:
+        article_id = id_map.get(item.link)
+        if not article_id:
             continue
-        article_id = result.data[0]["id"]
 
         label_result = classify(item.title, item.description_snippet)
-        supabase.table("article_labels").upsert(
+        label_rows.append(
             {
                 "article_id": article_id,
                 "label": label_result["label"],
                 "confidence": label_result["confidence"],
-            },
-            on_conflict="article_id",
-        ).execute()
+            }
+        )
+        for secondary in label_result.get("secondary_labels", []):
+            label_rows.append(
+                {"article_id": article_id, "label": secondary, "confidence": None}
+            )
 
         summary_result = summarize_article(
             title=item.title,
@@ -89,25 +105,31 @@ def _label_and_link_players(items: list[NormalizedNewsItem]) -> None:
             primary_label=label_result["label"],
             published_at=item.published_date,
         )
-        event_summary = summary_result.get("event_summary", "")
-        if event_summary:
-            (
-                supabase.table("articles")
-                .update({"event_summary": event_summary})
-                .eq("id", article_id)
-                .execute()
+        if summary_result.get("event_summary"):
+            summary_updates.append(
+                (article_id, json.dumps(summary_result, ensure_ascii=False))
             )
 
-        player_ids = extract_players(item.title)
-        if player_ids:
-            player_rows = [
-                {"article_id": article_id, "player_id": player_id}
-                for player_id in player_ids
-            ]
-            supabase.table("article_players").upsert(
-                player_rows,
-                on_conflict="article_id,player_id",
-            ).execute()
+        for player_id in extract_players(item.title):
+            player_rows.append({"article_id": article_id, "player_id": player_id})
+
+    if label_rows:
+        supabase.table("article_labels").upsert(
+            label_rows, on_conflict="article_id,label"
+        ).execute()
+
+    for article_id, json_str in summary_updates:
+        (
+            supabase.table("articles")
+            .update({"event_summary": json_str})
+            .eq("id", article_id)
+            .execute()
+        )
+
+    if player_rows:
+        supabase.table("article_players").upsert(
+            player_rows, on_conflict="article_id,player_id"
+        ).execute()
 
 
 def run() -> int:

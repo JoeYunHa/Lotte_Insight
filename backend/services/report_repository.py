@@ -101,5 +101,11 @@ def fetch_latest_player_stats(player_id: int) -> dict:
 
 
 def list_active_players() -> list[dict]:
-    result = supabase.table("players").select("id, name").eq("status", "active").execute()
+    # "active" is set by sync_players.py; "1군" handles legacy seeds before the sync ran.
+    result = (
+        supabase.table("players")
+        .select("id, name")
+        .in_("status", ["active", "1군"])
+        .execute()
+    )
     return result.data
