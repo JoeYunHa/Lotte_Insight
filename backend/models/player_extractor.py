@@ -1,4 +1,4 @@
-from services.player_catalog import build_player_alias_index, invalidate_cache
+from services.player_catalog import build_player_alias_index
 
 
 def extract_players(title: str) -> list[int]:

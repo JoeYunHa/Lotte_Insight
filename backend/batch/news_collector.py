@@ -4,16 +4,19 @@ Collect Lotte Giants news articles from the Naver Search API.
 
 import json
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import requests
 
 from core.config import settings
 from core.database import supabase
-from models.classifier import classify
+from models.classifier import classify_batch
 from models.player_extractor import extract_players
-from models.summarizer import summarize as summarize_article
+from models.summarizer import summarize_batch
 from services.article_utils import NormalizedNewsItem, normalize_naver_news_item
 from services.player_catalog import list_player_names
+
+_FETCH_WORKERS = 8
 
 logger = logging.getLogger(__name__)
 
@@ -44,70 +47,103 @@ def _normalized_items(items: list[dict]) -> list[NormalizedNewsItem]:
     return normalized_items
 
 
-def _upsert_articles(items: list[NormalizedNewsItem]) -> int:
-    rows = [
+def _run_inference(items: list[NormalizedNewsItem]) -> list[dict]:
+    """Classify all items in batch, then summarize in batch. Returns enriched dicts."""
+    total = len(items)
+    logger.info("Inference started: %d items", total)
+
+    articles = [{"title": item.title, "description_snippet": item.description_snippet} for item in items]
+    label_results = classify_batch(articles)
+    logger.info("Classification done: %d items", total)
+
+    summarizer_inputs = [
         {
-            "source_url": item.link,
-            "source_name": item.source_name,
             "title": item.title,
-            "published_at": item.published_at,
+            "description_snippet": item.description_snippet,
+            "primary_label": label_result["label"],
+            "published_at": item.published_date,
         }
-        for item in items
+        for item, label_result in zip(items, label_results)
     ]
+    summary_results = summarize_batch(summarizer_inputs)
+    logger.info("Summarization done: %d items", total)
+
+    enriched = []
+    for item, label_result, summary_result in zip(items, label_results, summary_results):
+        event_summary_json = (
+            json.dumps(summary_result, ensure_ascii=False)
+            if summary_result.get("event_summary")
+            else None
+        )
+        enriched.append({
+            "item": item,
+            "label_result": label_result,
+            "event_summary_json": event_summary_json,
+        })
+    return enriched
+
+
+def _upsert_articles(enriched: list[dict]) -> int:
+    rows = []
+    for e in enriched:
+        row: dict = {
+            "source_url": e["item"].link,
+            "source_name": e["item"].source_name,
+            "title": e["item"].title,
+            "published_at": e["item"].published_at,
+        }
+        # event_summary_json이 None이면 row에서 제외 → upsert 시 기존 DB 값 보존
+        if e["event_summary_json"] is not None:
+            row["event_summary"] = e["event_summary_json"]
+        rows.append(row)
     if not rows:
         return 0
-
     result = supabase.table("articles").upsert(rows, on_conflict="source_url").execute()
-    return len(result.data)
+    saved = len(result.data)
+    logger.info("Upserted %d articles to DB", saved)
+    return saved
 
 
-def _get_article_id_map(items: list[NormalizedNewsItem]) -> dict[str, int]:
-    urls = [item.link for item in items]
+_ID_MAP_CHUNK_SIZE = 100
+
+
+def _get_article_id_map(enriched: list[dict]) -> dict[str, int]:
+    urls = [e["item"].link for e in enriched]
     if not urls:
         return {}
-    result = (
-        supabase.table("articles")
-        .select("id, source_url")
-        .in_("source_url", urls)
-        .execute()
-    )
-    return {row["source_url"]: row["id"] for row in result.data}
+    id_map: dict[str, int] = {}
+    for i in range(0, len(urls), _ID_MAP_CHUNK_SIZE):
+        chunk = urls[i : i + _ID_MAP_CHUNK_SIZE]
+        result = (
+            supabase.table("articles")
+            .select("id, source_url")
+            .in_("source_url", chunk)
+            .execute()
+        )
+        for row in result.data:
+            id_map[row["source_url"]] = row["id"]
+    return id_map
 
 
-def _label_and_link_players(items: list[NormalizedNewsItem]) -> None:
-    id_map = _get_article_id_map(items)
-
+def _save_labels_and_players(enriched: list[dict], id_map: dict[str, int]) -> None:
     label_rows: list[dict] = []
-    summary_updates: list[tuple[int, str]] = []
     player_rows: list[dict] = []
 
-    for item in items:
+    for e in enriched:
+        item = e["item"]
         article_id = id_map.get(item.link)
         if not article_id:
             continue
 
-        label_result = classify(item.title, item.description_snippet)
-        label_rows.append(
-            {
-                "article_id": article_id,
-                "label": label_result["label"],
-                "confidence": label_result["confidence"],
-            }
-        )
+        label_result = e["label_result"]
+        label_rows.append({
+            "article_id": article_id,
+            "label": label_result["label"],
+            "confidence": label_result["confidence"],
+        })
         for secondary in label_result.get("secondary_labels", []):
             label_rows.append(
                 {"article_id": article_id, "label": secondary, "confidence": None}
-            )
-
-        summary_result = summarize_article(
-            title=item.title,
-            description_snippet=item.description_snippet,
-            primary_label=label_result["label"],
-            published_at=item.published_date,
-        )
-        if summary_result.get("event_summary"):
-            summary_updates.append(
-                (article_id, json.dumps(summary_result, ensure_ascii=False))
             )
 
         for player_id in extract_players(item.title):
@@ -117,37 +153,39 @@ def _label_and_link_players(items: list[NormalizedNewsItem]) -> None:
         supabase.table("article_labels").upsert(
             label_rows, on_conflict="article_id,label"
         ).execute()
-
-    for article_id, json_str in summary_updates:
-        (
-            supabase.table("articles")
-            .update({"event_summary": json_str})
-            .eq("id", article_id)
-            .execute()
-        )
+        logger.info("Upserted %d label rows", len(label_rows))
 
     if player_rows:
         supabase.table("article_players").upsert(
             player_rows, on_conflict="article_id,player_id"
         ).execute()
+        logger.info("Upserted %d player-article rows", len(player_rows))
 
 
 def run() -> int:
+    from datetime import datetime, timezone, timedelta
+    from batch import game_collector
+
+    _KST = timezone(timedelta(hours=9))
+
     logger.info("News collection started")
 
     keywords = BASE_KEYWORDS + [
         f"{settings.team_name_ko} {name}"
-        for name in list_player_names()[: settings.article_keyword_limit]
+        for name in list_player_names(active_only=True)[: settings.article_keyword_limit]
     ]
 
     all_items: list[dict] = []
-    for keyword in keywords:
-        try:
-            items = _fetch_news(keyword)
-            all_items.extend(items)
-            logger.info("Collected %s items for keyword %s", len(items), keyword)
-        except Exception as exc:
-            logger.error("Failed to collect keyword %s: %s", keyword, exc)
+    with ThreadPoolExecutor(max_workers=_FETCH_WORKERS) as executor:
+        future_to_keyword = {executor.submit(_fetch_news, kw): kw for kw in keywords}
+        for future in as_completed(future_to_keyword):
+            keyword = future_to_keyword[future]
+            try:
+                items = future.result()
+                all_items.extend(items)
+                logger.info("Collected %d items for keyword '%s'", len(items), keyword)
+            except Exception as exc:
+                logger.error("Failed to collect keyword '%s': %s", keyword, exc)
 
     seen: set[str] = set()
     unique_items: list[dict] = []
@@ -156,10 +194,20 @@ def run() -> int:
         if url and url not in seen:
             seen.add(url)
             unique_items.append(item)
+    logger.info("Dedup: %d raw → %d unique", len(all_items), len(unique_items))
 
     normalized_items = _normalized_items(unique_items)
-    _upsert_articles(normalized_items)
-    _label_and_link_players(normalized_items)
+    logger.info("Normalized: %d items (dropped %d)", len(normalized_items), len(unique_items) - len(normalized_items))
+    enriched = _run_inference(normalized_items)
+    _upsert_articles(enriched)
+    id_map = _get_article_id_map(enriched)
+    _save_labels_and_players(enriched, id_map)
+
+    today_kst = datetime.now(_KST).date()
+    try:
+        game_collector.sync_game(today_kst)
+    except Exception as exc:
+        logger.warning("경기 데이터 동기화 실패 (무시): %s", exc)
 
     logger.info("News collection completed: %s items", len(unique_items))
     return len(unique_items)

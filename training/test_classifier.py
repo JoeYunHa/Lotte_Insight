@@ -14,7 +14,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "backend"))
 
-from models.classifier import classify
+from models.classifier import classify, classify_batch
 
 SAMPLE_ARTICLES = [
     {
@@ -55,12 +55,15 @@ def run(articles: list[dict], model_dir: str | None = None) -> None:
         import os
         os.environ["CLASSIFIER_MODEL_DIR"] = model_dir
         import models.classifier as _clf
-        _clf._model_loaded = False
+        _clf._runtime._loaded = False
 
     correct = 0
     print("=" * 60)
-    for i, article in enumerate(articles, 1):
-        result = classify(article["title"], article.get("description_snippet", ""))
+
+    batch = [{"title": a["title"], "description_snippet": a.get("description_snippet", "")} for a in articles]
+    results = classify_batch(batch)
+
+    for i, (article, result) in enumerate(zip(articles, results), 1):
         predicted = result["label"]
         expected = article.get("expected", "")
         mark = "O" if predicted == expected else "X"

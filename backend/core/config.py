@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     kbo_crawl_interval_hours: int = 2
     team_code: str = "LT"
     team_name_ko: str = "롯데"
-    article_keyword_limit: int = 20
+    article_keyword_limit: int = 60
     article_description_snippet_length: int = 120
     report_recent_days: int = 7
     player_report_article_limit: int = 10

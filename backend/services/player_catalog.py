@@ -31,7 +31,7 @@ class PlayerAliasIndex:
 
 
 def _fetch_players() -> list[dict]:
-    result = supabase.table("players").select("id, name, name_variants").execute()
+    result = supabase.table("players").select("id, name, name_variants, status").execute()
     return result.data
 
 
@@ -56,8 +56,16 @@ def build_player_alias_index(*, use_cache: bool = True) -> PlayerAliasIndex:
     )
 
 
-def list_player_names(*, use_cache: bool = True) -> list[str]:
-    return build_player_alias_index(use_cache=use_cache).all_names()
+_ACTIVE_STATUSES = {"active", "1군"}
+
+
+def list_player_names(*, use_cache: bool = True, active_only: bool = False) -> list[str]:
+    players = list_players(use_cache=use_cache)
+    if active_only:
+        players = [p for p in players if p.get("status") in _ACTIVE_STATUSES]
+    return PlayerAliasIndex(
+        aliases_by_player_id={p["id"]: _player_aliases(p) for p in players}
+    ).all_names()
 
 
 def player_name_to_id_map(*, use_cache: bool = True) -> dict[str, int]:

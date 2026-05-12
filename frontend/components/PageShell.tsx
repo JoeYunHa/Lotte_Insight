@@ -27,21 +27,27 @@ export function PageShell({
         className="sticky top-0 z-50 backdrop-blur-md"
         style={{ background: 'rgba(0, 18, 40, 0.92)', borderBottom: '1px solid var(--border)' }}
       >
-        <div className="max-w-2xl mx-auto px-4 h-14 flex items-center justify-between">
+        <div className="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div
-              className="w-7 h-7 rounded flex items-center justify-center text-sm font-bold"
+              className="w-8 h-8 rounded flex flex-col items-center justify-center gap-0 shrink-0"
               style={{ background: 'var(--red)', color: '#fff' }}
             >
-              L
+              <span className="text-sm font-bold leading-none">L</span>
+              <span className="text-[7px] font-bold tracking-widest leading-none opacity-80">DESK</span>
             </div>
-            <span className="font-semibold text-sm tracking-wide" style={{ color: 'var(--text)' }}>
-              롯데 인사이트
-            </span>
+            <div className="flex flex-col">
+              <span className="font-bold text-sm tracking-wide leading-none" style={{ color: 'var(--text)' }}>
+                롯데 인사이트
+              </span>
+              <span className="text-[10px] font-mono-code leading-none mt-0.5" style={{ color: 'var(--dim)' }}>
+                SAJIK MATCHDAY DESK
+              </span>
+            </div>
             {seasonBadge ? (
               <span
-                className="text-xs px-1.5 py-0.5 rounded font-mono-code"
-                style={{ background: 'var(--surface-2)', color: 'var(--muted)' }}
+                className="text-xs px-1.5 py-0.5 rounded font-mono-code ml-1"
+                style={{ background: 'var(--surface-2)', color: 'var(--muted)', border: '1px solid var(--border)' }}
               >
                 {seasonBadge}
               </span>
@@ -61,7 +67,7 @@ export function PageShell({
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-4 pb-20">{children}</main>
+      <main className="max-w-4xl mx-auto px-4 pb-24">{children}</main>
 
       {footer ? <footer className="text-center pb-8">{footer}</footer> : null}
     </div>

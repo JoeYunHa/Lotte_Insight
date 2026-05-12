@@ -60,24 +60,25 @@ SAMPLE_ARTICLES = [
 
 
 class JsonClosedStopping(StoppingCriteria):
-    """JSON 객체가 완전히 닫히면(중괄호 균형) 생성을 중단한다."""
+    """JSON 객체가 완전히 닫히면(중괄호 균형) 생성을 중단한다. greedy(num_beams=1) 전용."""
 
     def __init__(self, tokenizer):
         self.tokenizer = tokenizer
         self._depth = 0
         self._started = False
+        self._prev_len = 0
 
     def __call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor, **kwargs) -> bool:
-        text = self.tokenizer.decode(input_ids[0], skip_special_tokens=True)
-        depth = 0
-        started = False
-        for ch in text:
+        current = input_ids[0]
+        new_text = self.tokenizer.decode(current[self._prev_len:].tolist(), skip_special_tokens=True)
+        self._prev_len = len(current)
+        for ch in new_text:
             if ch == "{":
-                depth += 1
-                started = True
+                self._depth += 1
+                self._started = True
             elif ch == "}":
-                depth -= 1
-        return started and depth <= 0
+                self._depth -= 1
+        return self._started and self._depth <= 0
 
 
 def _extract_first_json(text: str) -> dict | None:
@@ -140,7 +141,7 @@ def summarize(
     model_dir: str | None = None,
     max_source_len: int = DEFAULT_SUMMARIZER_MAX_SOURCE_LEN,
     max_target_len: int = DEFAULT_SUMMARIZER_MAX_TARGET_LEN,
-    num_beams: int = DEFAULT_SUMMARIZER_NUM_BEAMS,
+    num_beams: int = 2,
     length_penalty: float = DEFAULT_SUMMARIZER_LENGTH_PENALTY,
     no_repeat_ngram_size: int = DEFAULT_SUMMARIZER_NO_REPEAT_NGRAM,
 ) -> list[dict]:
@@ -148,7 +149,7 @@ def summarize(
     print(f"모델 로드 중: {model_path}")
 
     tokenizer = AutoTokenizer.from_pretrained(model_path)
-    model = AutoModelForSeq2SeqLM.from_pretrained(model_path)
+    model = AutoModelForSeq2SeqLM.from_pretrained(model_path, tie_word_embeddings=False)
     model.eval()
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -165,18 +166,19 @@ def summarize(
             return_tensors="pt",
         ).to(device)
 
-        stopping = StoppingCriteriaList([JsonClosedStopping(tokenizer)])
+        gen_kwargs: dict = dict(
+            max_new_tokens=max_target_len,
+            max_length=None,
+            num_beams=num_beams,
+            length_penalty=length_penalty,
+            no_repeat_ngram_size=no_repeat_ngram_size,
+            early_stopping=DEFAULT_SUMMARIZER_EARLY_STOPPING,
+        )
+        if num_beams == 1:
+            gen_kwargs["stopping_criteria"] = StoppingCriteriaList([JsonClosedStopping(tokenizer)])
 
         with torch.no_grad():
-            output_ids = model.generate(
-                **inputs,
-                max_new_tokens=max_target_len,
-                num_beams=num_beams,
-                length_penalty=length_penalty,
-                no_repeat_ngram_size=no_repeat_ngram_size,
-                early_stopping=DEFAULT_SUMMARIZER_EARLY_STOPPING,
-                stopping_criteria=stopping,
-            )
+            output_ids = model.generate(**inputs, **gen_kwargs)
 
         raw = tokenizer.decode(output_ids[0], skip_special_tokens=True).strip()
         parsed = _extract_first_json(raw)
@@ -193,7 +195,7 @@ def main():
     parser.add_argument("--date", type=str, default="", help="발행일 (예: 2026-05-06)")
     parser.add_argument("--game-context", type=str, default="", help="경기 컨텍스트 (선택)")
     parser.add_argument("--model-dir", type=str, default=None, help="모델 디렉토리 경로")
-    parser.add_argument("--beams", type=int, default=DEFAULT_SUMMARIZER_NUM_BEAMS, help="빔 수")
+    parser.add_argument("--beams", type=int, default=2, help="빔 수 (기본 2, 품질 검증 시 --beams 6)")
     parser.add_argument("--max-len", type=int, default=DEFAULT_SUMMARIZER_MAX_TARGET_LEN, help="최대 출력 토큰 수")
     parser.add_argument("--length-penalty", type=float, default=DEFAULT_SUMMARIZER_LENGTH_PENALTY, help="길이 패널티")
     parser.add_argument("--no-repeat-ngram", type=int, default=DEFAULT_SUMMARIZER_NO_REPEAT_NGRAM, help="반복 억제 n-gram 크기")

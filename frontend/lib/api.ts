@@ -1,5 +1,6 @@
 import type {
   Article,
+  HomeReport,
   LabelKey,
   PlayerDailyReport,
   PlayerDetail,
@@ -72,4 +73,8 @@ export async function getPlayerReport(
   date: string
 ): Promise<PlayerDailyReport | null> {
   return getOrNull<PlayerDailyReport>(`/reports/players/${playerId}/${date}`)
+}
+
+export async function getHomeReport(date: string): Promise<HomeReport> {
+  return get<HomeReport>(`/reports/home?report_date=${date}`)
 }

@@ -1,5 +1,34 @@
 import type { Article, LabelKey, Player, PlayerMention } from './types'
 
+export interface SentimentRatio {
+  positive: number  // ratio out of analyzed articles only
+  neutral: number
+  negative: number
+  analyzed: number  // articles with lotte_stance populated
+}
+
+export function computeSentiment(articles: Article[]): SentimentRatio {
+  let positive = 0, neutral = 0, negative = 0
+  for (const a of articles) {
+    if (a.lotte_stance === '긍정') positive++
+    else if (a.lotte_stance === '부정') negative++
+    else if (a.lotte_stance === '중립') neutral++
+  }
+  const analyzed = positive + neutral + negative
+  return {
+    positive: analyzed ? positive / analyzed : 0,
+    neutral: analyzed ? neutral / analyzed : 0,
+    negative: analyzed ? negative / analyzed : 0,
+    analyzed,
+  }
+}
+
+export function getLeadLabel(labelCounts: Record<LabelKey, number>): LabelKey | null {
+  const entries = Object.entries(labelCounts) as [LabelKey, number][]
+  const sorted = entries.filter(([, count]) => count > 0).sort(([, a], [, b]) => b - a)
+  return sorted[0]?.[0] ?? null
+}
+
 export function computeLabelCounts(articles: Article[]): Record<LabelKey, number> {
   const counts: Record<LabelKey, number> = {
     MATCH_RELATED: 0,

@@ -2,6 +2,7 @@
 Generate daily team and player reports.
 """
 
+import json
 import logging
 from datetime import date, timedelta
 
@@ -13,6 +14,33 @@ from services import report_repository
 logger = logging.getLogger(__name__)
 _openai_client: OpenAI | None = None
 
+_LABEL_NAMES_KO: dict[str, str] = {
+    "MATCH_RELATED": "경기",
+    "INJURY_ROSTER": "부상·엔트리",
+    "TRANSACTION_CONTRACT": "거래·계약",
+    "PERFORMANCE_ANALYSIS": "성적 분석",
+    "INTERVIEW": "인터뷰",
+    "CLUB_OPERATION": "구단 운영",
+    "ETC": "기타",
+}
+
+_TEAM_SYSTEM_PROMPT = (
+    "당신은 KBO {team_name_ko} 자이언츠 전문 여론 분석가입니다. "
+    "오늘 수집된 뉴스 데이터를 받아 팬이 읽기 좋은 브리핑을 작성합니다.\n\n"
+    "[목표]\n"
+    "제공된 기사 분류 현황, 주요 언급 선수, 핵심 이슈 요약을 근거로 "
+    "팬 관점에서 오늘 롯데 여론의 핵심을 150자 이내 한국어 문단으로 작성하세요.\n\n"
+    "[원칙]\n"
+    "- 제공된 데이터에 없는 내용은 절대 사용하지 마세요.\n"
+    "- 구체적인 이슈와 선수명을 포함하세요.\n"
+    "- 단정적 예측, 추측, 부상 상태 추정은 금지합니다.\n"
+    "- 불릿, 제목, 이모지 사용 금지.\n"
+    "- 출력은 한 문단만 작성하세요."
+)
+
+_TEAM_REPORT_MAX_TOKENS = 250
+_TEAM_EVENT_TEXT_LIMIT = 8
+
 
 def _get_openai() -> OpenAI:
     global _openai_client
@@ -20,6 +48,15 @@ def _get_openai() -> OpenAI:
         _openai_client = OpenAI(api_key=settings.openai_api_key)
     return _openai_client
 
+
+def _extract_event_summary(raw_summary: str | None) -> str:
+    if not raw_summary:
+        return ""
+    try:
+        parsed = json.loads(raw_summary)
+        return parsed.get("event_summary") or ""
+    except (json.JSONDecodeError, TypeError, AttributeError):
+        return ""
 
 
 def _summarize_label_counts(articles: list[dict]) -> dict[str, int]:
@@ -40,25 +77,110 @@ def _summarize_player_mentions(mentions: list[dict]) -> dict[str, int]:
     return player_mentions
 
 
+def _build_team_event_texts(articles: list[dict]) -> list[str]:
+    """라벨별 최대 2건씩 균형 있게 뽑아 GPT 입력용 텍스트 목록을 만든다."""
+    from collections import defaultdict
+    buckets: dict[str, list[str]] = defaultdict(list)
+    unlabeled: list[str] = []
+
+    for article in articles:
+        event_summary = _extract_event_summary(article.get("event_summary"))
+        text = event_summary or article.get("title", "")
+        if not text:
+            continue
+        labels = article.get("article_labels") or []
+        label = labels[0]["label"] if labels else None
+        if label:
+            buckets[label].append(text)
+        else:
+            unlabeled.append(text)
+
+    texts: list[str] = []
+    per_label = max(1, _TEAM_EVENT_TEXT_LIMIT // max(len(buckets), 1))
+    for bucket in buckets.values():
+        texts.extend(bucket[:per_label])
+        if len(texts) >= _TEAM_EVENT_TEXT_LIMIT:
+            break
+    remaining = _TEAM_EVENT_TEXT_LIMIT - len(texts)
+    if remaining > 0:
+        texts.extend(unlabeled[:remaining])
+    return texts[:_TEAM_EVENT_TEXT_LIMIT]
+
+
+def _build_team_gpt_prompt(
+    article_count: int,
+    label_counts: dict[str, int],
+    player_mentions: dict[str, int],
+    event_texts: list[str],
+) -> str:
+    label_summary = ", ".join(
+        f"{_LABEL_NAMES_KO.get(label, label)} {count}건"
+        for label, count in sorted(label_counts.items(), key=lambda x: -x[1])
+        if count > 0
+    ) or "없음"
+    top_players = sorted(player_mentions.items(), key=lambda x: -x[1])[:5]
+    player_summary = ", ".join(f"{name}({count}회)" for name, count in top_players) or "없음"
+    texts_block = "\n".join(f"- {t}" for t in event_texts) or "- (이슈 요약 없음)"
+    return (
+        f"기사 수: {article_count}건\n"
+        f"라벨 분포: {label_summary}\n"
+        f"주요 언급 선수: {player_summary}\n"
+        f"주요 이슈 요약:\n{texts_block}"
+    )
+
+
+def _generate_team_insight(user_prompt: str) -> str | None:
+    try:
+        response = _get_openai().chat.completions.create(
+            model=settings.openai_model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": _TEAM_SYSTEM_PROMPT.format(team_name_ko=settings.team_name_ko),
+                },
+                {"role": "user", "content": user_prompt},
+            ],
+            max_tokens=_TEAM_REPORT_MAX_TOKENS,
+            temperature=0.4,
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as exc:
+        logger.error("Failed to generate team insight via GPT: %s", exc)
+        return None
+
+
 def _format_team_report(today: date, articles: list[dict], mentions: list[dict]) -> dict:
     label_counts = _summarize_label_counts(articles)
     player_mentions = _summarize_player_mentions(mentions)
+    top_labels = [
+        label
+        for label, _ in sorted(label_counts.items(), key=lambda x: -x[1])[:3]
+        if label_counts[label] > 0
+    ]
 
-    label_summary = ", ".join(
-        f"{label} {count}건"
-        for label, count in sorted(label_counts.items(), key=lambda item: -item[1])
-    ) or "없음"
-    top_players = sorted(player_mentions.items(), key=lambda item: -item[1])[:5]
-    player_summary = ", ".join(f"{name}({count})" for name, count in top_players) or "없음"
-    top_labels = [label for label, _ in sorted(label_counts.items(), key=lambda item: -item[1])[:3]]
+    event_texts = _build_team_event_texts(articles)
+    user_prompt = _build_team_gpt_prompt(len(articles), label_counts, player_mentions, event_texts)
+    insight = _generate_team_insight(user_prompt)
+
+    if not insight:
+        # GPT 실패 시 템플릿 fallback
+        label_summary = ", ".join(
+            f"{_LABEL_NAMES_KO.get(l, l)} {c}건"
+            for l, c in sorted(label_counts.items(), key=lambda x: -x[1])
+            if c > 0
+        ) or "없음"
+        top_players = sorted(player_mentions.items(), key=lambda x: -x[1])[:5]
+        player_summary = ", ".join(f"{name}({cnt})" for name, cnt in top_players) or "없음"
+        insight = (
+            f"오늘 {settings.team_name_ko} 자이언츠 관련 기사 {len(articles)}건. "
+            f"분류 현황: {label_summary}. "
+            f"주요 언급 선수: {player_summary}."
+        )
+        logger.warning("Team insight fallback to template (GPT unavailable)")
 
     return {
         "date": today.isoformat(),
-        "issue_summary": (
-            f"오늘 {settings.team_name_ko} 자이언츠 관련 기사 {len(articles)}건\n"
-            f"분류 현황: {label_summary}\n"
-            f"주요 언급 선수: {player_summary}"
-        ),
+        "issue_summary": insight,
         "article_count": len(articles),
         "top_labels": top_labels,
     }
@@ -81,11 +203,14 @@ def _collect_recent_titles(player_id: int, since: date) -> list[str]:
         since=since,
         limit=settings.player_report_article_limit,
     )
-    return [
-        row["articles"].get("event_summary") or row["articles"]["title"]
-        for row in article_rows
-        if row.get("articles")
-    ]
+    results = []
+    for row in article_rows:
+        article = row.get("articles")
+        if not article:
+            continue
+        summary = _extract_event_summary(article.get("event_summary"))
+        results.append(summary or article["title"])
+    return results
 
 
 def _format_stats_snapshot(stat_snapshot: dict) -> str:

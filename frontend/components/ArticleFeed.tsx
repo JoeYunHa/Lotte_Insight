@@ -35,37 +35,61 @@ export function ArticleFeed({ articles }: Props) {
     <div>
       {/* ── Filter tabs (sticky under header) ── */}
       <div
-        className="sticky top-14 z-40 -mx-4 px-4 pb-3 pt-2"
-        style={{ background: 'var(--bg)' }}
+        className="sticky top-14 z-40 -mx-4 px-4 pt-2"
+        style={{
+          background: 'rgba(6, 19, 37, 0.96)',
+          backdropFilter: 'blur(8px)',
+          borderBottom: '1px solid var(--border)',
+        }}
       >
-        <div className="flex gap-1.5 overflow-x-auto pb-1">
-          {tabs.map(tab => {
-            const isActive = activeFilter === tab.key
-            return (
-              <button
-                key={tab.key}
-                onClick={() => setActiveFilter(tab.key)}
-                className="flex-none flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all whitespace-nowrap"
-                style={{
-                  background: isActive ? 'var(--red)' : 'var(--surface)',
-                  color: isActive ? '#fff' : 'var(--muted)',
-                  border: `1px solid ${isActive ? 'var(--red)' : 'var(--border)'}`,
-                }}
-              >
-                {tab.name}
-                {tab.count > 0 && (
-                  <span
-                    className="font-mono-code"
-                    style={{ opacity: isActive ? 0.85 : 0.6, fontSize: '10px' }}
-                  >
-                    {tab.count}
-                  </span>
-                )}
-              </button>
-            )
-          })}
+        {/* FILTER DESK label */}
+        <p
+          className="text-[9px] font-mono-code uppercase tracking-widest mb-1"
+          style={{ color: 'var(--dim)' }}
+        >
+          FILTER DESK
+        </p>
+
+        {/* Tabs with right fade mask */}
+        <div className="relative">
+          <div
+            className="absolute right-0 top-0 bottom-0 w-8 pointer-events-none z-10"
+            style={{
+              background: 'linear-gradient(to right, transparent, rgba(6,19,37,0.96))',
+            }}
+          />
+          <div className="flex gap-0 overflow-x-auto">
+            {tabs.map(tab => {
+              const isActive = activeFilter === tab.key
+              return (
+                <button
+                  key={tab.key}
+                  onClick={() => setActiveFilter(tab.key)}
+                  className="flex-none flex items-center gap-1.5 px-3 py-2.5 text-xs transition-all whitespace-nowrap"
+                  style={{
+                    color: isActive ? 'var(--text)' : 'var(--dim)',
+                    fontWeight: isActive ? 700 : 500,
+                    borderBottom: isActive ? '2px solid var(--red)' : '2px solid transparent',
+                    marginBottom: '-1px',
+                  }}
+                >
+                  {tab.name}
+                  {tab.count > 0 && (
+                    <span
+                      className="font-mono-code"
+                      style={{
+                        color: isActive ? 'var(--gold)' : 'var(--dim)',
+                        fontSize: '10px',
+                      }}
+                    >
+                      {tab.count}
+                    </span>
+                  )}
+                </button>
+              )
+            })}
+          </div>
         </div>
-        <div className="h-px w-full mt-2" style={{ background: 'var(--border)' }} />
       </div>
 
       {/* ── Article list ── */}

@@ -82,37 +82,36 @@ def _extract_first_json(text: str) -> dict | None:
     return None
 
 
-def _make_stopping_criteria():
+def _make_stopping_criteria(tokenizer, num_beams: int = 1):
+    # beam search에서는 step 사이에 0번 beam의 가설이 교체될 수 있어
+    # 증분 상태 기반 stopping이 depth를 잘못 추적한다. greedy(num_beams=1)에서만 사용.
+    if num_beams > 1:
+        return None
     try:
-        import torch
         from transformers import StoppingCriteria, StoppingCriteriaList
 
-        runtime = _runtime.get()
-        if runtime is None or runtime.tokenizer is None:
-            return None
-
         class _JsonClosedStopping(StoppingCriteria):
-            def __init__(self, tokenizer):
-                self._tokenizer = tokenizer
+            def __init__(self, tok):
+                self._tokenizer = tok
+                self._depth = 0
+                self._started = False
+                self._prev_len = 0
 
-            def __call__(
-                self,
-                input_ids: "torch.LongTensor",
-                scores: "torch.FloatTensor",
-                **kwargs,
-            ) -> bool:
-                text = self._tokenizer.decode(input_ids[0], skip_special_tokens=True)
-                depth = 0
-                started = False
-                for char in text:
-                    if char == "{":
-                        depth += 1
-                        started = True
-                    elif char == "}":
-                        depth -= 1
-                return started and depth <= 0
+            def __call__(self, input_ids, scores, **kwargs) -> bool:
+                current = input_ids[0]
+                new_text = self._tokenizer.decode(
+                    current[self._prev_len:].tolist(), skip_special_tokens=True
+                )
+                self._prev_len = len(current)
+                for ch in new_text:
+                    if ch == "{":
+                        self._depth += 1
+                        self._started = True
+                    elif ch == "}":
+                        self._depth -= 1
+                return self._started and self._depth <= 0
 
-        return StoppingCriteriaList([_JsonClosedStopping(runtime.tokenizer)])
+        return StoppingCriteriaList([_JsonClosedStopping(tokenizer)])
     except Exception:
         return None
 
@@ -136,6 +135,75 @@ def _build_source_text(
     if game_context:
         parts.append(f"game_context: {game_context.strip()}")
     return "\n".join(parts)
+
+
+_SUMMARIZE_BATCH_SIZE = 16
+
+
+def summarize_batch(articles: list[dict]) -> list[dict]:
+    """Batch inference for a list of article dicts.
+
+    Each dict may have: title, description_snippet, primary_label, published_at, game_context.
+    Returns a list of summary dicts in the same order as input.
+    Falls back to empty summaries on failure.
+    """
+    if not articles:
+        return []
+
+    runtime = _runtime.get()
+    if runtime is None or runtime.model is None or runtime.tokenizer is None:
+        return [_empty_summary() for _ in articles]
+
+    import torch
+
+    results: list[dict] = [_empty_summary()] * len(articles)
+
+    for start in range(0, len(articles), _SUMMARIZE_BATCH_SIZE):
+        chunk = articles[start : start + _SUMMARIZE_BATCH_SIZE]
+        sources = [
+            _build_source_text(
+                a.get("title", ""),
+                a.get("description_snippet", ""),
+                a.get("primary_label", ""),
+                a.get("published_at", ""),
+                a.get("game_context", ""),
+            )
+            for a in chunk
+        ]
+        try:
+            inputs = runtime.tokenizer(
+                sources,
+                max_length=_MAX_SOURCE_LEN,
+                truncation=True,
+                padding=True,
+                return_tensors="pt",
+            ).to(runtime.device)
+
+            with torch.no_grad():
+                output_ids = runtime.model.generate(
+                    **inputs,
+                    max_new_tokens=_MAX_TARGET_LEN,
+                    num_beams=_NUM_BEAMS,
+                    length_penalty=_LENGTH_PENALTY,
+                    no_repeat_ngram_size=_NO_REPEAT_NGRAM,
+                    early_stopping=True,
+                )
+
+            for i, ids in enumerate(output_ids):
+                raw = runtime.tokenizer.decode(ids, skip_special_tokens=True).strip()
+                parsed = _extract_first_json(raw) or {}
+                key_players = parsed.get("key_players") or []
+                if isinstance(key_players, str):
+                    key_players = [p.strip() for p in key_players.split(";") if p.strip()]
+                results[start + i] = {
+                    "event_summary": parsed.get("event_summary", ""),
+                    "lotte_stance": parsed.get("lotte_stance", ""),
+                    "key_players": [p for p in key_players if p and p != "nan"],
+                }
+        except Exception as exc:
+            logger.error("Summarizer batch inference failed for chunk [%d:%d] (%s)", start, start + len(chunk), exc)
+
+    return results
 
 
 def summarize(
@@ -169,12 +237,13 @@ def summarize(
 
         generation_kwargs: dict = {
             "max_new_tokens": _MAX_TARGET_LEN,
+            "max_length": None,
             "num_beams": _NUM_BEAMS,
             "length_penalty": _LENGTH_PENALTY,
             "no_repeat_ngram_size": _NO_REPEAT_NGRAM,
             "early_stopping": True,
         }
-        stopping = _make_stopping_criteria()
+        stopping = _make_stopping_criteria(runtime.tokenizer, num_beams=_NUM_BEAMS)
         if stopping is not None:
             generation_kwargs["stopping_criteria"] = stopping
 

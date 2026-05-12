@@ -1,25 +1,65 @@
-import Link from 'next/link'
 import { ArticleFeed } from '@/components/ArticleFeed'
-import { LabelBadge } from '@/components/Badges'
 import { PageShell } from '@/components/PageShell'
-import { getArticles, getPlayers, getTeamReport } from '@/lib/api'
-import { ALL_LABELS } from '@/lib/label-config'
-import { computeLabelCounts, getTopMentionedPlayersFromArticles } from '@/lib/selectors'
+import { HomeHeroDesk } from '@/components/HomeHeroDesk'
+import { SignalCard, SentimentBar } from '@/components/SignalCard'
+import { LeadIssueCard } from '@/components/LeadIssueCard'
+import { HotPlayerCard } from '@/components/HotPlayerCard'
+import { SectionHeader } from '@/components/SectionHeader'
+import { getArticles, getHomeReport } from '@/lib/api'
+import { LABEL_META } from '@/lib/label-config'
 import { formatDateKo, getTodayKST } from '@/lib/time'
+import type { LabelKey } from '@/lib/types'
 
 export const dynamic = 'force-dynamic'
+
+const ARTICLE_FEED_LIMIT = 30
+
+const LABEL_HEADLINE: Record<LabelKey, string> = {
+  MATCH_RELATED:        '경기 이슈',
+  INJURY_ROSTER:        '부상·엔트리 이슈',
+  TRANSACTION_CONTRACT: '거래·계약 이슈',
+  PERFORMANCE_ANALYSIS: '성적 분석',
+  INTERVIEW:            '선수단 인터뷰',
+  CLUB_OPERATION:       '구단 운영 이슈',
+  ETC:                  '여러 이슈',
+}
 
 export default async function HomePage() {
   const today = getTodayKST()
 
-  const [report, articles, players] = await Promise.all([
-    getTeamReport(today),
-    getArticles({ date: today }),
-    getPlayers(),
+  const [home, articles] = await Promise.all([
+    getHomeReport(today),
+    getArticles({ date: today, limit: ARTICLE_FEED_LIMIT }),
   ])
 
-  const labelCounts = computeLabelCounts(articles)
-  const topPlayers = getTopMentionedPlayersFromArticles(articles, players)
+  const {
+    article_count,
+    label_counts,
+    sentiment,
+    lead_label,
+    lead_summary,
+    lead_key_players,
+    top_players,
+    game_context,
+  } = home
+
+  const headline = lead_label
+    ? `오늘 롯데 여론은 ${LABEL_HEADLINE[lead_label]}가 지배했다`
+    : article_count > 0
+      ? '오늘 롯데 자이언츠 이슈를 정리했습니다'
+      : '아직 수집된 기사가 없습니다'
+
+  const topPlayerName = top_players[0]?.player.name
+  const subcopy =
+    article_count === 0
+      ? '오늘 수집된 기사가 아직 없습니다.'
+      : lead_label
+        ? `기사 ${article_count}건 수집, ${label_counts[lead_label]}건이 ${LABEL_META[lead_label].name} 관련${topPlayerName ? `이며 ${topPlayerName} 언급량이 가장 높았습니다.` : '.'}`
+        : `총 ${article_count}건의 기사가 수집됐습니다.`
+
+  const gameKicker = game_context
+    ? `vs ${game_context.opponent} · ${game_context.home_away} · ${game_context.game_time ?? ''}`
+    : 'MATCHDAY BRIEFING'
 
   return (
     <PageShell
@@ -27,86 +67,99 @@ export default async function HomePage() {
       seasonBadge="2026 KBO"
       footer={
         <p className="text-xs" style={{ color: 'var(--dim)' }}>
-          롯데 인사이트 · 뉴스 원문은 각 출처를 통해 확인하세요.
+          비공식 팬 서비스 · 롯데 인사이트 · 뉴스 원문은 각 출처에서 확인하세요
         </p>
       }
     >
-      <div className="pt-10 pb-6">
-        <p className="text-xs font-medium mb-3 font-mono-code" style={{ color: 'var(--muted)' }}>
-          {formatDateKo(today)}
-        </p>
-        <h1 className="font-serif-kr text-3xl font-black leading-tight mb-4" style={{ color: 'var(--text)' }}>
-          오늘의 롯데
-        </h1>
-        <div className="h-px w-full mb-4" style={{ background: 'var(--border)' }} />
-        {report ? (
-          <p className="text-sm leading-relaxed" style={{ color: 'var(--muted)' }}>
-            {report.issue_summary}
-          </p>
-        ) : (
-          <p className="text-sm" style={{ color: 'var(--dim)' }}>
-            오늘의 리포트가 아직 생성되지 않았습니다.
-          </p>
-        )}
-      </div>
+      {/* 1. Hero Desk */}
+      <HomeHeroDesk
+        date={formatDateKo(today)}
+        headline={headline}
+        subcopy={subcopy}
+        kicker={gameKicker}
+        metaStat={article_count > 0 ? { label: 'TODAY', value: String(article_count) } : undefined}
+      />
 
-      <div
-        className="rounded-lg p-4 mb-4"
-        style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
-      >
-        <div className="flex items-center gap-2 mb-3">
-          <span className="text-xs font-medium" style={{ color: 'var(--muted)' }}>
-            오늘 수집 기사
-          </span>
-          <span className="font-mono-code text-lg font-bold" style={{ color: 'var(--text)' }}>
-            {articles.length}
-          </span>
-          <span className="text-xs" style={{ color: 'var(--dim)' }}>
-            건
-          </span>
+      {/* 2. Matchday Signals */}
+      <section className="mb-12">
+        <SectionHeader label="MATCHDAY SIGNALS" />
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <SignalCard
+            title="수집 기사"
+            value={String(article_count)}
+            detail="건"
+            delay={0}
+          />
+          <SignalCard
+            title="핵심 이슈"
+            value={lead_label ? LABEL_META[lead_label].name : '—'}
+            detail={lead_label ? `${label_counts[lead_label]}건` : undefined}
+            delay={80}
+            accent="red"
+          />
+          <SignalCard
+            title="최다 언급"
+            value={top_players[0]?.player.name ?? '—'}
+            detail={top_players[0] ? `${top_players[0].mention_count}회` : undefined}
+            delay={160}
+            accent="gold"
+          />
+          <SignalCard
+            title="여론 온도"
+            value={sentiment.analyzed > 0 ? '' : '—'}
+            delay={240}
+          >
+            {sentiment.analyzed > 0 ? (
+              <SentimentBar
+                positive={sentiment.positive}
+                neutral={sentiment.neutral}
+                negative={sentiment.negative}
+                analyzed={sentiment.analyzed}
+                total={article_count}
+              />
+            ) : (
+              <p className="text-xs mt-1" style={{ color: 'var(--dim)' }}>분석 대기중</p>
+            )}
+          </SignalCard>
         </div>
-        {articles.length > 0 ? (
-          <div className="flex flex-wrap gap-x-4 gap-y-1.5">
-            {ALL_LABELS.filter(label => labelCounts[label] > 0).map(label => (
-              <div key={label} className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--muted)' }}>
-                <LabelBadge label={label} />
-                <span className="font-mono-code" style={{ color: 'var(--text)' }}>
-                  {labelCounts[label]}
-                </span>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-xs" style={{ color: 'var(--dim)' }}>
-            수집된 기사가 없습니다
-          </p>
-        )}
-      </div>
+      </section>
 
-      {topPlayers.length > 0 ? (
-        <div className="mb-8">
-          <p className="text-xs mb-2.5" style={{ color: 'var(--dim)' }}>
-            주요 언급 선수
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {topPlayers.map(({ player, mention_count }) => (
-              <Link
-                key={player.id}
-                href={`/players/${player.id}`}
-                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-sm transition-all hover:-translate-y-px"
-                style={{ borderColor: 'var(--border)', color: 'var(--muted)' }}
-              >
-                {player.name}
-                <span className="font-mono-code text-xs" style={{ color: 'var(--gold)' }}>
-                  {mention_count}회
-                </span>
-              </Link>
-            ))}
-          </div>
-        </div>
+      {/* 3. Lead Story */}
+      {lead_label ? (
+        <section className="mb-12">
+          <SectionHeader label="LEAD STORY" accent="red" />
+          <LeadIssueCard
+            label={lead_label}
+            summary={lead_summary ?? ''}
+            articleCount={label_counts[lead_label]}
+            keyPlayers={lead_key_players}
+          />
+        </section>
       ) : null}
 
-      <ArticleFeed articles={articles} />
+      {/* 4. Hot Players */}
+      {top_players.length > 0 ? (
+        <section className="mb-12">
+          <SectionHeader label="HOT PLAYERS" accent="gold" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {top_players.map((pm, i) => (
+              <HotPlayerCard
+                key={pm.player.id}
+                playerMention={pm}
+                rank={i + 1}
+                delay={i * 60}
+                highlight={i === 0}
+              />
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {/* 5. Article Feed */}
+      <section>
+        <SectionHeader label="DESK FILES" />
+        <ArticleFeed articles={articles} />
+      </section>
     </PageShell>
   )
 }

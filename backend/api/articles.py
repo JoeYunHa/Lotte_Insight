@@ -15,7 +15,7 @@ def list_articles(
     article_date: date | None = None,
     label: str | None = None,
     player_id: int | None = None,
-    limit: int = Query(default=20, le=100),
+    limit: int = Query(default=20, le=500),
     offset: int = 0,
 ):
     return list_article_records(

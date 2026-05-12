@@ -94,6 +94,96 @@ def _build_auxiliary_text(description_snippet: str) -> str:
     return description_snippet[: settings.article_description_snippet_length].strip()
 
 
+def _predict_from_probs(probs, label_classes: list[str], label_thresholds: dict[str, float]) -> dict:
+    active = sorted(
+        [
+            (index, float(prob))
+            for index, prob in enumerate(probs)
+            if prob >= label_thresholds.get(label_classes[index], 0.5)
+        ],
+        key=lambda item: item[1],
+        reverse=True,
+    )
+
+    if not active:
+        top_index = (
+            label_classes.index("ETC")
+            if "ETC" in label_classes
+            else int(probs.argmax())
+        )
+        return {
+            "label": "ETC",
+            "confidence": round(float(probs[top_index]), 4),
+            "secondary_labels": [],
+        }
+
+    top_index, confidence = active[0]
+    label = label_classes[top_index]
+    if label == "ETC":
+        non_etc = [(i, p) for i, p in active if label_classes[i] != "ETC"]
+        if non_etc:
+            top_index, confidence = non_etc[0]
+            label = label_classes[top_index]
+    secondary_labels = [label_classes[i] for i, _ in active if i != top_index]
+    return {"label": label, "confidence": round(confidence, 4), "secondary_labels": secondary_labels}
+
+
+_CLASSIFY_CHUNK_SIZE = 16
+
+
+def classify_batch(articles: list[dict]) -> list[dict]:
+    """Batch inference with chunking and per-chunk failure isolation.
+
+    Each dict must have 'title' and optionally 'description_snippet'.
+    Returns a list of result dicts in the same order as input.
+    A chunk that raises (e.g. OOM) falls back to keyword classification for
+    that chunk only; other chunks are unaffected.
+    """
+    if not articles:
+        return []
+
+    runtime = _runtime.get()
+    titles = [a.get("title", "") for a in articles]
+    snippets = [_build_auxiliary_text(a.get("description_snippet", "")) for a in articles]
+
+    if runtime is None or runtime.model is None or runtime.tokenizer is None:
+        return [_keyword_classify((t + " " + s).strip()) for t, s in zip(titles, snippets)]
+
+    import torch
+
+    label_classes: list[str] = runtime.extras["label_classes"]
+    label_thresholds: dict[str, float] = runtime.extras.get("label_thresholds", {})
+    results: list[dict] = [{}] * len(articles)
+
+    for start in range(0, len(articles), _CLASSIFY_CHUNK_SIZE):
+        end = start + _CLASSIFY_CHUNK_SIZE
+        chunk_titles = titles[start:end]
+        chunk_snippets = snippets[start:end]
+        try:
+            encoded = runtime.tokenizer(
+                chunk_titles,
+                chunk_snippets,
+                truncation="only_second",
+                padding="max_length",
+                max_length=128,
+                return_tensors="pt",
+            )
+            encoded = {k: v.to(runtime.device) for k, v in encoded.items()}
+            with torch.no_grad():
+                probs_batch = torch.sigmoid(runtime.model(**encoded).logits).cpu().numpy()
+            for i, probs in enumerate(probs_batch):
+                results[start + i] = _predict_from_probs(probs, label_classes, label_thresholds)
+        except Exception as exc:
+            logger.error(
+                "Classifier batch inference failed for chunk [%d:%d] (%s); using keyword fallback.",
+                start, end, exc,
+            )
+            for i, (t, s) in enumerate(zip(chunk_titles, chunk_snippets)):
+                results[start + i] = _keyword_classify((t + " " + s).strip())
+
+    return results
+
+
 def classify(title: str, description_snippet: str = "") -> dict:
     """
     Returns:
@@ -125,40 +215,7 @@ def classify(title: str, description_snippet: str = "") -> dict:
 
         label_classes: list[str] = runtime.extras["label_classes"]
         label_thresholds: dict[str, float] = runtime.extras.get("label_thresholds", {})
-        active = sorted(
-            [
-                (index, float(prob))
-                for index, prob in enumerate(probs)
-                if prob >= label_thresholds.get(label_classes[index], 0.5)
-            ],
-            key=lambda item: item[1],
-            reverse=True,
-        )
-
-        if not active:
-            top_index = (
-                label_classes.index("ETC")
-                if "ETC" in label_classes
-                else int(probs.argmax())
-            )
-            label = "ETC"
-            confidence = float(probs[top_index])
-            secondary_labels: list[str] = []
-        else:
-            top_index, confidence = active[0]
-            label = label_classes[top_index]
-            if label == "ETC":
-                non_etc = [(index, prob) for index, prob in active if label_classes[index] != "ETC"]
-                if non_etc:
-                    top_index, confidence = non_etc[0]
-                    label = label_classes[top_index]
-            secondary_labels = [label_classes[index] for index, _ in active if index != top_index]
-
-        return {
-            "label": label,
-            "confidence": round(confidence, 4),
-            "secondary_labels": secondary_labels,
-        }
+        return _predict_from_probs(probs, label_classes, label_thresholds)
     except Exception as exc:
         logger.error("Classifier inference failed (%s); using keyword fallback.", exc)
         return _keyword_classify(text)

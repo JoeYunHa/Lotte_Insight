@@ -50,9 +50,10 @@ def fetch_articles_for_day(target_date: date) -> list[dict]:
     start_at, end_at = utc_day_bounds(target_date)
     result = (
         supabase.table("articles")
-        .select("id, article_labels(label)")
+        .select("id, title, event_summary, article_labels(label, confidence)")
         .gte("published_at", start_at)
         .lte("published_at", end_at)
+        .order("published_at", desc=True)
         .execute()
     )
     return result.data
@@ -106,6 +107,29 @@ def list_active_players() -> list[dict]:
         supabase.table("players")
         .select("id, name")
         .in_("status", ["active", "1군"])
+        .execute()
+    )
+    return result.data
+
+
+def fetch_game_for_day(target_date: date) -> dict | None:
+    result = (
+        supabase.table("games")
+        .select("*")
+        .eq("date", target_date.isoformat())
+        .maybe_single()
+        .execute()
+    )
+    return result.data
+
+
+def fetch_player_mentions_with_position(article_ids: list[int]) -> list[dict]:
+    if not article_ids:
+        return []
+    result = (
+        supabase.table("article_players")
+        .select("player_id, players(id, name, position)")
+        .in_("article_id", article_ids)
         .execute()
     )
     return result.data

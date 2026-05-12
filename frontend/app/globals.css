@@ -8,30 +8,53 @@
   --color-navy-600: #0d2e6b;
   --color-navy-500: #153a84;
 
-  --color-lotte-red: #e4002b;
-  --color-lotte-red-dark: #b8001f;
+  --color-lotte-red: #e1062c;
+  --color-lotte-red-dark: #b90d28;
   --color-lotte-red-light: #ff1a3e;
 
-  --color-gold-500: #c8a84b;
+  --color-gold-500: #c7a35a;
   --color-gold-400: #d4b866;
 
   --color-cream-50: #fdf8f2;
-  --color-cream-100: #f5f2ed;
+  --color-cream-100: #f5efe6;
   --color-cream-200: #e8e4dc;
   --color-cream-300: #d0c8bb;
 }
 
 :root {
-  --bg: #001228;
-  --surface: #001a3a;
-  --surface-2: #002050;
-  --border: #1a3260;
-  --border-strong: #2a4480;
-  --text: #f5f2ed;
-  --muted: #7a8ba8;
-  --dim: #3a4d6e;
-  --red: #e4002b;
-  --gold: #c8a84b;
+  --bg: #061325;
+  --surface: #0d1d36;
+  --surface-2: #12284b;
+  --surface-3: #18345f;
+  --border: #20385f;
+  --border-strong: #315285;
+  --text: #f5efe6;
+  --muted: #9aa8bf;
+  --dim: #6f7f99;
+  --red: #e1062c;
+  --red-dark: #b90d28;
+  --gold: #c7a35a;
+  --win: #d8b15b;
+  --loss: #d94b5c;
+  --neutral: #7c8aa5;
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@utility animate-fade-up {
+  animation: fadeUp 0.45s ease both;
+}
+
+@utility animate-fade-in {
+  animation: fadeIn 0.35s ease both;
 }
 
 *, *::before, *::after {

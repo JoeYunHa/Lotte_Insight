@@ -30,8 +30,8 @@ class LazyArtifactsLoader:
     ) -> None:
         this_dir = Path(current_file).resolve().parent
         repo_root = this_dir.parent.parent
-        self._candidate_dirs = [
-            os.environ.get(env_var, ""),
+        self._env_var = env_var
+        self._static_dirs = [
             str(this_dir / deployed_dir_name),
             str(repo_root / "training" / "models" / training_dir_name),
         ]
@@ -43,7 +43,8 @@ class LazyArtifactsLoader:
         self._artifacts: ModelArtifacts | None = None
 
     def _find_model_dir(self) -> Path | None:
-        for candidate_dir in self._candidate_dirs:
+        candidates = [os.environ.get(self._env_var, "")] + self._static_dirs
+        for candidate_dir in candidates:
             if candidate_dir and (Path(candidate_dir) / self._required_file).exists():
                 return Path(candidate_dir)
         return None

@@ -81,3 +81,33 @@ export interface PlayerMention {
   player: Pick<Player, 'id' | 'name' | 'position'>
   mention_count: number
 }
+
+export interface GameContext {
+  date: string
+  opponent: string
+  venue: string
+  home_away: '홈' | '원정'
+  game_time: string | null
+  result: '승' | '패' | '무' | null
+  score: string | null
+}
+
+export interface SentimentData {
+  positive: number
+  neutral: number
+  negative: number
+  analyzed: number
+}
+
+export interface HomeReport {
+  date: string
+  article_count: number
+  label_counts: Record<LabelKey, number>
+  sentiment: SentimentData
+  lead_label: LabelKey | null
+  lead_summary: string | null
+  lead_key_players: string[]
+  top_players: PlayerMention[]
+  team_report: TeamDailyReport | null
+  game_context: GameContext | null
+}
