@@ -39,8 +39,8 @@ def _load_summarizer_artifacts(model_dir: Path) -> ModelArtifacts:
 _runtime = LazyArtifactsLoader(
     current_file=__file__,
     env_var="SUMMARIZER_MODEL_DIR",
-    deployed_dir_name="summarizer_kobart",
-    training_dir_name="summarizer_kobart",
+    deployed_dir_name="summarizer_kobart_v2",
+    training_dir_name="summarizer_kobart_v2",
     required_file="config.json",
     loader=_load_summarizer_artifacts,
     missing_log="Summarizer model not found; skipping event summary generation.",

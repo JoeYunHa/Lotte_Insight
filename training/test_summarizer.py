@@ -149,7 +149,8 @@ def summarize(
     print(f"모델 로드 중: {model_path}")
 
     tokenizer = AutoTokenizer.from_pretrained(model_path)
-    model = AutoModelForSeq2SeqLM.from_pretrained(model_path, tie_word_embeddings=False)
+    model = AutoModelForSeq2SeqLM.from_pretrained(model_path)
+    model.tie_weights()
     model.eval()
 
     device = "cuda" if torch.cuda.is_available() else "cpu"

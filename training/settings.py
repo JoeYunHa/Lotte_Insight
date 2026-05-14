@@ -13,7 +13,7 @@ REPO_ROOT = ROOT_DIR.parent
 BACKEND_DIR = REPO_ROOT / "backend"
 DATA_DIR = ROOT_DIR / "data"
 MODEL_DIR = ROOT_DIR / "models" / "classifier_koelectra"
-SUMMARIZER_MODEL_DIR = ROOT_DIR / "models" / "summarizer_kobart"
+SUMMARIZER_MODEL_DIR = ROOT_DIR / "models" / "summarizer_kobart_v2"
 
 LABELED_TITLES_CSV = DATA_DIR / "labeled_titles.csv"
 LABELED_PLAYERS_CSV = DATA_DIR / "labeled_players.csv"
