@@ -21,7 +21,7 @@ _NO_REPEAT_NGRAM = 3
 
 
 def _empty_summary() -> dict:
-    return {"event_summary": "", "lotte_stance": "", "key_players": []}
+    return {"event_summary": "", "lotte_stance": "", "player_stance": "", "key_players": []}
 
 
 def _load_summarizer_artifacts(model_dir: Path) -> ModelArtifacts:
@@ -56,6 +56,9 @@ def _regex_extract(text: str) -> dict:
     match = re.search(r'"lotte_stance"\s*:\s*"([^"]+)"', text)
     if match:
         result["lotte_stance"] = match.group(1)
+    match = re.search(r'"player_stance"\s*:\s*"([^"]+)"', text)
+    if match:
+        result["player_stance"] = match.group(1)
     players = re.findall(r'"key_players"\s*:\s*\[([^\]]*)\]', text)
     if players:
         names = re.findall(r'"([^"]+)"', players[0])
@@ -122,6 +125,7 @@ def _build_source_text(
     primary_label: str,
     published_at: str,
     game_context: str,
+    target_player: str = "",
 ) -> str:
     parts = ["news summary:"]
     parts.append(f"title: {clean_html(title.strip())}")
@@ -132,6 +136,8 @@ def _build_source_text(
         parts.append(f"published_at: {published_at.strip()}")
     if primary_label:
         parts.append(f"topic_label: {primary_label.strip()}")
+    if target_player:
+        parts.append(f"target_player: {target_player.strip()}")
     if game_context:
         parts.append(f"game_context: {game_context.strip()}")
     return "\n".join(parts)
@@ -167,6 +173,7 @@ def summarize_batch(articles: list[dict]) -> list[dict]:
                 a.get("primary_label", ""),
                 a.get("published_at", ""),
                 a.get("game_context", ""),
+                a.get("target_player", ""),
             )
             for a in chunk
         ]
@@ -198,10 +205,13 @@ def summarize_batch(articles: list[dict]) -> list[dict]:
                 results[start + i] = {
                     "event_summary": parsed.get("event_summary", ""),
                     "lotte_stance": parsed.get("lotte_stance", ""),
+                    "player_stance": parsed.get("player_stance", ""),
                     "key_players": [p for p in key_players if p and p != "nan"],
                 }
         except Exception as exc:
             logger.error("Summarizer batch inference failed for chunk [%d:%d] (%s)", start, start + len(chunk), exc)
+
+        logger.info("Summarize [%d/%d]", min(start + len(chunk), len(articles)), len(articles))
 
     return results
 
@@ -212,6 +222,7 @@ def summarize(
     primary_label: str = "",
     published_at: str = "",
     game_context: str = "",
+    target_player: str = "",
 ) -> dict:
     runtime = _runtime.get()
     if runtime is None or runtime.model is None or runtime.tokenizer is None:
@@ -223,6 +234,7 @@ def summarize(
         primary_label,
         published_at,
         game_context,
+        target_player,
     )
 
     try:
@@ -260,6 +272,7 @@ def summarize(
         return {
             "event_summary": parsed.get("event_summary", ""),
             "lotte_stance": parsed.get("lotte_stance", ""),
+            "player_stance": parsed.get("player_stance", ""),
             "key_players": [player for player in key_players if player and player != "nan"],
         }
     except Exception as exc:

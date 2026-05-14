@@ -50,8 +50,10 @@ SUMMARY_REQUIRED_COLUMNS = {
     "event_summary": "",
     "key_players": "",
     "lotte_stance": "neutral",
+    "player_stance": "",
     "game_ref": "false",
     "game_context": "",
+    "query_player": "",
 }
 
 def build_source_text(row: dict) -> str:
@@ -70,6 +72,10 @@ def build_source_text(row: dict) -> str:
     if topic_label:
         parts.append(f"topic_label: {topic_label}")
 
+    query_player = str(row.get("query_player", "") or "").strip()
+    if query_player:
+        parts.append(f"target_player: {query_player}")
+
     game_context = str(row.get("game_context", "") or "").strip()
     if game_context:
         parts.append(f"game_context: {game_context}")
@@ -85,10 +91,12 @@ def build_target_text(row: dict) -> str:
         key_players = [p.strip() for p in raw_kp.split(";") if p.strip()]
     else:
         key_players = []
-    return json.dumps(
-        {"event_summary": event_summary, "lotte_stance": lotte_stance, "key_players": key_players},
-        ensure_ascii=False,
-    )
+    player_stance = str(row.get("player_stance", "") or "").strip()
+    target = {"event_summary": event_summary, "lotte_stance": lotte_stance, "key_players": key_players}
+    # neutral은 명확한 학습 신호가 아니므로 제외, positive/negative만 포함
+    if player_stance in {"positive", "negative"}:
+        target["player_stance"] = player_stance
+    return json.dumps(target, ensure_ascii=False)
 
 
 def load_data(data_dir: Path | None = None) -> pd.DataFrame:

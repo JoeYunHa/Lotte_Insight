@@ -50,6 +50,7 @@ CSV_HEADERS = [
     "event_summary",
     "key_players",
     "lotte_stance",
+    "player_stance",
     "game_ref",
     "game_context",
 ]
@@ -109,7 +110,16 @@ Rules:
 - Do not invent facts that are not directly supported by the inputs.
 - `event_summary` must be one Korean sentence, typically 30-80 characters.
 - `key_players` must include 0-3 player names actually supported by the inputs.
-- `lotte_stance` must be one of: positive, negative, neutral.
+- `lotte_stance` reflects the outcome for the Lotte Giants team:
+  - "positive": Lotte players performed well, Lotte won, or news is favorable for Lotte.
+  - "negative": Opponent players excelled against Lotte, Lotte players were injured/slumping, or Lotte lost.
+  - "neutral": Transaction/contract news, general team operations, balanced reporting, or unclear impact on Lotte.
+  - IMPORTANT: If the article's main subject is an opponent player who performed well against Lotte, use "negative" — not "positive".
+- `player_stance` reflects how the article portrays the specific Lotte player named in `target_player`:
+  - "positive": The player is portrayed favorably — good performance, recovery, signing, milestones.
+  - "negative": The player is portrayed unfavorably — injury, slump, criticism, removal from roster.
+  - "neutral": The player is mentioned without a clear positive or negative tone, or `target_player` is not provided.
+  - Evaluate only the target player's portrayal, regardless of the team outcome.
 - `game_ref` is true only when the summary meaningfully uses the game context.
 
 Return:
@@ -120,6 +130,7 @@ Return:
       "event_summary": "롯데가 ...",
       "key_players": ["선수1"],
       "lotte_stance": "positive",
+      "player_stance": "positive",
       "game_ref": true
     }
   ]
@@ -571,6 +582,9 @@ def _build_summary_batch_payload(batch: list[tuple[int, dict]]) -> str:
         primary_label = row.get("primary_label", "")
         if primary_label:
             lines.append(f"topic_label: {primary_label}")
+        query_player = str(row.get("query_player", "") or "").strip()
+        if query_player:
+            lines.append(f"target_player: {query_player}")
         game_context = row.get("game_context", "")
         if game_context:
             lines.append(f"game_context: {game_context}")
@@ -655,9 +669,18 @@ def _normalize_summary_result(result: dict, row: dict) -> dict:
         if len(normalized_players) >= 3:
             break
 
-    stance = str(result.get("lotte_stance", "neutral")).strip().lower()
-    if stance not in {"positive", "negative", "neutral"}:
-        stance = "neutral"
+    lotte_stance = str(result.get("lotte_stance", "neutral")).strip().lower()
+    if lotte_stance not in {"positive", "negative", "neutral"}:
+        lotte_stance = "neutral"
+
+    query_player = str(row.get("query_player", "") or "").strip()
+    raw_player_stance = str(result.get("player_stance", "neutral")).strip().lower()
+    if raw_player_stance not in {"positive", "negative", "neutral"}:
+        raw_player_stance = "neutral"
+    # query_player가 key_players에 포함된 경우에만 player_stance 신뢰
+    # key_players에 없으면 기사의 실제 주제가 아닌 검색 노이즈일 가능성이 높음
+    player_is_key = query_player and query_player in normalized_players
+    player_stance = raw_player_stance if player_is_key else ""
 
     game_ref = str(bool(result.get("game_ref", False))).lower()
     event_summary = str(result.get("event_summary", "") or "").strip()
@@ -668,7 +691,8 @@ def _normalize_summary_result(result: dict, row: dict) -> dict:
     return {
         "event_summary": event_summary,
         "key_players": ";".join(normalized_players),
-        "lotte_stance": stance,
+        "lotte_stance": lotte_stance,
+        "player_stance": player_stance,
         "game_ref": game_ref,
     }
 
@@ -895,6 +919,123 @@ def add_structured_summaries(
     return rows
 
 
+PLAYER_STANCE_SYSTEM_PROMPT = """You classify how a Korean baseball news article portrays a specific player.
+
+Return compact JSON only.
+
+Rules:
+- Evaluate only the Lotte Giants player named in `target_player`.
+- Use the title and description to determine the article's tone toward that player.
+- "positive": favorable portrayal — good performance, recovery, signing, milestones, praise.
+- "negative": unfavorable portrayal — injury, slump, criticism, roster removal, controversy.
+- "neutral": factual mention without a clear positive or negative tone.
+
+Return:
+{
+  "items": [
+    {
+      "index": 0,
+      "player_stance": "positive"
+    }
+  ]
+}"""
+
+OPENAI_PLAYER_STANCE_MAX_TOKENS = 200
+
+
+def _build_player_stance_batch_payload(batch: list[tuple[int, dict]]) -> str:
+    lines = ["Classify player portrayal for each item and return JSON with an `items` array."]
+    for output_index, row in batch:
+        lines.append(f"\n[index={output_index}]")
+        lines.append(f"target_player: {row['query_player']}")
+        lines.append(f"title: {clean_snippet(str(row.get('title', '')))}")
+        description = clean_snippet(str(row.get("description_snippet", "") or ""))
+        if description:
+            lines.append(f"description: {description[:ARTICLE_SNIPPET_LENGTH]}")
+    return "\n".join(lines)
+
+
+def _call_player_stance_gpt_batch(batch: list[tuple[int, dict]]) -> tuple[dict[int, dict], set[int]]:
+    seq_to_actual = {seq: actual for seq, (actual, _) in enumerate(batch)}
+    seq_batch = [(seq, row) for seq, (_, row) in enumerate(batch)]
+    response = chat_json(
+        PLAYER_STANCE_SYSTEM_PROMPT,
+        _build_player_stance_batch_payload(seq_batch),
+        max_tokens=OPENAI_PLAYER_STANCE_MAX_TOKENS,
+    )
+    seq_parsed, seq_missing = _parse_batch_response(response, set(seq_to_actual.keys()))
+    actual_parsed = {seq_to_actual[s]: v for s, v in seq_parsed.items()}
+    actual_missing = {seq_to_actual[s] for s in seq_missing}
+    return actual_parsed, actual_missing
+
+
+def _player_stance_batch(batch: list[tuple[int, dict]]) -> list[tuple[int, str]]:
+    parsed, _missing = _call_player_stance_gpt_batch(batch)
+    results: list[tuple[int, str]] = []
+    for output_index, _row in batch:
+        if output_index in parsed:
+            raw = str(parsed[output_index].get("player_stance", "neutral")).strip().lower()
+            stance = raw if raw in {"positive", "negative", "neutral"} else "neutral"
+        else:
+            stance = "neutral"
+        results.append((output_index, stance))
+    return results
+
+
+def add_player_stances(rows: list[dict]) -> list[dict]:
+    """labeled_players.csv 전용: query_player가 key_players에 포함된 행에만 player_stance를 생성한다.
+
+    event_summary 등 기존 필드는 변경하지 않는다.
+    """
+    require_openai_api_key()
+
+    candidates: list[tuple[int, dict]] = []
+    for index, row in enumerate(rows):
+        if str(row.get("player_stance", "")).strip():
+            continue
+        query_player = str(row.get("query_player", "") or "").strip()
+        if not query_player:
+            continue
+        key_players = [p.strip() for p in str(row.get("key_players", "") or "").split(";") if p.strip()]
+        if query_player not in key_players:
+            continue
+        candidates.append((index, row))
+
+    if not candidates:
+        print("player_stance: 생성 대상 없음 (모두 이미 존재하거나 조건 미충족).")
+        return rows
+
+    print(
+        f"\nplayer_stance generation start - {len(candidates)} rows "
+        f"(model: {OPENAI_MODEL}, workers: {OPENAI_LABEL_MAX_WORKERS})"
+    )
+
+    batches = _iter_batches(candidates, OPENAI_LABEL_BATCH_SIZE)
+    completed = 0
+    fail = 0
+    with ThreadPoolExecutor(max_workers=OPENAI_LABEL_MAX_WORKERS) as executor:
+        future_map = {executor.submit(_player_stance_batch, batch): batch for batch in batches}
+        for future in as_completed(future_map):
+            batch = future_map[future]
+            completed += len(batch)
+            try:
+                stance_batch = future.result()
+                for output_index, stance in stance_batch:
+                    rows[output_index]["player_stance"] = stance
+            except Exception as exc:
+                fail += len(batch)
+                for output_index, _row in batch:
+                    rows[output_index]["player_stance"] = ""
+                    rows[output_index]["confidence_note"] = (
+                        f"{rows[output_index].get('confidence_note', '')};player_stance_failed:{exc}"
+                    ).strip(";")
+            print(f"  player_stance progress {completed:>4}/{len(candidates)}  fail {fail}")
+            time.sleep(AUTO_LABEL_SLEEP_SECONDS)
+
+    print(f"player_stance generation complete - rows {len(candidates)} / fail {fail}")
+    return rows
+
+
 def _normalize_csv_row(row: dict | None) -> dict:
     normalized = {header: "" for header in CSV_HEADERS}
     if not row:
@@ -1025,6 +1166,7 @@ __all__ = [
     "clean_html",
     "clean_snippet",
     "collect_news_by_keywords",
+    "add_player_stances",
     "add_structured_summaries",
     "build_game_context_for_row",
     "fetch_naver",
