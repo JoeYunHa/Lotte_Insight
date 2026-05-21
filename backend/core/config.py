@@ -1,5 +1,7 @@
+import json
 from pathlib import Path
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
 
 
@@ -49,7 +51,18 @@ class Settings(BaseSettings):
         "- 추측 금지"
     )
     is_lotte_related_threshold: float = 0.40
+    gpt_summary_labels: list[str] = ["MATCH_RELATED", "INJURY_ROSTER", "TRANSACTION_CONTRACT"]
     redis_url: str = ""
+
+    @field_validator("gpt_summary_labels", mode="before")
+    @classmethod
+    def _parse_list(cls, v: object) -> object:
+        if isinstance(v, str):
+            v = v.strip()
+            if v.startswith("["):
+                return json.loads(v)
+            return [item.strip() for item in v.split(",") if item.strip()]
+        return v
     app_env: str = "development"
     log_level: str = "INFO"
 

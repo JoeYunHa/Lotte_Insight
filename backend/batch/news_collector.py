@@ -10,10 +10,11 @@ import requests
 
 from core.config import settings
 from core.database import supabase
+from batch.gpt_summarizer import gpt_summarize_batch
 from models.classifier import classify_batch
 from models.lotte_related_detector import detect_is_lotte_related_batch
 from models.player_extractor import extract_players
-from models.summarizer import summarize_batch
+from models.stance_classifier import classify_stance_batch
 from services.article_utils import NormalizedNewsItem, normalize_naver_news_item
 from services.player_catalog import list_player_names
 
@@ -48,57 +49,76 @@ def _normalized_items(items: list[dict]) -> list[NormalizedNewsItem]:
     return normalized_items
 
 
+def _should_gpt_summarize(label_result: dict) -> bool:
+    summarizable = set(settings.gpt_summary_labels)
+    if label_result["label"] in summarizable:
+        return True
+    return any(s in summarizable for s in label_result.get("secondary_labels", []))
+
+
 def _run_inference(items: list[NormalizedNewsItem]) -> list[dict]:
-    """Gate by is_lotte_related, then classify and summarize only related items."""
+    """
+    Pipeline:
+      1. is_lotte_related gate (hybrid: rule + KoELECTRA)
+      2. label classification  (KoELECTRA multi-label, lotte-related only)
+      3. stance classification (KoELECTRA 3-class, lotte-related only)
+      4. GPT event_summary     (gpt-4o-mini, lotte-related + summarizable labels only)
+    """
     total = len(items)
     logger.info("Inference started: %d items", total)
 
     articles = [{"title": item.title, "description_snippet": item.description_snippet} for item in items]
-    lr_results = detect_is_lotte_related_batch(articles)
-    lotte_count = sum(1 for lr in lr_results if lr["is_lotte_related"])
-    logger.info("is_lotte_related: %d/%d items", lotte_count, total)
 
+    # Step 1: is_lotte_related
+    lr_results = detect_is_lotte_related_batch(articles)
     lotte_indices = [i for i, lr in enumerate(lr_results) if lr["is_lotte_related"]]
+    logger.info("is_lotte_related: %d/%d items", len(lotte_indices), total)
+
     related_articles = [articles[i] for i in lotte_indices]
+
+    # Step 2: label classification (lotte-related only)
     related_label_results = classify_batch(related_articles) if related_articles else []
     logger.info("Classification done: %d items", len(related_articles))
 
-    label_results = [
-        {"label": "ETC", "confidence": 0.0, "secondary_labels": []}
-        for _ in items
-    ]
+    label_results = [{"label": "ETC", "confidence": 0.0, "secondary_labels": []} for _ in items]
     for idx, label_result in zip(lotte_indices, related_label_results):
         label_results[idx] = label_result
 
-    summarizer_inputs = [
-        {
-            "title": items[i].title,
-            "description_snippet": items[i].description_snippet,
-            "primary_label": label_results[i]["label"],
-            "published_at": items[i].published_date,
-        }
-        for i in lotte_indices
+    # Step 3: stance classification (lotte-related only)
+    stance_results_related = classify_stance_batch(related_articles) if related_articles else []
+    stance_results = [{"label": None, "confidence": 0.0, "source": "not_applicable"} for _ in items]
+    for idx, stance in zip(lotte_indices, stance_results_related):
+        stance_results[idx] = stance
+    logger.info("Stance classification done: %d items", len(related_articles))
+
+    # Step 4: GPT event_summary (lotte-related + summarizable labels only)
+    gpt_indices = [
+        i for i in lotte_indices
+        if _should_gpt_summarize(label_results[i])
     ]
-    summary_list = summarize_batch(summarizer_inputs) if summarizer_inputs else []
-    summary_by_index = {idx: s for idx, s in zip(lotte_indices, summary_list)}
-    logger.info("Summarization done: %d items", len(summarizer_inputs))
+    gpt_inputs = [articles[i] for i in gpt_indices]
+    gpt_results_list = gpt_summarize_batch(gpt_inputs) if gpt_inputs else []
+    gpt_results = [{} for _ in items]
+    for idx, gpt_result in zip(gpt_indices, gpt_results_list):
+        gpt_results[idx] = gpt_result
+    logger.info("GPT summarization done: %d items", len(gpt_indices))
 
     enriched = []
     for i, (item, label_result, lr_result) in enumerate(zip(items, label_results, lr_results)):
+        stance = stance_results[i]
+        gpt = gpt_results[i]
         if lr_result["is_lotte_related"]:
-            summary = summary_by_index.get(i, {})
-            raw_stance = summary.get("lotte_stance") or None
-            lotte_stance = raw_stance if raw_stance in {"positive", "negative", "neutral"} else None
             event_summary_json = json.dumps(
                 {
                     "is_lotte_related": True,
                     "is_lotte_related_confidence": lr_result["confidence"],
                     "is_lotte_related_source": lr_result["source"],
-                    "lotte_stance": lotte_stance,
-                    "lotte_stance_source": "kobart" if lotte_stance else "no_output",
-                    "event_summary": summary.get("event_summary", ""),
-                    "key_players": summary.get("key_players", []),
-                    "summary_source": "kobart" if summary.get("event_summary") else "no_output",
+                    "lotte_stance": stance["label"],
+                    "lotte_stance_confidence": stance["confidence"],
+                    "lotte_stance_source": stance["source"],
+                    "event_summary": gpt.get("event_summary", ""),
+                    "key_players": gpt.get("key_players", []),
+                    "summary_source": gpt.get("source", "not_applicable"),
                 },
                 ensure_ascii=False,
             )
@@ -109,6 +129,7 @@ def _run_inference(items: list[NormalizedNewsItem]) -> list[dict]:
                     "is_lotte_related_confidence": lr_result["confidence"],
                     "is_lotte_related_source": lr_result["source"],
                     "lotte_stance": None,
+                    "lotte_stance_confidence": None,
                     "lotte_stance_source": "not_applicable",
                     "event_summary": "",
                     "key_players": [],

@@ -41,7 +41,7 @@ def _load_stance_artifacts(model_dir: Path) -> ModelArtifacts:
 
 _runtime = LazyArtifactsLoader(
     current_file=__file__,
-    env_var="STANCE_MODEL_DIR",
+    env_var="STANCE_CLASSIFIER_MODEL_DIR",
     deployed_dir_name="stance_koelectra",
     training_dir_name="stance_koelectra",
     required_file="config.json",
@@ -89,3 +89,62 @@ def classify_stance(title: str, description_snippet: str = "") -> dict:
     except Exception as exc:
         logger.error("Stance classification failed: %s", exc)
         return dict(_MODEL_ERROR)
+
+
+_STANCE_CHUNK_SIZE = 32
+
+
+def classify_stance_batch(articles: list[dict]) -> list[dict]:
+    """
+    articles: list of {"title": str, "description_snippet": str}
+    Returns list of {label, confidence, source} in the same order.
+    """
+    if not articles:
+        return []
+
+    artifacts = _runtime.get()
+    if artifacts is None:
+        return [dict(_NOT_APPLICABLE) for _ in articles]
+
+    import torch
+
+    labels = artifacts.extras.get("labels") or _DEFAULT_STANCE_LABELS
+    results: list[dict] = [dict(_MODEL_ERROR)] * len(articles)
+
+    for start in range(0, len(articles), _STANCE_CHUNK_SIZE):
+        end = start + _STANCE_CHUNK_SIZE
+        chunk = articles[start:end]
+        titles = [a["title"] for a in chunk]
+        snippets = [
+            (a.get("description_snippet") or "")[: settings.article_description_snippet_length].strip()
+            for a in chunk
+        ]
+        try:
+            enc = artifacts.tokenizer(
+                titles,
+                snippets,
+                truncation="only_second",
+                padding=True,
+                max_length=128,
+                return_tensors="pt",
+            )
+            enc = {k: v.to(artifacts.device) for k, v in enc.items()}
+
+            with torch.no_grad():
+                logits = artifacts.model(**enc).logits
+                probs_batch = torch.softmax(logits, dim=-1).cpu().tolist()
+
+            for i, probs in enumerate(probs_batch):
+                best_idx = int(max(range(len(probs)), key=lambda j: probs[j]))
+                results[start + i] = {
+                    "label": labels[best_idx],
+                    "confidence": round(probs[best_idx], 4),
+                    "source": "koelectra",
+                }
+        except Exception as exc:
+            logger.error(
+                "Stance batch inference failed for chunk [%d:%d] (%s); returning model_error.",
+                start, end, exc,
+            )
+
+    return results
