@@ -82,54 +82,47 @@ class StanceDataset(Dataset):
 
 
 def load_data(data_dir: Path | None = None) -> tuple[list[str], list[str], list[int]]:
-    base = data_dir or DATA_DIR
-
-    def _read_valid(path: Path) -> pd.DataFrame | None:
+    csv_files = [
+        (data_dir or DATA_DIR) / LABELED_TITLES_CSV.name,
+        (data_dir or DATA_DIR) / LABELED_PLAYERS_CSV.name,
+    ]
+    frames = []
+    for path in csv_files:
         if not path.exists():
             print(f"  Skipped: {path.name} not found")
-            return None
+            continue
         df = pd.read_csv(path, encoding="utf-8-sig")
         if "lotte_stance" not in df.columns or "is_lotte_related" not in df.columns:
             print(f"  Skipped: {path.name} missing required columns")
-            return None
+            continue
         before = len(df)
         df = df[df["is_lotte_related"].astype(str).str.lower().isin({"true", "1", "yes"})].copy()
         df = df.dropna(subset=["lotte_stance"])
         df = df[df["lotte_stance"].isin(STANCE_LABELS)]
-        df["title"] = df["title"].fillna("").astype(str).str.strip()
-        df["description_snippet"] = (
-            df["description_snippet"].fillna("").astype(str)
-            .str[:ARTICLE_SNIPPET_LENGTH].str.strip()
-        )
         print(f"  Loaded: {path.name} ({len(df)} rows, dropped {before - len(df)})")
-        return df
+        frames.append(df)
 
-    lt_df = _read_valid(base / LABELED_TITLES_CSV.name)
-    lp_df = _read_valid(base / LABELED_PLAYERS_CSV.name)
+    if not frames:
+        raise FileNotFoundError(f"No valid stance data under: {data_dir or DATA_DIR}")
 
-    if lt_df is None and lp_df is None:
-        raise FileNotFoundError(f"No valid stance data under: {base}")
-
-    # Build priority lookup: labeled_titles.csv wins on conflict
-    # Same article collected via team-keyword and player-keyword may get different GPT labels.
-    # labeled_titles.csv (team-level perspective) is treated as the authoritative source.
-    lt_priority: dict[str, str] = {}
-    if lt_df is not None:
-        lt_priority = dict(zip(lt_df["title"], lt_df["lotte_stance"]))
-
-    if lp_df is not None and lt_priority:
-        overridden = 0
-        for idx in lp_df.index:
-            title = lp_df.at[idx, "title"]
-            if title in lt_priority and lp_df.at[idx, "lotte_stance"] != lt_priority[title]:
-                lp_df.at[idx, "lotte_stance"] = lt_priority[title]
-                overridden += 1
-        if overridden:
-            print(f"  Resolved {overridden} conflicts in labeled_players.csv "
-                  f"using labeled_titles.csv label (team perspective wins)")
-
-    frames = [df for df in [lt_df, lp_df] if df is not None]
     df = pd.concat(frames, ignore_index=True)
+    df["title"] = df["title"].fillna("").astype(str).str.strip()
+    df["description_snippet"] = (
+        df["description_snippet"].fillna("").astype(str)
+        .str[:ARTICLE_SNIPPET_LENGTH].str.strip()
+    )
+
+    # Conflicting titles (same title, different lotte_stance across CSVs) indicate
+    # genuine ambiguity — GPT itself disagreed. Drop them rather than picking a side.
+    df["_label_id"] = df["lotte_stance"].map(LABEL2ID)
+    conflicting = (
+        df.groupby("title")["_label_id"].nunique()
+        .loc[lambda c: c > 1].index
+    )
+    if len(conflicting) > 0:
+        print(f"  WARNING: dropping {len(conflicting)} titles with conflicting stance labels")
+        df = df[~df["title"].isin(conflicting)].reset_index(drop=True)
+
     df = df.drop_duplicates(subset=["title"]).reset_index(drop=True)
 
     labels = df["lotte_stance"].map(LABEL2ID).tolist()
