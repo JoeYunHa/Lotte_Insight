@@ -48,6 +48,7 @@ class Settings(BaseSettings):
         "- 출처 언급 금지\n"
         "- 추측 금지"
     )
+    is_lotte_related_threshold: float = 0.40
     redis_url: str = ""
     app_env: str = "development"
     log_level: str = "INFO"

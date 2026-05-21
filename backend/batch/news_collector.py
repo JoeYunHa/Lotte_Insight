@@ -11,6 +11,7 @@ import requests
 from core.config import settings
 from core.database import supabase
 from models.classifier import classify_batch
+from models.lotte_related_detector import detect_is_lotte_related_batch
 from models.player_extractor import extract_players
 from models.summarizer import summarize_batch
 from services.article_utils import NormalizedNewsItem, normalize_naver_news_item
@@ -48,36 +49,77 @@ def _normalized_items(items: list[dict]) -> list[NormalizedNewsItem]:
 
 
 def _run_inference(items: list[NormalizedNewsItem]) -> list[dict]:
-    """Classify all items in batch, then summarize in batch. Returns enriched dicts."""
+    """Gate by is_lotte_related, then classify and summarize only related items."""
     total = len(items)
     logger.info("Inference started: %d items", total)
 
     articles = [{"title": item.title, "description_snippet": item.description_snippet} for item in items]
-    label_results = classify_batch(articles)
-    logger.info("Classification done: %d items", total)
+    lr_results = detect_is_lotte_related_batch(articles)
+    lotte_count = sum(1 for lr in lr_results if lr["is_lotte_related"])
+    logger.info("is_lotte_related: %d/%d items", lotte_count, total)
+
+    lotte_indices = [i for i, lr in enumerate(lr_results) if lr["is_lotte_related"]]
+    related_articles = [articles[i] for i in lotte_indices]
+    related_label_results = classify_batch(related_articles) if related_articles else []
+    logger.info("Classification done: %d items", len(related_articles))
+
+    label_results = [
+        {"label": "ETC", "confidence": 0.0, "secondary_labels": []}
+        for _ in items
+    ]
+    for idx, label_result in zip(lotte_indices, related_label_results):
+        label_results[idx] = label_result
 
     summarizer_inputs = [
         {
-            "title": item.title,
-            "description_snippet": item.description_snippet,
-            "primary_label": label_result["label"],
-            "published_at": item.published_date,
+            "title": items[i].title,
+            "description_snippet": items[i].description_snippet,
+            "primary_label": label_results[i]["label"],
+            "published_at": items[i].published_date,
         }
-        for item, label_result in zip(items, label_results)
+        for i in lotte_indices
     ]
-    summary_results = summarize_batch(summarizer_inputs)
-    logger.info("Summarization done: %d items", total)
+    summary_list = summarize_batch(summarizer_inputs) if summarizer_inputs else []
+    summary_by_index = {idx: s for idx, s in zip(lotte_indices, summary_list)}
+    logger.info("Summarization done: %d items", len(summarizer_inputs))
 
     enriched = []
-    for item, label_result, summary_result in zip(items, label_results, summary_results):
-        event_summary_json = (
-            json.dumps(summary_result, ensure_ascii=False)
-            if summary_result.get("event_summary")
-            else None
-        )
+    for i, (item, label_result, lr_result) in enumerate(zip(items, label_results, lr_results)):
+        if lr_result["is_lotte_related"]:
+            summary = summary_by_index.get(i, {})
+            raw_stance = summary.get("lotte_stance") or None
+            lotte_stance = raw_stance if raw_stance in {"positive", "negative", "neutral"} else None
+            event_summary_json = json.dumps(
+                {
+                    "is_lotte_related": True,
+                    "is_lotte_related_confidence": lr_result["confidence"],
+                    "is_lotte_related_source": lr_result["source"],
+                    "lotte_stance": lotte_stance,
+                    "lotte_stance_source": "kobart" if lotte_stance else "no_output",
+                    "event_summary": summary.get("event_summary", ""),
+                    "key_players": summary.get("key_players", []),
+                    "summary_source": "kobart" if summary.get("event_summary") else "no_output",
+                },
+                ensure_ascii=False,
+            )
+        else:
+            event_summary_json = json.dumps(
+                {
+                    "is_lotte_related": False,
+                    "is_lotte_related_confidence": lr_result["confidence"],
+                    "is_lotte_related_source": lr_result["source"],
+                    "lotte_stance": None,
+                    "lotte_stance_source": "not_applicable",
+                    "event_summary": "",
+                    "key_players": [],
+                    "summary_source": "not_applicable",
+                },
+                ensure_ascii=False,
+            )
         enriched.append({
             "item": item,
             "label_result": label_result,
+            "is_lotte_related": lr_result["is_lotte_related"],
             "event_summary_json": event_summary_json,
         })
     return enriched
@@ -86,16 +128,13 @@ def _run_inference(items: list[NormalizedNewsItem]) -> list[dict]:
 def _upsert_articles(enriched: list[dict]) -> int:
     rows = []
     for e in enriched:
-        row: dict = {
+        rows.append({
             "source_url": e["item"].link,
             "source_name": e["item"].source_name,
             "title": e["item"].title,
             "published_at": e["item"].published_at,
-        }
-        # event_summary_json이 None이면 row에서 제외 → upsert 시 기존 DB 값 보존
-        if e["event_summary_json"] is not None:
-            row["event_summary"] = e["event_summary_json"]
-        rows.append(row)
+            "event_summary": e["event_summary_json"],
+        })
     if not rows:
         return 0
     result = supabase.table("articles").upsert(rows, on_conflict="source_url").execute()
@@ -130,6 +169,8 @@ def _save_labels_and_players(enriched: list[dict], id_map: dict[str, int]) -> No
     player_rows: list[dict] = []
 
     for e in enriched:
+        if not e["is_lotte_related"]:
+            continue
         item = e["item"]
         article_id = id_map.get(item.link)
         if not article_id:
