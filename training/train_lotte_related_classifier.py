@@ -124,17 +124,16 @@ def load_data(data_dir: Path | None = None) -> tuple[list[str], list[str], list[
         raw_labels = raw_labels[~invalid_mask].reset_index(drop=True)
 
     df["_raw_label"] = raw_labels
-    conflicting = (
+    conflicting_titles = (
         df.groupby("title")["_raw_label"]
         .nunique()
         .loc[lambda counts: counts > 1]
+        .index
     )
-    if not conflicting.empty:
-        sample_titles = conflicting.index[:10].tolist()
-        raise ValueError(
-            "Conflicting is_lotte_related labels found for duplicate titles: "
-            f"{sample_titles} (total {len(conflicting)})"
-        )
+    if len(conflicting_titles) > 0:
+        print(f"  WARNING: dropping {len(conflicting_titles)} titles with conflicting labels "
+              f"(same title, different is_lotte_related across CSVs)")
+        df = df[~df["title"].isin(conflicting_titles)].reset_index(drop=True)
 
     df = df.drop_duplicates(subset=["title"]).reset_index(drop=True)
 
