@@ -6,6 +6,7 @@ import type {
   PlayerDetail,
   Player,
   TeamDailyReport,
+  TopicMapData,
 } from './types'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? ''
@@ -77,4 +78,8 @@ export async function getPlayerReport(
 
 export async function getHomeReport(date: string): Promise<HomeReport> {
   return get<HomeReport>(`/reports/home?report_date=${date}`)
+}
+
+export async function getTopicMap(date: string): Promise<TopicMapData | null> {
+  return getOrNull<TopicMapData>(`/topics?map_date=${date}`)
 }

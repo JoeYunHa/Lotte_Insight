@@ -29,3 +29,8 @@ export const STANCE_META: Record<LotteStance, StanceMeta> = {
 }
 
 export const ALL_LABELS = Object.keys(LABEL_META) as LabelKey[]
+
+export function getLabelMeta(label: string | null | undefined): LabelMeta | null {
+  if (!label || !(label in LABEL_META)) return null
+  return LABEL_META[label as LabelKey]
+}

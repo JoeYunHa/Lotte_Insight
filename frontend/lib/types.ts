@@ -82,6 +82,41 @@ export interface GameContext {
   score: string | null
 }
 
+export interface TopicCluster {
+  id: string
+  map_date: string
+  article_count: number
+  representative_article_id: string | null
+  title: string
+  summary: string
+  label_hint: LabelKey | null
+  key_players: string[]
+  created_at: string
+  updated_at: string
+}
+
+export interface TopicArticlePoint {
+  article_id: string
+  cluster_id: string | null
+  cluster_rank: number | null
+  x: number
+  y: number
+  is_outlier: boolean
+  article?: {
+    id: string
+    title: string
+    source_name: string
+    published_at: string
+    primary_label: LabelKey | null
+  } | null
+}
+
+export interface TopicMapData {
+  map_date: string
+  clusters: TopicCluster[]
+  points: TopicArticlePoint[]
+}
+
 export interface SentimentData {
   positive: number
   neutral: number

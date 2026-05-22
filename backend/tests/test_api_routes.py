@@ -1,15 +1,43 @@
 """Integration-style unit tests for FastAPI route handlers."""
+import asyncio
 from datetime import date
 from unittest.mock import patch
 
+import httpx
 import pytest
-from fastapi.testclient import TestClient
+
+
+class _SyncASGIClient:
+    """Sync wrapper around httpx.AsyncClient + ASGITransport.
+
+    Replaces starlette.testclient.TestClient which is broken with httpx >= 0.28
+    (starlette passes `app=` kwarg that httpx 0.28 removed from Client.__init__).
+    """
+
+    def __init__(self, app) -> None:
+        self._app = app
+
+    def _run(self, method: str, path: str, **kwargs):
+        async def _req():
+            async with httpx.AsyncClient(
+                transport=httpx.ASGITransport(app=self._app),
+                base_url="http://testserver",
+            ) as ac:
+                return await ac.request(method, path, **kwargs)
+
+        return asyncio.run(_req())
+
+    def get(self, path: str, **kwargs):
+        return self._run("GET", path, **kwargs)
+
+    def post(self, path: str, **kwargs):
+        return self._run("POST", path, **kwargs)
 
 
 @pytest.fixture(scope="module")
 def client():
     from main import app
-    return TestClient(app)
+    return _SyncASGIClient(app)
 
 
 class TestHealthEndpoint:
@@ -96,6 +124,38 @@ class TestPlayersApi:
             response = client.get("/players/1")
         assert response.status_code == 200
         assert response.json()["name"] == "전준우"
+
+
+class TestTopicsApi:
+    def test_get_topic_map_found(self, client):
+        data = {
+            "map_date": "2026-05-22",
+            "clusters": [],
+            "points": [],
+        }
+        with patch("api.topics.get_topic_map", return_value=data):
+            response = client.get("/topics?map_date=2026-05-22")
+        assert response.status_code == 200
+        assert response.json()["map_date"] == "2026-05-22"
+
+    def test_get_topic_map_not_found(self, client):
+        with patch("api.topics.get_topic_map", return_value=None):
+            response = client.get("/topics?map_date=2026-05-22")
+        assert response.status_code == 404
+
+    def test_get_topic_map_defaults_to_today(self, client):
+        data = {"map_date": "2026-05-22", "clusters": [], "points": []}
+        with (
+            patch("api.topics.today_kst", return_value=__import__("datetime").date(2026, 5, 22)),
+            patch("api.topics.get_topic_map", return_value=data) as mock_fn,
+        ):
+            response = client.get("/topics")
+        assert response.status_code == 200
+        mock_fn.assert_called_once()
+
+    def test_get_topic_map_invalid_date(self, client):
+        response = client.get("/topics?map_date=not-a-date")
+        assert response.status_code == 422
 
 
 class TestHomeApi:

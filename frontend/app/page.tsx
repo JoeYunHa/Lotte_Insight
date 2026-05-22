@@ -91,6 +91,7 @@ export default async function HomePage() {
     <PageShell
       headerActions={[
         { href: '/players', label: 'Players' },
+        { href: '/topics', label: 'Topics' },
         { href: '/archive', label: 'Archive' },
       ]}
       seasonBadge="2026 KBO"
