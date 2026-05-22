@@ -106,8 +106,11 @@ def load_data(data_dir: Path | None = None) -> tuple[list[str], list[str], list[
         df["description_snippet"].fillna("").astype(str)
         .str[:ARTICLE_SNIPPET_LENGTH].str.strip()
     )
-    # Prepend player name so the model can anchor stance to the specific player
-    df["player_snippet"] = df["query_player"] + " " + df["description_snippet"]
+    df["event_summary"] = df["event_summary"].fillna("").astype(str).str.strip() if "event_summary" in df.columns else ""
+    # seq-B: player name (anchor) + description snippet + event_summary (refined context)
+    df["player_snippet"] = (
+        df["query_player"] + " " + df["description_snippet"] + " " + df["event_summary"]
+    ).str.strip()
 
     # Drop titles with conflicting player_stance labels (same title+player, different label)
     df["_label_id"] = df["player_stance"].map(LABEL2ID)

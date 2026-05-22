@@ -52,17 +52,18 @@ _runtime = LazyArtifactsLoader(
 )
 
 
-def _build_player_snippet(player_name: str, description_snippet: str) -> str:
+def _build_player_snippet(player_name: str, description_snippet: str, event_summary: str = "") -> str:
     snippet = (description_snippet or "")[: settings.article_description_snippet_length].strip()
-    if player_name:
-        return f"{player_name} {snippet}".strip()
-    return snippet
+    summary = (event_summary or "").strip()
+    parts = [p for p in [player_name, snippet, summary] if p]
+    return " ".join(parts)
 
 
 def classify_player_stance(
     title: str,
     description_snippet: str = "",
     player_name: str = "",
+    event_summary: str = "",
 ) -> dict:
     """
     Returns {label, confidence, source} for the given article and player.
@@ -76,7 +77,7 @@ def classify_player_stance(
         import torch
 
         labels = artifacts.extras.get("labels") or _DEFAULT_LABELS
-        player_snippet = _build_player_snippet(player_name, description_snippet)
+        player_snippet = _build_player_snippet(player_name, description_snippet, event_summary)
         enc = artifacts.tokenizer(
             title,
             player_snippet,
@@ -127,7 +128,11 @@ def classify_player_stance_batch(articles: list[dict]) -> list[dict]:
         chunk = articles[start:end]
         titles = [a["title"] for a in chunk]
         player_snippets = [
-            _build_player_snippet(a.get("player_name", ""), a.get("description_snippet", ""))
+            _build_player_snippet(
+                a.get("player_name", ""),
+                a.get("description_snippet", ""),
+                a.get("event_summary", ""),
+            )
             for a in chunk
         ]
         try:
