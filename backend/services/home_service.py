@@ -2,32 +2,17 @@
 Server-side aggregation for GET /reports/home.
 """
 
-import json
 import logging
 from datetime import date
 
 from services import report_repository
+from services.article_utils import parse_event_summary_json, select_primary_label
 
 logger = logging.getLogger(__name__)
 
-_SENTIMENT_VALUES = {"긍정", "부정", "중립"}
-
-
-def _parse_event_summary(raw: str | None) -> dict:
-    if not raw:
-        return {}
-    try:
-        return json.loads(raw)
-    except (json.JSONDecodeError, TypeError):
-        return {}
-
 
 def _primary_label(article: dict) -> str | None:
-    labels: list[dict] = article.get("article_labels") or []
-    if not labels:
-        return None
-    best = max(labels, key=lambda x: x.get("confidence") or 0.0)
-    return best.get("label")
+    return select_primary_label(article.get("article_labels") or [])
 
 
 def _compute_label_counts(articles: list[dict]) -> dict[str, int]:
@@ -50,13 +35,13 @@ def _compute_label_counts(articles: list[dict]) -> dict[str, int]:
 def _compute_sentiment(articles: list[dict]) -> dict:
     positive = neutral = negative = 0
     for article in articles:
-        parsed = _parse_event_summary(article.get("event_summary"))
+        parsed = parse_event_summary_json(article.get("event_summary"))
         stance = parsed.get("lotte_stance", "")
-        if stance == "긍정":
+        if stance == "positive":
             positive += 1
-        elif stance == "부정":
+        elif stance == "negative":
             negative += 1
-        elif stance == "중립":
+        elif stance == "neutral":
             neutral += 1
     analyzed = positive + neutral + negative
     # SentimentBar expects ratios (0-1), analyzed is a raw count
@@ -90,7 +75,7 @@ def _get_lead_story(
     all_key_players: list[str] = []
 
     for a in lead_articles:
-        parsed = _parse_event_summary(a.get("event_summary"))
+        parsed = parse_event_summary_json(a.get("event_summary"))
         summary = parsed.get("event_summary") or ""
         if summary:
             summaries.append(summary)

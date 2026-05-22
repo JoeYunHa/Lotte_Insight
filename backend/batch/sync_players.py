@@ -35,26 +35,36 @@ def run() -> dict:
     existing = list_players(use_cache=False)
     existing_by_name: dict[str, dict] = {p["name"]: p for p in existing}
 
-    upserted = 0
+    new_names: list[str] = []
+    reactivate_ids: list[int] = []
     for name in roster_names:
         if name in existing_by_name:
-            player = existing_by_name[name]
-            if player.get("status") != "active":
-                supabase.table("players").update({"status": "active"}).eq("id", player["id"]).execute()
-                logger.info("Reactivated player: %s", name)
+            if existing_by_name[name].get("status") != "active":
+                reactivate_ids.append(existing_by_name[name]["id"])
         else:
-            supabase.table("players").insert(
-                {"name": name, "name_variants": [], "status": "active"}
-            ).execute()
-            logger.info("Added new player: %s", name)
-        upserted += 1
+            new_names.append(name)
 
-    deactivated = 0
-    for name, player in existing_by_name.items():
-        if name not in roster_set and player.get("status") not in ("inactive", None):
-            supabase.table("players").update({"status": "inactive"}).eq("id", player["id"]).execute()
-            logger.info("Deactivated player: %s", name)
-            deactivated += 1
+    if new_names:
+        supabase.table("players").insert(
+            [{"name": n, "name_variants": [], "status": "active"} for n in new_names]
+        ).execute()
+        logger.info("Added %d new players: %s", len(new_names), new_names)
+
+    if reactivate_ids:
+        supabase.table("players").update({"status": "active"}).in_("id", reactivate_ids).execute()
+        logger.info("Reactivated %d players", len(reactivate_ids))
+
+    upserted = len(new_names) + len(reactivate_ids)
+
+    deactivate_ids = [
+        player["id"]
+        for name, player in existing_by_name.items()
+        if name not in roster_set and player.get("status") not in ("inactive", None)
+    ]
+    if deactivate_ids:
+        supabase.table("players").update({"status": "inactive"}).in_("id", deactivate_ids).execute()
+        logger.info("Deactivated %d players", len(deactivate_ids))
+    deactivated = len(deactivate_ids)
 
     invalidate_cache()
 

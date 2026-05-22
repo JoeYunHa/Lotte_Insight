@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from core.database import supabase
 
 _players_cache: list[dict] | None = None
+_alias_index_cache: "PlayerAliasIndex | None" = None
 
 
 @dataclass(frozen=True)
@@ -48,12 +49,15 @@ def list_players(*, use_cache: bool = True) -> list[dict]:
 
 
 def build_player_alias_index(*, use_cache: bool = True) -> PlayerAliasIndex:
-    return PlayerAliasIndex(
-        aliases_by_player_id={
-            player["id"]: _player_aliases(player)
-            for player in list_players(use_cache=use_cache)
-        }
-    )
+    global _alias_index_cache
+    if not use_cache or _alias_index_cache is None:
+        _alias_index_cache = PlayerAliasIndex(
+            aliases_by_player_id={
+                player["id"]: _player_aliases(player)
+                for player in list_players(use_cache=use_cache)
+            }
+        )
+    return _alias_index_cache
 
 
 _ACTIVE_STATUSES = {"active", "1군"}
@@ -73,5 +77,6 @@ def player_name_to_id_map(*, use_cache: bool = True) -> dict[str, int]:
 
 
 def invalidate_cache():
-    global _players_cache
+    global _players_cache, _alias_index_cache
     _players_cache = None
+    _alias_index_cache = None

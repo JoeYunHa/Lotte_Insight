@@ -2,14 +2,14 @@
 Generate daily team and player reports.
 """
 
-import json
 import logging
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 from openai import OpenAI
 
 from core.config import settings
 from services import report_repository
+from services.article_utils import parse_event_summary_json, select_primary_label
 
 logger = logging.getLogger(__name__)
 _openai_client: OpenAI | None = None
@@ -50,13 +50,7 @@ def _get_openai() -> OpenAI:
 
 
 def _extract_event_summary(raw_summary: str | None) -> str:
-    if not raw_summary:
-        return ""
-    try:
-        parsed = json.loads(raw_summary)
-        return parsed.get("event_summary") or ""
-    except (json.JSONDecodeError, TypeError, AttributeError):
-        return ""
+    return parse_event_summary_json(raw_summary).get("event_summary") or ""
 
 
 def _summarize_label_counts(articles: list[dict]) -> dict[str, int]:
@@ -89,7 +83,7 @@ def _build_team_event_texts(articles: list[dict]) -> list[str]:
         if not text:
             continue
         labels = article.get("article_labels") or []
-        label = labels[0]["label"] if labels else None
+        label = select_primary_label(labels)
         if label:
             buckets[label].append(text)
         else:
@@ -268,8 +262,11 @@ def _build_player_report(player_id: int, player_name: str, today: date) -> dict 
     }
 
 
+_KST = timezone(timedelta(hours=9))
+
+
 def run() -> dict:
-    today = date.today()
+    today = datetime.now(_KST).date()
     logger.info("Report generation started: %s", today)
 
     team_report = _build_team_report(today)

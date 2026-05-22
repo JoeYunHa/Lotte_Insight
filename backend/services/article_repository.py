@@ -1,8 +1,8 @@
-import json
 from datetime import date
 
 from core.database import supabase
 from core.time_utils import utc_day_bounds
+from services.article_utils import parse_event_summary_json, select_primary_label
 
 
 _RELATION_ID_LIMIT = 10_000
@@ -13,28 +13,19 @@ def _reshape_article(raw: dict) -> dict:
 
     # article_labels [{label, confidence}] → primary_label, confidence (highest confidence wins)
     labels: list[dict] = article.pop("article_labels", None) or []
-    if labels:
-        best = max(labels, key=lambda x: x.get("confidence") or 0.0)
-        article["primary_label"] = best.get("label")
-        article["confidence"] = best.get("confidence")
-    else:
-        article["primary_label"] = None
-        article["confidence"] = None
+    best_label = select_primary_label(labels)
+    best_confidence = (
+        max(labels, key=lambda x: x.get("confidence") or 0.0).get("confidence")
+        if labels else None
+    )
+    article["primary_label"] = best_label
+    article["confidence"] = best_confidence
 
     # event_summary JSON string → event_summary text + lotte_stance + key_players
-    raw_summary = article.get("event_summary")
-    if raw_summary:
-        try:
-            parsed = json.loads(raw_summary)
-            article["event_summary"] = parsed.get("event_summary") or None
-            article["lotte_stance"] = parsed.get("lotte_stance") or None
-            article["key_players"] = parsed.get("key_players") or []
-        except (json.JSONDecodeError, TypeError, AttributeError):
-            article["lotte_stance"] = None
-            article["key_players"] = []
-    else:
-        article["lotte_stance"] = None
-        article["key_players"] = []
+    parsed = parse_event_summary_json(article.get("event_summary"))
+    article["event_summary"] = parsed.get("event_summary") or None
+    article["lotte_stance"] = parsed.get("lotte_stance") or None
+    article["key_players"] = parsed.get("key_players") or []
 
     return article
 

@@ -1,3 +1,4 @@
+import json
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 import re
@@ -59,3 +60,26 @@ def normalize_naver_news_item(
 
 def is_past_date(target_date: date) -> bool:
     return target_date < date.today()
+
+
+# ---------------------------------------------------------------------------
+# Shared article helpers (used by home_service, article_repository,
+# report_generator to avoid duplicated JSON-parsing logic)
+# ---------------------------------------------------------------------------
+
+def parse_event_summary_json(raw: str | None) -> dict:
+    """Parse the event_summary JSON blob; returns empty dict on any failure."""
+    if not raw:
+        return {}
+    try:
+        return json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        return {}
+
+
+def select_primary_label(labels: list[dict]) -> str | None:
+    """Return the label with the highest confidence from article_labels rows."""
+    if not labels:
+        return None
+    best = max(labels, key=lambda x: x.get("confidence") or 0.0)
+    return best.get("label")
