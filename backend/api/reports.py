@@ -1,6 +1,6 @@
 from datetime import date
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 
 from core.config import settings
 from services import report_service
@@ -9,7 +9,7 @@ router = APIRouter()
 
 
 @router.get("/team")
-def list_team_reports(limit: int = settings.report_list_limit):
+def list_team_reports(limit: int = Query(default=settings.report_list_limit, ge=1, le=200)):
     return report_service.list_team_reports(limit)
 
 
@@ -22,7 +22,7 @@ def get_team_report(report_date: date):
 
 
 @router.get("/players/{player_id}")
-def list_player_reports(player_id: int, limit: int = settings.report_list_limit):
+def list_player_reports(player_id: int, limit: int = Query(default=settings.report_list_limit, ge=1, le=200)):
     return report_service.list_player_reports(player_id, limit)
 
 

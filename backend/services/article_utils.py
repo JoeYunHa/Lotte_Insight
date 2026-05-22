@@ -58,10 +58,6 @@ def normalize_naver_news_item(
     )
 
 
-def is_past_date(target_date: date) -> bool:
-    return target_date < date.today()
-
-
 # ---------------------------------------------------------------------------
 # Shared article helpers (used by home_service, article_repository,
 # report_generator to avoid duplicated JSON-parsing logic)
@@ -77,9 +73,15 @@ def parse_event_summary_json(raw: str | None) -> dict:
         return {}
 
 
+def select_primary_label_and_confidence(labels: list[dict]) -> tuple[str | None, float | None]:
+    """Return (label, confidence) for the highest-confidence row."""
+    if not labels:
+        return None, None
+    best = max(labels, key=lambda x: x.get("confidence") or 0.0)
+    return best.get("label"), best.get("confidence")
+
+
 def select_primary_label(labels: list[dict]) -> str | None:
     """Return the label with the highest confidence from article_labels rows."""
-    if not labels:
-        return None
-    best = max(labels, key=lambda x: x.get("confidence") or 0.0)
-    return best.get("label")
+    label, _ = select_primary_label_and_confidence(labels)
+    return label

@@ -42,9 +42,10 @@ def _get_client():
 
 def ttl_seconds(target_date: date) -> int:
     """과거 날짜: 24시간 고정. 오늘: KST 자정까지 남은 초."""
-    if target_date < date.today():
+    _KST = timezone(timedelta(hours=9))
+    now_kst = datetime.now(_KST)
+    if target_date < now_kst.date():
         return 86400
-    now_kst = datetime.now(timezone(timedelta(hours=9)))
     midnight_kst = (now_kst + timedelta(days=1)).replace(
         hour=0, minute=0, second=0, microsecond=0
     )

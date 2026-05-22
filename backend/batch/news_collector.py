@@ -13,10 +13,10 @@ from core.database import supabase
 from batch.gpt_summarizer import gpt_summarize_batch
 from models.classifier import classify_batch
 from models.lotte_related_detector import detect_is_lotte_related_batch
-from models.player_extractor import extract_players
+from models.player_stance_classifier import classify_player_stance_batch
 from models.stance_classifier import classify_stance_batch
 from services.article_utils import NormalizedNewsItem, normalize_naver_news_item
-from services.player_catalog import list_player_canonical_names
+from services.player_catalog import build_player_alias_index, list_player_canonical_names
 
 _FETCH_WORKERS = 8
 
@@ -63,6 +63,7 @@ def _run_inference(items: list[NormalizedNewsItem]) -> list[dict]:
       2. label classification  (KoELECTRA multi-label, lotte-related only)
       3. stance classification (KoELECTRA 3-class, lotte-related only)
       4. GPT event_summary     (gpt-4o-mini, lotte-related + summarizable labels only)
+      5. player_stance         (KoELECTRA 3-class, per detected player, lotte-related only)
     """
     total = len(items)
     logger.info("Inference started: %d items", total)
@@ -103,6 +104,38 @@ def _run_inference(items: list[NormalizedNewsItem]) -> list[dict]:
         gpt_results[idx] = gpt_result
     logger.info("GPT summarization done: %d items", len(gpt_indices))
 
+    # Step 5: player_stance (per detected player, lotte-related only)
+    alias_index = build_player_alias_index()
+    id_to_name: dict[int, str] = {
+        pid: aliases[0]
+        for pid, aliases in alias_index.aliases_by_player_id.items()
+        if aliases
+    }
+
+    ps_meta: list[tuple[int, int]] = []  # (item_idx, player_id)
+    ps_inputs: list[dict] = []
+    detected_players: list[list[int]] = [[] for _ in items]
+
+    for i in lotte_indices:
+        item = items[i]
+        player_ids = alias_index.match_player_ids(item.title)
+        detected_players[i] = player_ids
+        event_summary = gpt_results[i].get("event_summary", "")
+        for pid in player_ids:
+            ps_meta.append((i, pid))
+            ps_inputs.append({
+                "title": item.title,
+                "description_snippet": item.description_snippet,
+                "event_summary": event_summary,
+                "player_name": id_to_name.get(pid, ""),
+            })
+
+    ps_raw = classify_player_stance_batch(ps_inputs) if ps_inputs else []
+    player_stances: list[dict[int, dict]] = [{} for _ in items]
+    for (i, pid), stance_result in zip(ps_meta, ps_raw):
+        player_stances[i][pid] = stance_result
+    logger.info("Player stance classification done: %d player-article pairs", len(ps_inputs))
+
     enriched = []
     for i, (item, label_result, lr_result) in enumerate(zip(items, label_results, lr_results)):
         stance = stance_results[i]
@@ -142,6 +175,8 @@ def _run_inference(items: list[NormalizedNewsItem]) -> list[dict]:
             "label_result": label_result,
             "is_lotte_related": lr_result["is_lotte_related"],
             "event_summary_json": event_summary_json,
+            "detected_player_ids": detected_players[i],
+            "player_stances": player_stances[i],
         })
     return enriched
 
@@ -208,8 +243,14 @@ def _save_labels_and_players(enriched: list[dict], id_map: dict[str, int]) -> No
                 {"article_id": article_id, "label": secondary, "confidence": None}
             )
 
-        for player_id in extract_players(item.title):
-            player_rows.append({"article_id": article_id, "player_id": player_id})
+        ps_map = e.get("player_stances", {})
+        for player_id in e.get("detected_player_ids", []):
+            stance = ps_map.get(player_id, {})
+            row: dict = {"article_id": article_id, "player_id": player_id}
+            label = stance.get("label")
+            if label is not None:
+                row["player_stance"] = label
+            player_rows.append(row)
 
     if label_rows:
         supabase.table("article_labels").upsert(

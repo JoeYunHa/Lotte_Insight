@@ -2,8 +2,11 @@ from datetime import date
 
 from core.database import supabase
 from core.time_utils import utc_day_bounds
-from services.article_utils import parse_event_summary_json, select_primary_label
+import logging
 
+from services.article_utils import parse_event_summary_json, select_primary_label_and_confidence
+
+logger = logging.getLogger(__name__)
 
 _RELATION_ID_LIMIT = 10_000
 
@@ -13,11 +16,7 @@ def _reshape_article(raw: dict) -> dict:
 
     # article_labels [{label, confidence}] → primary_label, confidence (highest confidence wins)
     labels: list[dict] = article.pop("article_labels", None) or []
-    best_label = select_primary_label(labels)
-    best_confidence = (
-        max(labels, key=lambda x: x.get("confidence") or 0.0).get("confidence")
-        if labels else None
-    )
+    best_label, best_confidence = select_primary_label_and_confidence(labels)
     article["primary_label"] = best_label
     article["confidence"] = best_confidence
 
@@ -42,7 +41,13 @@ def _article_ids_for_relation(
         .limit(_RELATION_ID_LIMIT)
         .execute()
     )
-    return [row["article_id"] for row in result.data]
+    ids = [row["article_id"] for row in result.data]
+    if len(ids) == _RELATION_ID_LIMIT:
+        logger.warning(
+            "_article_ids_for_relation hit %d-row limit on %s.%s=%r — results may be incomplete",
+            _RELATION_ID_LIMIT, relation_table, filter_column, value,
+        )
+    return ids
 
 
 def list_articles(

@@ -65,12 +65,12 @@ _ACTIVE_STATUSES = {"active", "1군"}
 
 def list_player_names(*, use_cache: bool = True, active_only: bool = False) -> list[str]:
     """모든 alias(이름+변형)를 반환 — 내부 매칭용."""
-    players = list_players(use_cache=use_cache)
     if active_only:
-        players = [p for p in players if p.get("status") in _ACTIVE_STATUSES]
-    return PlayerAliasIndex(
-        aliases_by_player_id={p["id"]: _player_aliases(p) for p in players}
-    ).all_names()
+        players = [p for p in list_players(use_cache=use_cache) if p.get("status") in _ACTIVE_STATUSES]
+        return PlayerAliasIndex(
+            aliases_by_player_id={p["id"]: _player_aliases(p) for p in players}
+        ).all_names()
+    return build_player_alias_index(use_cache=use_cache).all_names()
 
 
 def list_player_canonical_names(*, use_cache: bool = True, active_only: bool = False) -> list[str]:
