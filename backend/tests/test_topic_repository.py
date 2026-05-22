@@ -296,15 +296,15 @@ class TestGetTopicMap:
 
         points_eq.order.assert_called_once_with("cluster_rank", nullsfirst=False)
 
-    def test_unknown_label_passes_through_unchanged(self):
+    def test_unknown_label_becomes_none(self):
         from services import topic_repository
 
         row = _point(article=_article_row(labels=[{"label": "UNKNOWN_LABEL", "confidence": 0.9}]))
         mock_db = _make_supabase(clusters_data=[_cluster()], points_data=[row])
         with patch.object(topic_repository, "supabase", mock_db):
             result = topic_repository.get_topic_map(date(2026, 5, 22))
-        # Repository does not validate labels — passes through as-is
-        assert result["points"][0]["article"]["primary_label"] == "UNKNOWN_LABEL"
+        # Repository normalizes unknown labels to None to satisfy the LabelKey | null contract
+        assert result["points"][0]["article"]["primary_label"] is None
 
     def test_queries_correct_date(self):
         from services import topic_repository

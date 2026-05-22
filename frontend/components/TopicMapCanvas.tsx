@@ -1,46 +1,21 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { getLabelMeta } from '@/lib/label-config'
+import {
+  CLUSTER_PALETTE,
+  VIEWBOX_H,
+  VIEWBOX_W,
+  filterPointsByLabel,
+  getPointColor,
+  getPointOpacity,
+  isPointClickable,
+  normalizePoints,
+  type NormalizedPoint,
+} from '@/lib/topic-map-utils'
 import type { TopicArticlePoint, TopicCluster } from '@/lib/types'
 import type { LabelFilter, ViewMode } from './TopicMapToolbar'
 
-const VIEWBOX_W = 600
-const VIEWBOX_H = 460
-const PADDING = 36
-
-export const CLUSTER_PALETTE = [
-  '#E1062C',
-  '#D97706',
-  '#7C3AED',
-  '#0D9488',
-  '#6366F1',
-  '#EC4899',
-  '#059669',
-  '#0891B2',
-  '#F59E0B',
-  '#DC2626',
-]
-
-type NormalizedPoint = TopicArticlePoint & { svgX: number; svgY: number }
-
-function normalize(points: TopicArticlePoint[]): NormalizedPoint[] {
-  if (points.length === 0) return []
-  const xs = points.map((p) => p.x)
-  const ys = points.map((p) => p.y)
-  const minX = Math.min(...xs)
-  const maxX = Math.max(...xs)
-  const minY = Math.min(...ys)
-  const maxY = Math.max(...ys)
-  const rangeX = maxX - minX || 1
-  const rangeY = maxY - minY || 1
-
-  return points.map((p) => ({
-    ...p,
-    svgX: PADDING + ((p.x - minX) / rangeX) * (VIEWBOX_W - 2 * PADDING),
-    svgY: PADDING + ((p.y - minY) / rangeY) * (VIEWBOX_H - 2 * PADDING),
-  }))
-}
+export { CLUSTER_PALETTE }
 
 interface Props {
   clusters: TopicCluster[]
@@ -70,37 +45,21 @@ export function TopicMapCanvas({
     return map
   }, [clusters])
 
-  const normalized = useMemo(() => normalize(points), [points])
+  const normalized = useMemo(() => normalizePoints(points), [points])
 
-  const visiblePoints = useMemo(() => {
-    if (labelFilter === 'ALL') return normalized
-    return normalized.filter((p) => {
-      const clusterLabel = p.cluster_id ? clusterById[p.cluster_id]?.label_hint : undefined
-      return p.article?.primary_label === labelFilter || clusterLabel === labelFilter
-    })
-  }, [normalized, labelFilter, clusterById])
+  const visiblePoints = useMemo(
+    () => filterPointsByLabel(normalized, labelFilter, clusterById),
+    [normalized, labelFilter, clusterById],
+  )
 
   const representativeIds = useMemo(
     () => new Set(clusters.map((c) => c.representative_article_id).filter(Boolean)),
     [clusters]
   )
 
-  function getColor(p: NormalizedPoint): string {
-    if (p.is_outlier) return '#94a3b8'
-    if (viewMode === 'label') {
-      const rawLabel = p.article?.primary_label ?? (p.cluster_id ? clusterById[p.cluster_id]?.label_hint : undefined)
-      return getLabelMeta(rawLabel)?.dot ?? '#94a3b8'
-    }
-    if (viewMode === 'outlier') return p.is_outlier ? '#E1062C' : 'rgba(148,163,184,0.35)'
-    return p.cluster_id ? (clusterColorMap[p.cluster_id] ?? '#94a3b8') : '#94a3b8'
-  }
-
-  function getOpacity(p: NormalizedPoint): number {
-    if (!selectedClusterId) return p.is_outlier ? 0.45 : 0.82
-    return p.cluster_id === selectedClusterId ? 1 : 0.1
-  }
-
-  const isClickable = (p: NormalizedPoint) => !p.is_outlier && !!p.cluster_id
+  const getColor = (p: NormalizedPoint) => getPointColor(p, viewMode, clusterById, clusterColorMap)
+  const getOpacity = (p: NormalizedPoint) => getPointOpacity(p, selectedClusterId)
+  const isClickable = isPointClickable
 
   return (
     <div

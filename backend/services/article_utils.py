@@ -73,6 +73,17 @@ def parse_event_summary_json(raw: str | None) -> dict:
         return {}
 
 
+VALID_LABEL_KEYS: frozenset[str] = frozenset({
+    "INJURY_ROSTER",
+    "TRANSACTION_CONTRACT",
+    "MATCH_RELATED",
+    "PERFORMANCE_ANALYSIS",
+    "INTERVIEW",
+    "CLUB_OPERATION",
+    "ETC",
+})
+
+
 def select_primary_label_and_confidence(labels: list[dict]) -> tuple[str | None, float | None]:
     """Return (label, confidence) for the highest-confidence row."""
     if not labels:

@@ -117,6 +117,9 @@ export interface TopicMapData {
   points: TopicArticlePoint[]
 }
 
+export type ViewMode = 'cluster' | 'label' | 'outlier'
+export type LabelFilter = 'ALL' | LabelKey
+
 export interface SentimentData {
   positive: number
   neutral: number

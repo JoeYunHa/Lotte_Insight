@@ -2,7 +2,7 @@ from datetime import date
 import logging
 
 from core.database import supabase
-from services.article_utils import select_primary_label_and_confidence
+from services.article_utils import VALID_LABEL_KEYS, select_primary_label_and_confidence
 
 logger = logging.getLogger(__name__)
 
@@ -74,13 +74,13 @@ def _reshape_points(raw_points: list[dict]) -> list[dict]:
         article = None
         if article_raw:
             labels = article_raw.get("article_labels") or []
-            primary_label, _ = select_primary_label_and_confidence(labels)
+            raw_label, _ = select_primary_label_and_confidence(labels)
             article = {
                 "id": str(article_raw["id"]),
                 "title": article_raw.get("title") or "",
                 "source_name": article_raw.get("source_name") or "",
                 "published_at": article_raw.get("published_at") or "",
-                "primary_label": primary_label,
+                "primary_label": raw_label if raw_label in VALID_LABEL_KEYS else None,
             }
         result.append({
             "article_id": str(row["article_id"]),

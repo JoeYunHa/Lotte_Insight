@@ -1,5 +1,6 @@
 'use client'
 
+import { findCluster, getClusterPoints } from '@/lib/topic-map-utils'
 import { TopicArticleList } from './TopicArticleList'
 import { TopicClusterCard } from './TopicClusterCard'
 import type { TopicArticlePoint, TopicCluster } from '@/lib/types'
@@ -19,12 +20,8 @@ export function TopicClusterPanel({
   selectedClusterId,
   onSelectCluster,
 }: TopicClusterPanelProps) {
-  const selectedCluster = selectedClusterId ? clusters.find((c) => c.id === selectedClusterId) : null
-  const clusterPoints = selectedClusterId
-    ? points
-        .filter((p) => p.cluster_id === selectedClusterId)
-        .sort((a, b) => (a.cluster_rank ?? Infinity) - (b.cluster_rank ?? Infinity))
-    : []
+  const selectedCluster = findCluster(clusters, selectedClusterId)
+  const clusterPoints = selectedClusterId ? getClusterPoints(points, selectedClusterId) : []
 
   if (clusters.length === 0) {
     return (
