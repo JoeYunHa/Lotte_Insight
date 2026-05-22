@@ -64,12 +64,25 @@ _ACTIVE_STATUSES = {"active", "1군"}
 
 
 def list_player_names(*, use_cache: bool = True, active_only: bool = False) -> list[str]:
+    """모든 alias(이름+변형)를 반환 — 내부 매칭용."""
     players = list_players(use_cache=use_cache)
     if active_only:
         players = [p for p in players if p.get("status") in _ACTIVE_STATUSES]
     return PlayerAliasIndex(
         aliases_by_player_id={p["id"]: _player_aliases(p) for p in players}
     ).all_names()
+
+
+def list_player_canonical_names(*, use_cache: bool = True, active_only: bool = False) -> list[str]:
+    """등록명(canonical name)만 반환 — 외부 API 검색 키워드 생성 전용.
+
+    alias를 포함하면 중복 쿼리와 약한 별칭 기반 노이즈가 늘어나므로
+    외부 수집에서는 이 함수를 사용하고, list_player_names()는 내부 매칭에만 사용한다.
+    """
+    players = list_players(use_cache=use_cache)
+    if active_only:
+        players = [p for p in players if p.get("status") in _ACTIVE_STATUSES]
+    return [p["name"] for p in players if p.get("name")]
 
 
 def player_name_to_id_map(*, use_cache: bool = True) -> dict[str, int]:

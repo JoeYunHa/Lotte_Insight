@@ -1,19 +1,25 @@
 """
 Integration smoke test for the KBO crawler.
+
+실행 방법:
+  python -m pytest backend/batch/test_kbo_crawler_integration.py -v
+  python backend/batch/test_kbo_crawler_integration.py [--save]
+
+playwright, pydantic_settings 가 설치되지 않은 환경에서는 파일 전체가 skip된다.
 """
 
 import argparse
 import logging
-import os
 import sys
 from datetime import date
 from unittest.mock import MagicMock, patch
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import pytest
 
-from playwright.sync_api import sync_playwright
+pytest.importorskip("playwright", reason="playwright not installed — skipping KBO crawler tests")
+pytest.importorskip("pydantic_settings", reason="pydantic_settings not installed — skipping KBO crawler tests")
 
-from batch.kbo_crawler import (
+from batch.kbo_crawler import (  # noqa: E402
     _STAT_MAP,
     _URLS,
     _can_fetch,
@@ -42,6 +48,8 @@ def test_robots_txt():
 def test_fetch_and_parse():
     print("\n[2] fetch and parse")
     all_ok = True
+
+    from playwright.sync_api import sync_playwright
 
     with sync_playwright() as pw:
         browser = pw.chromium.launch(headless=True)
@@ -74,7 +82,9 @@ def test_run_dry():
     mock_supabase.table.return_value.select.return_value.execute.return_value.data = []
     mock_supabase.table.return_value.upsert.return_value.execute.return_value = None
 
-    with patch("batch.kbo_crawler.supabase", mock_supabase):
+    # kbo_crawler.run() 은 load_supabase() 반환값을 지역 변수로 사용하므로
+    # 모듈 레벨 'supabase' 심볼 패치가 아닌 load_supabase 자체를 교체해야 DB 격리가 된다.
+    with patch("batch.kbo_crawler.load_supabase", return_value=mock_supabase):
         result = run(target_date=date.today())
 
     ok = {"saved", "unmatched", "date"}.issubset(result.keys())

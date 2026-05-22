@@ -16,7 +16,7 @@ from models.lotte_related_detector import detect_is_lotte_related_batch
 from models.player_extractor import extract_players
 from models.stance_classifier import classify_stance_batch
 from services.article_utils import NormalizedNewsItem, normalize_naver_news_item
-from services.player_catalog import list_player_names
+from services.player_catalog import list_player_canonical_names
 
 _FETCH_WORKERS = 8
 
@@ -234,7 +234,7 @@ def run() -> int:
 
     keywords = BASE_KEYWORDS + [
         f"{settings.team_name_ko} {name}"
-        for name in list_player_names(active_only=True)[: settings.article_keyword_limit]
+        for name in list_player_canonical_names(active_only=True)[: settings.article_keyword_limit]
     ]
 
     all_items: list[dict] = []

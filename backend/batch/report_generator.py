@@ -54,11 +54,12 @@ def _extract_event_summary(raw_summary: str | None) -> str:
 
 
 def _summarize_label_counts(articles: list[dict]) -> dict[str, int]:
+    """기사 단위 대표 라벨(최고 confidence)만 카운트 — 멀티라벨 중복 합산 방지."""
     label_counts: dict[str, int] = {}
     for article in articles:
-        for label in article.get("article_labels") or []:
-            label_name = label["label"]
-            label_counts[label_name] = label_counts.get(label_name, 0) + 1
+        label = select_primary_label(article.get("article_labels") or [])
+        if label:
+            label_counts[label] = label_counts.get(label, 0) + 1
     return label_counts
 
 
