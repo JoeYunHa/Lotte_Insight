@@ -22,21 +22,21 @@
 }
 
 :root {
-  --bg: #061325;
-  --surface: #0d1d36;
-  --surface-2: #12284b;
-  --surface-3: #18345f;
-  --border: #20385f;
-  --border-strong: #315285;
-  --text: #f5efe6;
-  --muted: #9aa8bf;
-  --dim: #6f7f99;
+  --bg: #f7f1e7;
+  --surface: #fffdf9;
+  --surface-2: #f1e8da;
+  --surface-3: #e7dbc9;
+  --border: #d8c6ab;
+  --border-strong: #bea27b;
+  --text: #16263f;
+  --muted: #53657c;
+  --dim: #7d8da1;
   --red: #e1062c;
   --red-dark: #b90d28;
   --gold: #c7a35a;
   --win: #d8b15b;
   --loss: #d94b5c;
-  --neutral: #7c8aa5;
+  --neutral: #99a3b3;
   --radius-sm: 10px;
   --radius-md: 14px;
   --radius-lg: 20px;
@@ -69,7 +69,10 @@ html {
 }
 
 body {
-  background: var(--bg);
+  background:
+    radial-gradient(circle at top left, rgba(225, 6, 44, 0.12), transparent 22%),
+    radial-gradient(circle at top right, rgba(199, 163, 90, 0.16), transparent 18%),
+    linear-gradient(180deg, #fbf6ef 0%, #f2e8db 100%);
   color: var(--text);
   font-family: var(--font-sans-kr), 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
   -webkit-font-smoothing: antialiased;

@@ -1,5 +1,3 @@
-// Date/time utilities shared across components.
-
 export function formatRelativeTime(isoString: string): string {
   const now = new Date()
   const then = new Date(isoString)
@@ -7,21 +5,21 @@ export function formatRelativeTime(isoString: string): string {
   const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
   const diffDays = Math.floor(diffHours / 24)
 
-  if (diffHours < 1) return '방금 전'
-  if (diffHours < 24) return `${diffHours}시간 전`
-  if (diffDays < 7) return `${diffDays}일 전`
+  if (diffHours < 1) return 'Just now'
+  if (diffHours < 24) return `${diffHours}h ago`
+  if (diffDays < 7) return `${diffDays}d ago`
   return formatDate(isoString)
 }
 
 export function formatDate(isoString: string): string {
-  const d = new Date(isoString)
-  return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`
+  const date = new Date(isoString)
+  return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')}`
 }
 
 export function formatDateKo(isoOrDate: string): string {
-  const d = new Date(isoOrDate.length === 10 ? isoOrDate + 'T00:00:00' : isoOrDate)
-  const days = ['일', '월', '화', '수', '목', '금', '토']
-  return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 ${days[d.getDay()]}요일`
+  const date = new Date(isoOrDate.length === 10 ? isoOrDate + 'T00:00:00' : isoOrDate)
+  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} (${days[date.getDay()]})`
 }
 
 export function getTodayKST(): string {
@@ -31,8 +29,8 @@ export function getTodayKST(): string {
     month: '2-digit',
     day: '2-digit',
   }).formatToParts(new Date())
-  const year = parts.find((p) => p.type === 'year')?.value ?? '1970'
-  const month = parts.find((p) => p.type === 'month')?.value ?? '01'
-  const day = parts.find((p) => p.type === 'day')?.value ?? '01'
+  const year = parts.find((part) => part.type === 'year')?.value ?? '1970'
+  const month = parts.find((part) => part.type === 'month')?.value ?? '01'
+  const day = parts.find((part) => part.type === 'day')?.value ?? '01'
   return `${year}-${month}-${day}`
 }

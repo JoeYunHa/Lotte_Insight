@@ -7,12 +7,9 @@ interface Props {
 
 export default function Error({ error, reset }: Props) {
   return (
-    <div
-      className="min-h-dvh flex flex-col items-center justify-center px-4 gap-4"
-      style={{ background: 'var(--bg)' }}
-    >
+    <div className="min-h-dvh flex flex-col items-center justify-center px-4 gap-4" style={{ background: 'var(--bg)' }}>
       <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
-        오류가 발생했습니다
+        Something went wrong
       </p>
       <p className="text-xs text-center max-w-xs" style={{ color: 'var(--dim)' }}>
         {error.message}
@@ -26,7 +23,7 @@ export default function Error({ error, reset }: Props) {
           border: '1px solid var(--border)',
         }}
       >
-        다시 시도
+        Retry
       </button>
     </div>
   )

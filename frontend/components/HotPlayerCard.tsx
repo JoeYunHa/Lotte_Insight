@@ -23,20 +23,12 @@ export function HotPlayerCard({ playerMention, rank, delay = 0, summary, highlig
       }}
     >
       <div className="flex items-start gap-3">
-        {/* Rank — small meta, not the main event */}
-        <span
-          className="text-[10px] font-mono-code font-bold mt-1 w-4 shrink-0"
-          style={{ color: highlight ? 'var(--gold)' : 'var(--dim)' }}
-        >
+        <span className="text-[10px] font-mono-code font-bold mt-1 w-4 shrink-0" style={{ color: highlight ? 'var(--gold)' : 'var(--dim)' }}>
           {String(rank).padStart(2, '0')}
         </span>
 
-        {/* Player info */}
         <div className="flex-1 min-w-0">
-          <div
-            className="font-bold text-base leading-tight transition-colors group-hover:text-lotte-red"
-            style={{ color: 'var(--text)' }}
-          >
+          <div className="font-bold text-base leading-tight transition-colors group-hover:text-lotte-red" style={{ color: 'var(--text)' }}>
             {player.name}
           </div>
           <div className="text-xs mt-0.5" style={{ color: 'var(--dim)' }}>
@@ -49,19 +41,12 @@ export function HotPlayerCard({ playerMention, rank, delay = 0, summary, highlig
           ) : null}
         </div>
 
-        {/* Mention count — gold mono, prominent */}
         <div className="shrink-0 text-right">
-          <p
-            className="text-2xl font-bold font-mono-code leading-none"
-            style={{ color: 'var(--gold)' }}
-          >
+          <p className="text-2xl font-bold font-mono-code leading-none" style={{ color: 'var(--gold)' }}>
             {mention_count}
           </p>
-          <p
-            className="text-[10px] font-mono-code uppercase tracking-widest mt-0.5"
-            style={{ color: 'var(--dim)' }}
-          >
-            언급
+          <p className="text-[10px] font-mono-code uppercase tracking-widest mt-0.5" style={{ color: 'var(--dim)' }}>
+            MENTIONS
           </p>
         </div>
       </div>
