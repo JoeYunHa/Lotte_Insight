@@ -200,3 +200,10 @@ DEFAULT_STANCE_EPOCHS = 5
 DEFAULT_STANCE_LR = 5e-5
 DEFAULT_STANCE_BATCH_SIZE = 16
 STANCE_LABELS = ["negative", "neutral", "positive"]
+
+PLAYER_STANCE_MODEL_DIR = ROOT_DIR / "models" / "player_stance_koelectra"
+DEFAULT_PLAYER_STANCE_PRETRAINED = "monologg/koelectra-small-v3-discriminator"
+DEFAULT_PLAYER_STANCE_EPOCHS = 5
+DEFAULT_PLAYER_STANCE_LR = 5e-5
+DEFAULT_PLAYER_STANCE_BATCH_SIZE = 16
+PLAYER_STANCE_LABELS = ["negative", "neutral", "positive"]

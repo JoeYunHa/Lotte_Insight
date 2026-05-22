@@ -1,7 +1,13 @@
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 
 from core import cache
 from services import report_repository
+
+_KST = timezone(timedelta(hours=9))
+
+
+def _today_kst() -> date:
+    return datetime.now(_KST).date()
 
 TEAM_REPORT_TABLE = "team_daily_report"
 PLAYER_REPORT_TABLE = "player_daily_report"
@@ -28,7 +34,7 @@ def list_team_reports(limit: int) -> list[dict]:
     cache_key = f"report:team:list:{limit}"
     return _load_cached_report(
         cache_key,
-        date.today(),
+        _today_kst(),
         lambda: report_repository.list_reports(TEAM_REPORT_TABLE, limit=limit),
     )
 
@@ -46,7 +52,7 @@ def list_player_reports(player_id: int, limit: int) -> list[dict]:
     cache_key = f"report:player:{player_id}:list:{limit}"
     return _load_cached_report(
         cache_key,
-        date.today(),
+        _today_kst(),
         lambda: report_repository.list_reports(
             PLAYER_REPORT_TABLE,
             limit=limit,

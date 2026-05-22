@@ -36,18 +36,18 @@ FAIL = "\033[91m[FAIL]\033[0m"
 
 def test_robots_txt():
     print("\n[1] robots.txt access")
-    all_ok = True
+    blocked = []
     for key, url in _URLS.items():
         allowed = _can_fetch(url)
         print(f"  {(PASS if allowed else FAIL)} {key}: {'allowed' if allowed else 'blocked'}")
         if not allowed:
-            all_ok = False
-    return all_ok
+            blocked.append(key)
+    assert not blocked, f"robots.txt blocked: {blocked}"
 
 
 def test_fetch_and_parse():
     print("\n[2] fetch and parse")
-    all_ok = True
+    failed = []
 
     from playwright.sync_api import sync_playwright
 
@@ -60,19 +60,19 @@ def test_fetch_and_parse():
             html = _select_team_and_get_html(page, url)
             if html is None:
                 print(f"  {FAIL} failed to fetch HTML")
-                all_ok = False
+                failed.append(page_key)
                 continue
 
             rows = _parse_table(html, _STAT_MAP[page_key])
             if not rows:
                 print(f"  {FAIL} no parsed rows")
-                all_ok = False
+                failed.append(page_key)
             else:
                 print(f"  {PASS} parsed {len(rows)} rows")
 
         browser.close()
 
-    return all_ok
+    assert not failed, f"failed pages: {failed}"
 
 
 def test_run_dry():
@@ -89,7 +89,7 @@ def test_run_dry():
 
     ok = {"saved", "unmatched", "date"}.issubset(result.keys())
     print(f"  {(PASS if ok else FAIL)} result={result}")
-    return ok
+    assert ok, f"run() result missing keys: {result}"
 
 
 def test_run_save():
@@ -97,7 +97,7 @@ def test_run_save():
     result = run(target_date=date.today())
     ok = result["saved"] >= 0
     print(f"  {(PASS if ok else FAIL)} result={result}")
-    return ok
+    assert ok, f"run() saved < 0: {result}"
 
 
 def main():
@@ -105,12 +105,17 @@ def main():
     parser.add_argument("--save", action="store_true", help="Persist results to DB")
     args = parser.parse_args()
 
-    results = [test_robots_txt(), test_fetch_and_parse()]
-    results.append(test_run_save() if args.save else test_run_dry())
+    tests = [test_robots_txt, test_fetch_and_parse, test_run_save if args.save else test_run_dry]
+    passed = 0
+    for test in tests:
+        try:
+            test()
+            passed += 1
+        except AssertionError as exc:
+            print(f"  {FAIL} {exc}")
 
     print("\n" + "=" * 50)
-    passed = sum(results)
-    total = len(results)
+    total = len(tests)
     if passed == total:
         print(f"{PASS} all {total} tests passed")
     else:

@@ -70,4 +70,20 @@ class Settings(BaseSettings):
         env_file = str(Path(__file__).resolve().parents[2] / ".env")
 
 
-settings = Settings()
+_settings_instance: Settings | None = None
+
+
+class _LazySettings:
+    """Settings 인스턴스를 첫 속성 접근 시점까지 지연 생성한다.
+
+    import 시점 env 검증 실패를 방지하여 pytest collect와 로컬 도구 실행성을 높인다.
+    """
+
+    def __getattr__(self, name: str):
+        global _settings_instance
+        if _settings_instance is None:
+            _settings_instance = Settings()
+        return getattr(_settings_instance, name)
+
+
+settings = _LazySettings()

@@ -77,11 +77,12 @@ def fetch_recent_player_articles(
     since: date,
     limit: int,
 ) -> list[dict]:
+    start_at, _ = utc_day_bounds(since)
     result = (
         supabase.table("article_players")
         .select("articles!inner(title, published_at, event_summary)")
         .eq("player_id", player_id)
-        .gte("articles.published_at", f"{since.isoformat()}T00:00:00")
+        .gte("articles.published_at", start_at)
         .order("articles.published_at", desc=True)
         .limit(limit)
         .execute()
