@@ -5,7 +5,7 @@ import { PlayerIdentityHeader, PlayerStatsCard } from '@/components/PlayerStatsC
 import { getArticles, getPlayer, getPlayerReport } from '@/lib/api'
 import { getTodayKST } from '@/lib/time'
 
-export const revalidate = 300
+export const dynamic = 'force-dynamic'
 
 interface Props {
   params: Promise<{ id: string }>
@@ -15,18 +15,28 @@ export default async function PlayerPage({ params }: Props) {
   const { id } = await params
   const today = getTodayKST()
 
-  const [player, report, playerArticles] = await Promise.all([
-    getPlayer(id, today),
-    getPlayerReport(id, today),
-    getArticles({ player_id: id, limit: 10 }),
-  ])
+  let player = null
+  let report = null
+  let playerArticles = []
+  try {
+    const result = await Promise.all([
+      getPlayer(id, today),
+      getPlayerReport(id, today),
+      getArticles({ player_id: id, limit: 10 }),
+    ])
+    player = result[0]
+    report = result[1]
+    playerArticles = result[2]
+  } catch {
+    notFound()
+  }
 
   if (!player) notFound()
 
   const stats = player.stats?.[0] ?? null
 
   return (
-    <PageShell headerAction={{ href: '/', label: '오늘 리포트' }}>
+    <PageShell headerActions={[{ href: '/players', label: '선수단' }, { href: '/', label: '오늘 리포트' }]}>
       <PlayerIdentityHeader
         playerName={player.name}
         playerNumber={player.number}

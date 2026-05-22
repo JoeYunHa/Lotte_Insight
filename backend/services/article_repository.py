@@ -1,26 +1,24 @@
 from datetime import date
+import logging
 
 from core.database import supabase
 from core.time_utils import utc_day_bounds
-import logging
-
 from services.article_utils import parse_event_summary_json, select_primary_label_and_confidence
 
 logger = logging.getLogger(__name__)
 
-_RELATION_ID_LIMIT = 10_000
+_RELATION_PAGE_SIZE = 1_000
+_RELATION_MAX_ROWS = 100_000
 
 
 def _reshape_article(raw: dict) -> dict:
     article = dict(raw)
 
-    # article_labels [{label, confidence}] → primary_label, confidence (highest confidence wins)
     labels: list[dict] = article.pop("article_labels", None) or []
     best_label, best_confidence = select_primary_label_and_confidence(labels)
     article["primary_label"] = best_label
     article["confidence"] = best_confidence
 
-    # event_summary JSON string → event_summary text + lotte_stance + key_players
     parsed = parse_event_summary_json(article.get("event_summary"))
     article["event_summary"] = parsed.get("event_summary") or None
     article["lotte_stance"] = parsed.get("lotte_stance") or None
@@ -34,19 +32,32 @@ def _article_ids_for_relation(
     filter_column: str,
     value: int | str,
 ) -> list[int]:
-    result = (
-        supabase.table(relation_table)
-        .select("article_id")
-        .eq(filter_column, value)
-        .limit(_RELATION_ID_LIMIT)
-        .execute()
-    )
-    ids = [row["article_id"] for row in result.data]
-    if len(ids) == _RELATION_ID_LIMIT:
-        logger.warning(
-            "_article_ids_for_relation hit %d-row limit on %s.%s=%r — results may be incomplete",
-            _RELATION_ID_LIMIT, relation_table, filter_column, value,
+    ids: list[int] = []
+    offset = 0
+    while True:
+        result = (
+            supabase.table(relation_table)
+            .select("article_id")
+            .eq(filter_column, value)
+            .range(offset, offset + _RELATION_PAGE_SIZE - 1)
+            .execute()
         )
+        rows = result.data or []
+        if not rows:
+            break
+        ids.extend(row["article_id"] for row in rows)
+        if len(rows) < _RELATION_PAGE_SIZE:
+            break
+        offset += _RELATION_PAGE_SIZE
+        if offset >= _RELATION_MAX_ROWS:
+            logger.warning(
+                "_article_ids_for_relation hit %d-row cap on %s.%s=%r",
+                _RELATION_MAX_ROWS,
+                relation_table,
+                filter_column,
+                value,
+            )
+            break
     return ids
 
 

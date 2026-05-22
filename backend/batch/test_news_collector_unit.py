@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -33,8 +33,6 @@ def _run_save(enriched: list[dict], id_map: dict[str, int]) -> list[dict]:
 
     captured: list[list[dict]] = []
 
-    original_table = news_collector.supabase.table
-
     def fake_table(name: str):
         mock = MagicMock()
         if name == "article_players":
@@ -46,7 +44,10 @@ def _run_save(enriched: list[dict], id_map: dict[str, int]) -> list[dict]:
             mock.upsert.return_value = MagicMock(data=[])
         return mock
 
-    with patch.object(news_collector.supabase, "table", side_effect=fake_table):
+    mock_supabase = MagicMock()
+    mock_supabase.table.side_effect = fake_table
+
+    with patch.object(news_collector, "supabase", mock_supabase):
         news_collector._save_labels_and_players(enriched, id_map)
 
     return captured[0] if captured else []

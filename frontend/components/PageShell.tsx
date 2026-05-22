@@ -9,14 +9,14 @@ interface HeaderAction {
 interface PageShellProps {
   children: ReactNode
   footer?: ReactNode
-  headerAction?: HeaderAction
+  headerActions?: HeaderAction[]
   seasonBadge?: string
 }
 
 export function PageShell({
   children,
   footer,
-  headerAction,
+  headerActions,
   seasonBadge,
 }: PageShellProps) {
   return (
@@ -27,10 +27,10 @@ export function PageShell({
         className="sticky top-0 z-50 backdrop-blur-md"
         style={{ background: 'rgba(0, 18, 40, 0.92)', borderBottom: '1px solid var(--border)' }}
       >
-        <div className="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
+        <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div
-              className="w-8 h-8 rounded flex flex-col items-center justify-center gap-0 shrink-0"
+              className="w-8 h-8 rounded-xl flex flex-col items-center justify-center gap-0 shrink-0"
               style={{ background: 'var(--red)', color: '#fff' }}
             >
               <span className="text-sm font-bold leading-none">L</span>
@@ -53,21 +53,24 @@ export function PageShell({
               </span>
             ) : null}
           </div>
-          {headerAction ? (
-            <nav className="flex items-center gap-4">
-              <Link
-                href={headerAction.href}
-                className="text-xs transition-colors hover:text-cream-100"
-                style={{ color: 'var(--muted)' }}
-              >
-                {headerAction.label}
-              </Link>
+          {headerActions && headerActions.length > 0 ? (
+            <nav className="flex items-center gap-2">
+              {headerActions.map(action => (
+                <Link
+                  key={action.href}
+                  href={action.href}
+                  className="text-xs transition-colors hover:text-cream-100 px-2.5 py-1.5 rounded-full"
+                  style={{ color: 'var(--muted)', border: '1px solid transparent' }}
+                >
+                  {action.label}
+                </Link>
+              ))}
             </nav>
           ) : null}
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 pb-24">{children}</main>
+      <main className="max-w-5xl mx-auto px-4 pb-24">{children}</main>
 
       {footer ? <footer className="text-center pb-8">{footer}</footer> : null}
     </div>

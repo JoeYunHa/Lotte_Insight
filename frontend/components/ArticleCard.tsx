@@ -21,7 +21,7 @@ export function ArticleCard({
 
   return (
     <article
-      className="group relative rounded-lg overflow-hidden transition-all duration-200"
+      className="group relative rounded-2xl overflow-hidden transition-all duration-200"
       style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
     >
       {/* Left label accent bar */}

@@ -14,11 +14,11 @@ export function LabelBadge({ label }: { label: LabelKey }) {
 }
 
 export function StanceBadge({ stance }: { stance: LotteStance }) {
-  const { symbol, badge } = STANCE_META[stance]
+  const { label, symbol, badge } = STANCE_META[stance]
   return (
     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium leading-none ${badge}`}>
       <span className="text-[10px]">{symbol}</span>
-      {stance}
+      {label}
     </span>
   )
 }

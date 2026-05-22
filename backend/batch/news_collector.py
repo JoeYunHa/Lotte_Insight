@@ -23,7 +23,6 @@ _FETCH_WORKERS = 8
 logger = logging.getLogger(__name__)
 
 NAVER_NEWS_URL = "https://openapi.naver.com/v1/search/news.json"
-BASE_KEYWORDS = [f"{settings.team_name_ko} 자이언츠"]
 
 
 def _fetch_news(keyword: str, display: int = 100) -> list[dict]:
@@ -273,7 +272,8 @@ def run() -> int:
 
     logger.info("News collection started")
 
-    keywords = BASE_KEYWORDS + [
+    base_keywords = [f"{settings.team_name_ko} 자이언츠"]
+    keywords = base_keywords + [
         f"{settings.team_name_ko} {name}"
         for name in list_player_canonical_names(active_only=True)[: settings.article_keyword_limit]
     ]

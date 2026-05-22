@@ -10,9 +10,9 @@ export interface SentimentRatio {
 export function computeSentiment(articles: Article[]): SentimentRatio {
   let positive = 0, neutral = 0, negative = 0
   for (const a of articles) {
-    if (a.lotte_stance === '긍정') positive++
-    else if (a.lotte_stance === '부정') negative++
-    else if (a.lotte_stance === '중립') neutral++
+    if (a.lotte_stance === 'positive') positive++
+    else if (a.lotte_stance === 'negative') negative++
+    else if (a.lotte_stance === 'neutral') neutral++
   }
   const analyzed = positive + neutral + negative
   return {

@@ -16,7 +16,7 @@ export function LeadIssueCard({ label, summary, articleCount, keyPlayers, title,
 
   return (
     <div
-      className="rounded-lg overflow-hidden animate-fade-up"
+      className="rounded-2xl overflow-hidden animate-fade-up"
       style={{
         background: 'var(--surface)',
         border: '1px solid var(--border-strong)',

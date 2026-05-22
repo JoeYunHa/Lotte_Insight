@@ -9,6 +9,8 @@ _alias_index_cache: "PlayerAliasIndex | None" = None
 @dataclass(frozen=True)
 class PlayerAliasIndex:
     aliases_by_player_id: dict[int, tuple[str, ...]]
+    player_ids_by_alias: dict[str, tuple[int, ...]]
+    aliases_desc: tuple[str, ...]
 
     def all_names(self) -> list[str]:
         names: list[str] = []
@@ -24,11 +26,11 @@ class PlayerAliasIndex:
         return name_map
 
     def match_player_ids(self, text: str) -> list[int]:
-        found: list[int] = []
-        for player_id, aliases in self.aliases_by_player_id.items():
-            if any(alias in text for alias in aliases):
-                found.append(player_id)
-        return found
+        found: set[int] = set()
+        for alias in self.aliases_desc:
+            if alias in text:
+                found.update(self.player_ids_by_alias.get(alias, ()))
+        return list(found)
 
 
 def _fetch_players() -> list[dict]:
@@ -51,11 +53,19 @@ def list_players(*, use_cache: bool = True) -> list[dict]:
 def build_player_alias_index(*, use_cache: bool = True) -> PlayerAliasIndex:
     global _alias_index_cache
     if not use_cache or _alias_index_cache is None:
+        aliases_by_player_id = {
+            player["id"]: _player_aliases(player)
+            for player in list_players(use_cache=use_cache)
+        }
+        player_ids_by_alias: dict[str, list[int]] = {}
+        for player_id, aliases in aliases_by_player_id.items():
+            for alias in aliases:
+                player_ids_by_alias.setdefault(alias, []).append(player_id)
+        aliases_desc = tuple(sorted(player_ids_by_alias.keys(), key=len, reverse=True))
         _alias_index_cache = PlayerAliasIndex(
-            aliases_by_player_id={
-                player["id"]: _player_aliases(player)
-                for player in list_players(use_cache=use_cache)
-            }
+            aliases_by_player_id=aliases_by_player_id,
+            player_ids_by_alias={k: tuple(v) for k, v in player_ids_by_alias.items()},
+            aliases_desc=aliases_desc,
         )
     return _alias_index_cache
 
@@ -67,8 +77,15 @@ def list_player_names(*, use_cache: bool = True, active_only: bool = False) -> l
     """모든 alias(이름+변형)를 반환 — 내부 매칭용."""
     if active_only:
         players = [p for p in list_players(use_cache=use_cache) if p.get("status") in _ACTIVE_STATUSES]
+        aliases_by_player_id = {p["id"]: _player_aliases(p) for p in players}
+        player_ids_by_alias: dict[str, list[int]] = {}
+        for player_id, aliases in aliases_by_player_id.items():
+            for alias in aliases:
+                player_ids_by_alias.setdefault(alias, []).append(player_id)
         return PlayerAliasIndex(
-            aliases_by_player_id={p["id"]: _player_aliases(p) for p in players}
+            aliases_by_player_id=aliases_by_player_id,
+            player_ids_by_alias={k: tuple(v) for k, v in player_ids_by_alias.items()},
+            aliases_desc=tuple(sorted(player_ids_by_alias.keys(), key=len, reverse=True)),
         ).all_names()
     return build_player_alias_index(use_cache=use_cache).all_names()
 

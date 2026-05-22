@@ -8,7 +8,7 @@ import { SectionHeader } from '@/components/SectionHeader'
 import { getArticles, getHomeReport } from '@/lib/api'
 import { LABEL_META } from '@/lib/label-config'
 import { formatDateKo, getTodayKST } from '@/lib/time'
-import type { LabelKey } from '@/lib/types'
+import type { Article, HomeReport, LabelKey } from '@/lib/types'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,10 +27,40 @@ const LABEL_HEADLINE: Record<LabelKey, string> = {
 export default async function HomePage() {
   const today = getTodayKST()
 
-  const [home, articles] = await Promise.all([
-    getHomeReport(today),
-    getArticles({ date: today, limit: ARTICLE_FEED_LIMIT }),
-  ])
+  const emptyHome: HomeReport = {
+    date: today,
+    article_count: 0,
+    label_counts: {
+      MATCH_RELATED: 0,
+      INJURY_ROSTER: 0,
+      TRANSACTION_CONTRACT: 0,
+      PERFORMANCE_ANALYSIS: 0,
+      INTERVIEW: 0,
+      CLUB_OPERATION: 0,
+      ETC: 0,
+    },
+    sentiment: { positive: 0, neutral: 0, negative: 0, analyzed: 0 },
+    lead_label: null,
+    lead_summary: null,
+    lead_key_players: [],
+    top_players: [],
+    team_report: null,
+    game_context: null,
+  }
+
+  let home: HomeReport = emptyHome
+  let articles: Article[] = []
+  try {
+    const result = await Promise.all([
+      getHomeReport(today),
+      getArticles({ date: today, limit: ARTICLE_FEED_LIMIT }),
+    ])
+    home = result[0]
+    articles = result[1]
+  } catch {
+    home = emptyHome
+    articles = []
+  }
 
   const {
     article_count,
@@ -63,7 +93,7 @@ export default async function HomePage() {
 
   return (
     <PageShell
-      headerAction={{ href: '/archive', label: '아카이브' }}
+      headerActions={[{ href: '/players', label: '선수단' }, { href: '/archive', label: '아카이브' }]}
       seasonBadge="2026 KBO"
       footer={
         <p className="text-xs" style={{ color: 'var(--dim)' }}>

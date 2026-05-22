@@ -6,11 +6,6 @@ export interface LabelMeta {
   badge: string   // Tailwind classes for badge
 }
 
-export interface StanceMeta {
-  symbol: string
-  badge: string
-}
-
 export const LABEL_META: Record<LabelKey, LabelMeta> = {
   MATCH_RELATED:        { name: '경기',       dot: '#ef4444', badge: 'bg-red-500/15 text-red-400 border border-red-500/25' },
   INJURY_ROSTER:        { name: '부상·엔트리', dot: '#f59e0b', badge: 'bg-amber-500/15 text-amber-400 border border-amber-500/25' },
@@ -21,10 +16,16 @@ export const LABEL_META: Record<LabelKey, LabelMeta> = {
   ETC:                  { name: '기타',        dot: '#94a3b8', badge: 'bg-slate-500/15 text-slate-400 border border-slate-500/25' },
 }
 
+export interface StanceMeta {
+  label: string
+  symbol: string
+  badge: string
+}
+
 export const STANCE_META: Record<LotteStance, StanceMeta> = {
-  '긍정': { symbol: '▲', badge: 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/25' },
-  '부정': { symbol: '▼', badge: 'bg-red-500/15 text-red-400 border border-red-500/25' },
-  '중립': { symbol: '─', badge: 'bg-slate-600/20 text-slate-400 border border-slate-500/25' },
+  positive: { label: '긍정', symbol: '▲', badge: 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/25' },
+  negative: { label: '부정', symbol: '▼', badge: 'bg-red-500/15 text-red-400 border border-red-500/25' },
+  neutral:  { label: '중립', symbol: '─', badge: 'bg-slate-600/20 text-slate-400 border border-slate-500/25' },
 }
 
 export const ALL_LABELS = Object.keys(LABEL_META) as LabelKey[]

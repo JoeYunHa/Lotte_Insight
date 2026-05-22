@@ -4,8 +4,6 @@ import json
 import logging
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 
 def _make_raw(
     *,
@@ -72,42 +70,73 @@ class TestReshapeArticle:
 
 
 class TestArticleIdsForRelationTruncation:
-    def test_warning_logged_when_limit_hit(self, caplog):
+    def test_warning_logged_when_cap_hit(self, caplog):
         from services import article_repository
 
-        limit = article_repository._RELATION_ID_LIMIT
-        fake_data = [{"article_id": i} for i in range(limit)]
+        page = article_repository._RELATION_PAGE_SIZE
+        cap = article_repository._RELATION_MAX_ROWS
 
-        mock_chain = MagicMock()
-        mock_chain.execute.return_value = MagicMock(data=fake_data)
-        mock_chain.eq.return_value = mock_chain
-        mock_chain.select.return_value = mock_chain
-        mock_chain.limit.return_value = mock_chain
+        class _Table:
+            def __init__(self):
+                self.start = 0
 
-        with patch.object(article_repository.supabase, "table", return_value=mock_chain):
+            def select(self, *_args, **_kwargs):
+                return self
+
+            def eq(self, *_args, **_kwargs):
+                return self
+
+            def range(self, start, _end):
+                self.start = start
+                return self
+
+            def execute(self):
+                if self.start < cap:
+                    return MagicMock(data=[{"article_id": self.start + i} for i in range(page)])
+                return MagicMock(data=[])
+
+        mock_db = MagicMock()
+        mock_db.table.return_value = _Table()
+
+        with patch.object(article_repository, "supabase", mock_db):
             with caplog.at_level(logging.WARNING, logger="services.article_repository"):
                 result = article_repository._article_ids_for_relation(
                     "article_labels", "label", "MATCH_RELATED"
                 )
 
-        assert len(result) == limit
-        assert any("incomplete" in msg.lower() or str(limit) in msg for msg in caplog.messages)
+        assert len(result) == cap
+        assert any("cap" in msg.lower() or str(cap) in msg for msg in caplog.messages)
 
-    def test_no_warning_when_under_limit(self, caplog):
+    def test_no_warning_when_under_cap(self, caplog):
         from services import article_repository
 
-        fake_data = [{"article_id": i} for i in range(5)]
+        class _Table:
+            def __init__(self):
+                self.called = False
 
-        mock_chain = MagicMock()
-        mock_chain.execute.return_value = MagicMock(data=fake_data)
-        mock_chain.eq.return_value = mock_chain
-        mock_chain.select.return_value = mock_chain
-        mock_chain.limit.return_value = mock_chain
+            def select(self, *_args, **_kwargs):
+                return self
 
-        with patch.object(article_repository.supabase, "table", return_value=mock_chain):
+            def eq(self, *_args, **_kwargs):
+                return self
+
+            def range(self, *_args, **_kwargs):
+                return self
+
+            def execute(self):
+                if not self.called:
+                    self.called = True
+                    return MagicMock(data=[{"article_id": i} for i in range(5)])
+                return MagicMock(data=[])
+
+        mock_db = MagicMock()
+        mock_db.table.return_value = _Table()
+
+        with patch.object(article_repository, "supabase", mock_db):
             with caplog.at_level(logging.WARNING, logger="services.article_repository"):
-                article_repository._article_ids_for_relation(
+                result = article_repository._article_ids_for_relation(
                     "article_labels", "label", "MATCH_RELATED"
                 )
 
+        assert result == [0, 1, 2, 3, 4]
         assert not caplog.records

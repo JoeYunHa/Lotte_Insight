@@ -2,15 +2,21 @@ import { ArchiveCalendar } from '@/components/ArchiveCalendar'
 import { PageShell } from '@/components/PageShell'
 import { getTeamReports } from '@/lib/api'
 import { getTodayKST } from '@/lib/time'
+import type { TeamDailyReport } from '@/lib/types'
 
-export const revalidate = 3600
+export const dynamic = 'force-dynamic'
 
 export default async function ArchivePage() {
   const today = getTodayKST()
-  const reports = await getTeamReports(60)
+  let reports: TeamDailyReport[] = []
+  try {
+    reports = await getTeamReports(60)
+  } catch {
+    reports = []
+  }
 
   return (
-    <PageShell headerAction={{ href: '/', label: '오늘로' }}>
+    <PageShell headerActions={[{ href: '/', label: '오늘로' }]}>
       <div className="pt-10 pb-6">
         <p className="text-xs font-medium mb-3 font-mono-code" style={{ color: 'var(--muted)' }}>
           2026 KBO 시즌

@@ -11,9 +11,9 @@ export type LabelKey =
   | 'CLUB_OPERATION'
   | 'ETC'
 
-export type LotteStance = '긍정' | '부정' | '중립'
+export type LotteStance = 'positive' | 'negative' | 'neutral'
 export type GameResult = '승' | '패' | '무'
-export type PlayerStatus = '1군' | '2군' | '말소'
+export type PlayerStatus = 'active' | '1군' | '2군' | '말소'
 
 // articles + article_labels (primary) joined
 export interface Article {

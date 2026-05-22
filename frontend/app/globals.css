@@ -37,6 +37,9 @@
   --win: #d8b15b;
   --loss: #d94b5c;
   --neutral: #7c8aa5;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
 }
 
 @keyframes fadeUp {

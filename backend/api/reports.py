@@ -2,15 +2,26 @@ from datetime import date
 
 from fastapi import APIRouter, HTTPException, Query
 
-from core.config import settings
 from services import report_service
 
 router = APIRouter()
 
+_DEFAULT_REPORT_LIST_LIMIT = 30
+
+
+def _resolve_limit(limit: int | None) -> int:
+    if limit is not None:
+        return limit
+    try:
+        from core.config import settings
+        return settings.report_list_limit
+    except Exception:
+        return _DEFAULT_REPORT_LIST_LIMIT
+
 
 @router.get("/team")
-def list_team_reports(limit: int = Query(default=settings.report_list_limit, ge=1, le=200)):
-    return report_service.list_team_reports(limit)
+def list_team_reports(limit: int | None = Query(default=None, ge=1, le=200)):
+    return report_service.list_team_reports(_resolve_limit(limit))
 
 
 @router.get("/team/{report_date}")
@@ -22,8 +33,8 @@ def get_team_report(report_date: date):
 
 
 @router.get("/players/{player_id}")
-def list_player_reports(player_id: int, limit: int = Query(default=settings.report_list_limit, ge=1, le=200)):
-    return report_service.list_player_reports(player_id, limit)
+def list_player_reports(player_id: int, limit: int | None = Query(default=None, ge=1, le=200)):
+    return report_service.list_player_reports(player_id, _resolve_limit(limit))
 
 
 @router.get("/players/{player_id}/{report_date}")
