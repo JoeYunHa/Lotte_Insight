@@ -12,7 +12,7 @@ export function TopicArticleList({ points }: TopicArticleListProps) {
   if (withArticle.length === 0) {
     return (
       <p className="text-xs py-4 text-center" style={{ color: 'var(--dim)' }}>
-        No articles in this cluster.
+        이 클러스터에 기사가 없습니다.
       </p>
     )
   }

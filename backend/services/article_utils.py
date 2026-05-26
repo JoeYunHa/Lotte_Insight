@@ -26,6 +26,49 @@ def extract_source_name(url: str) -> str:
         return ""
 
 
+def normalize_url(url: str) -> str:
+    """Normalize URL for deduplication.
+
+    Removes query parameters, fragments, and normalizes the URL structure
+    to improve duplicate detection across different sources.
+
+    Args:
+        url: Raw URL string
+
+    Returns:
+        Normalized URL string
+
+    Examples:
+        >>> normalize_url("https://example.com/article?utm_source=rss#section1")
+        'https://example.com/article'
+        >>> normalize_url("http://www.example.com/article")
+        'https://example.com/article'
+    """
+    try:
+        url_stripped = url.strip()
+        if not url_stripped:
+            return ""
+
+        parsed = urlparse(url_stripped.lower())
+
+        # Normalize scheme to https
+        scheme = "https" if parsed.scheme in ("http", "https") else parsed.scheme
+
+        # Remove www. prefix (already lowercase from above)
+        netloc = parsed.netloc.replace("www.", "")
+
+        # Remove trailing slash from path
+        path = parsed.path.rstrip("/") if parsed.path != "/" else parsed.path
+
+        # Reconstruct URL without query params and fragments
+        normalized = f"{scheme}://{netloc}{path}"
+        return normalized
+
+    except Exception:
+        # Return original URL if parsing fails
+        return url.strip().lower()
+
+
 def parse_naver_pubdate(pub_date: str) -> datetime | None:
     try:
         return datetime.strptime(pub_date, "%a, %d %b %Y %H:%M:%S %z")

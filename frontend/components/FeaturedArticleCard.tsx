@@ -9,7 +9,7 @@ interface FeaturedArticleCardProps {
 
 export function FeaturedArticleCard({
   article,
-  eyebrow = 'Featured Story',
+  eyebrow = '주요 기사',
 }: FeaturedArticleCardProps) {
   if (!article) {
     return (
@@ -25,10 +25,10 @@ export function FeaturedArticleCard({
           {eyebrow}
         </p>
         <h2 className="mt-4 text-2xl font-serif-kr font-bold" style={{ color: 'var(--text)' }}>
-          No featured story yet
+          아직 주요 기사가 없습니다
         </h2>
         <p className="mt-3 max-w-2xl text-sm leading-7" style={{ color: 'var(--muted)' }}>
-          The dashboard is ready. As soon as article collection finishes, the lead article and summary will appear here.
+          대시보드가 준비되었습니다. 기사 수집이 완료되면 주요 기사와 요약이 여기에 표시됩니다.
         </p>
       </section>
     )
@@ -81,7 +81,7 @@ export function FeaturedArticleCard({
             border: '1px solid rgba(225,6,44,0.26)',
           }}
         >
-          Open original article
+          원문 기사 보기
         </a>
       </div>
     </section>

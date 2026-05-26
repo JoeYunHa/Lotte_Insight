@@ -22,8 +22,8 @@ export function RankingPanel({
   eyebrow,
   rows,
   accent = 'neutral',
-  emptyTitle = 'No ranking data',
-  emptyBody = 'This block is ready and waiting for backend support.',
+  emptyTitle = '순위 데이터 없음',
+  emptyBody = '백엔드 지원을 기다리고 있습니다.',
 }: RankingPanelProps) {
   const accentColor =
     accent === 'gold' ? 'var(--gold)' :

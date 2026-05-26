@@ -27,7 +27,7 @@ export function TopicClusterPanel({
     return (
       <div className="rounded-[24px] p-5" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
         <p className="text-xs text-center py-8" style={{ color: 'var(--dim)' }}>
-          No clusters available for this date.
+          이 날짜의 클러스터가 없습니다.
         </p>
       </div>
     )
@@ -49,7 +49,7 @@ export function TopicClusterPanel({
             className="text-[10px] font-mono-code uppercase tracking-[0.18em] mb-3"
             style={{ color: clusterColorMap[selectedCluster.id] ?? 'var(--gold)' }}
           >
-            Selected Cluster
+            선택된 클러스터
           </p>
           <p className="font-serif-kr font-bold text-lg leading-snug mb-1.5" style={{ color: 'var(--text)' }}>
             {selectedCluster.title}
@@ -73,7 +73,7 @@ export function TopicClusterPanel({
 
           <div className="pt-3" style={{ borderTop: '1px solid var(--border)' }}>
             <p className="text-[10px] font-mono-code uppercase tracking-[0.16em] mb-2.5" style={{ color: 'var(--muted)' }}>
-              Articles in this cluster &middot; {clusterPoints.length}
+              이 클러스터의 기사 &middot; {clusterPoints.length}
             </p>
             <TopicArticleList points={clusterPoints} />
           </div>
@@ -83,7 +83,7 @@ export function TopicClusterPanel({
             className="mt-4 w-full text-xs rounded-full py-1.5 transition-all"
             style={{ color: 'var(--dim)', border: '1px solid var(--border)', background: 'transparent' }}
           >
-            Deselect
+            선택 해제
           </button>
         </div>
       ) : (
@@ -92,7 +92,7 @@ export function TopicClusterPanel({
             className="text-[10px] font-mono-code uppercase tracking-[0.18em] px-1"
             style={{ color: 'var(--muted)' }}
           >
-            Top Clusters &middot; {clusters.length}
+            주요 클러스터 &middot; {clusters.length}
           </p>
           <div className="space-y-2">
             {clusters.map((cluster) => (

@@ -18,7 +18,7 @@ export function ArticleFeed({ articles }: Props) {
 
   const filtered = activeFilter === 'ALL' ? articles : articles.filter((article) => article.primary_label === activeFilter)
   const tabs: { key: FilterKey; name: string; count: number }[] = [
-    { key: 'ALL', name: 'All', count: articles.length },
+    { key: 'ALL', name: '전체', count: articles.length },
     ...ALL_LABELS.filter((label) => labelCounts[label] > 0).map((label) => ({ key: label as FilterKey, name: LABEL_META[label].name, count: labelCounts[label] })),
   ]
 
@@ -33,7 +33,7 @@ export function ArticleFeed({ articles }: Props) {
         }}
       >
         <p className="text-[10px] font-mono-code uppercase tracking-[0.22em] mb-2" style={{ color: 'var(--muted)' }}>
-          Filter Board
+          필터 보드
         </p>
 
         <div className="relative">
@@ -70,7 +70,7 @@ export function ArticleFeed({ articles }: Props) {
         {filtered.length === 0 ? (
           <div className="py-16 text-center">
             <p className="text-sm" style={{ color: 'var(--dim)' }}>
-              No stories in this category.
+              이 카테고리에 기사가 없습니다.
             </p>
           </div>
         ) : (

@@ -37,14 +37,14 @@ export default async function PlayerPage({ params }: Props) {
   const stats = player.stats?.[0] ?? null
 
   return (
-    <PageShell headerActions={[{ href: '/players', label: 'Players' }, { href: '/', label: 'Today' }]}>
+    <PageShell headerActions={[{ href: '/players', label: '선수단' }, { href: '/', label: '오늘' }]}>
       <PlayerIdentityHeader playerName={player.name} playerNumber={player.number} playerPosition={player.position} playerStatus={player.status} />
 
       <PlayerStatsCard stats={stats} statsDate={today} />
 
       <div className="mb-8">
         <p className="text-xs mb-2" style={{ color: 'var(--dim)' }}>
-          Today&apos;s player report
+          오늘의 선수 리포트
         </p>
         <div
           className="rounded-lg p-4"
@@ -60,7 +60,7 @@ export default async function PlayerPage({ params }: Props) {
             </p>
           ) : (
             <p className="text-sm" style={{ color: 'var(--dim)' }}>
-              Report is not generated yet for this date.
+              이 날짜의 리포트가 아직 생성되지 않았습니다.
             </p>
           )}
         </div>
@@ -68,7 +68,7 @@ export default async function PlayerPage({ params }: Props) {
 
       <div>
         <p className="text-xs mb-3" style={{ color: 'var(--dim)' }}>
-          Recent stories ({playerArticles.length})
+          최근 기사 ({playerArticles.length})
         </p>
         {playerArticles.length > 0 ? (
           <div className="space-y-2.5">
@@ -78,7 +78,7 @@ export default async function PlayerPage({ params }: Props) {
           </div>
         ) : (
           <p className="text-sm py-8 text-center" style={{ color: 'var(--dim)' }}>
-            No recent stories found.
+            최근 기사가 없습니다.
           </p>
         )}
       </div>

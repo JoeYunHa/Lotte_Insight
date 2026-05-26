@@ -27,7 +27,7 @@ export function TopicClusterCard({ cluster, color, isSelected, onClick }: TopicC
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
             <span className="text-[11px] font-mono-code" style={{ color: 'var(--muted)' }}>
-              {cluster.article_count} stories
+              {cluster.article_count}개 기사
             </span>
             {(() => { const meta = getLabelMeta(cluster.label_hint); return meta ? (
               <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${meta.badge}`}>

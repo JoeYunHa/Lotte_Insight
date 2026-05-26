@@ -64,12 +64,12 @@ export default async function PlayersPage() {
   const activeCount = players.filter((player) => isActiveStatus(player.status)).length
 
   return (
-    <PageShell headerActions={[{ href: '/', label: 'Today' }, { href: '/archive', label: 'Archive' }]}>
-      <PageIntro title="Lotte Players" subtitle={`Active ${activeCount} / Total ${players.length}`} />
+    <PageShell headerActions={[{ href: '/', label: '오늘' }, { href: '/archive', label: '아카이브' }]}>
+      <PageIntro title="롯데 선수단" subtitle={`활성 ${activeCount} / 전체 ${players.length}`} />
 
       {players.length === 0 ? (
         <p className="text-sm py-16 text-center" style={{ color: 'var(--dim)' }}>
-          No player data available.
+          선수 데이터가 없습니다.
         </p>
       ) : (
         POSITION_GROUPS.map((group) => {
@@ -97,7 +97,7 @@ export default async function PlayersPage() {
 
       {groups.etc.length > 0 ? (
         <section className="mb-10">
-          <SectionHeader label="Others" />
+          <SectionHeader label="기타" />
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {groups.etc.map((player) => (
               <PlayerCard key={player.id} player={player} />

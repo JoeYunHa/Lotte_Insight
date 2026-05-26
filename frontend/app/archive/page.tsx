@@ -17,12 +17,12 @@ export default async function ArchivePage() {
   }
 
   return (
-    <PageShell headerActions={[{ href: '/', label: 'Today' }]}>
-      <PageIntro title="Archive" />
+    <PageShell headerActions={[{ href: '/', label: '오늘' }]}>
+      <PageIntro title="아카이브" />
 
       {reports.length === 0 ? (
         <p className="text-sm py-16 text-center" style={{ color: 'var(--dim)' }}>
-          No reports are available yet.
+          아직 리포트가 없습니다.
         </p>
       ) : (
         <ArchiveCalendar reports={reports} initialDate={today} />

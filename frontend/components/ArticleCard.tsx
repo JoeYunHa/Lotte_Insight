@@ -64,7 +64,7 @@ export function ArticleCard({ article, variant = 'default', showKeyPlayers = tru
             className="text-[10px] font-mono-code uppercase tracking-widest transition-colors hover:text-lotte-red"
             style={{ color: 'var(--dim)' }}
           >
-            Open source
+            원문 보기
           </a>
         </div>
       </div>

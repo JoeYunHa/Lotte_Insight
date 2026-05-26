@@ -1,7 +1,11 @@
 """Unit tests for services/article_utils.py."""
 
 import pytest
-from services.article_utils import select_primary_label, select_primary_label_and_confidence
+from services.article_utils import (
+    normalize_url,
+    select_primary_label,
+    select_primary_label_and_confidence,
+)
 
 
 class TestSelectPrimaryLabelAndConfidence:
@@ -51,3 +55,54 @@ class TestSelectPrimaryLabelAndConfidence:
         label_standalone = select_primary_label(labels)
         label_pair, _ = select_primary_label_and_confidence(labels)
         assert label_standalone == label_pair
+
+
+class TestNormalizeURL:
+    """Test URL normalization for deduplication."""
+
+    def test_removes_query_parameters(self):
+        url = "https://example.com/article?utm_source=rss&id=123"
+        assert normalize_url(url) == "https://example.com/article"
+
+    def test_removes_fragment(self):
+        url = "https://example.com/article#section"
+        assert normalize_url(url) == "https://example.com/article"
+
+    def test_removes_www_prefix(self):
+        url = "https://www.example.com/article"
+        assert normalize_url(url) == "https://example.com/article"
+
+    def test_converts_http_to_https(self):
+        url = "http://example.com/article"
+        assert normalize_url(url) == "https://example.com/article"
+
+    def test_removes_trailing_slash(self):
+        url = "https://example.com/article/"
+        assert normalize_url(url) == "https://example.com/article"
+
+    def test_converts_to_lowercase(self):
+        url = "HTTPS://EXAMPLE.COM/Article"
+        assert normalize_url(url) == "https://example.com/article"
+
+    def test_keeps_root_path_slash(self):
+        url = "https://example.com/"
+        assert normalize_url(url) == "https://example.com/"
+
+    def test_full_normalization(self):
+        url = "HTTP://WWW.EXAMPLE.COM/Article/?utm=test#top"
+        assert normalize_url(url) == "https://example.com/article"
+
+    def test_handles_invalid_url_gracefully(self):
+        url = "not-a-url"
+        result = normalize_url(url)
+        # Should return something (original or lowercased)
+        assert isinstance(result, str)
+        assert "not-a-url" in result.lower()
+
+    def test_handles_empty_string(self):
+        result = normalize_url("")
+        assert result == ""
+
+    def test_preserves_path_structure(self):
+        url = "https://example.com/news/2026/05/article"
+        assert normalize_url(url) == "https://example.com/news/2026/05/article"

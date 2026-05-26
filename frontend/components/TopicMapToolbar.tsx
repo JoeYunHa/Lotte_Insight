@@ -14,19 +14,19 @@ interface TopicMapToolbarProps {
 }
 
 const FILTER_TABS: { key: LabelFilter; name: string }[] = [
-  { key: "ALL", name: "All" },
-  { key: "MATCH_RELATED", name: "Match" },
-  { key: "INJURY_ROSTER", name: "Roster" },
-  { key: "TRANSACTION_CONTRACT", name: "Transaction" },
-  { key: "PERFORMANCE_ANALYSIS", name: "Performance" },
-  { key: "INTERVIEW", name: "Interview" },
-  { key: "CLUB_OPERATION", name: "Club" },
+  { key: "ALL", name: "전체" },
+  { key: "MATCH_RELATED", name: "경기" },
+  { key: "INJURY_ROSTER", name: "엔트리" },
+  { key: "TRANSACTION_CONTRACT", name: "트레이드" },
+  { key: "PERFORMANCE_ANALYSIS", name: "성적" },
+  { key: "INTERVIEW", name: "인터뷰" },
+  { key: "CLUB_OPERATION", name: "구단" },
 ];
 
 const VIEW_TABS: { key: ViewMode; name: string }[] = [
-  { key: "cluster", name: "Cluster" },
-  { key: "label", name: "Label" },
-  { key: "outlier", name: "Outlier" },
+  { key: "cluster", name: "클러스터" },
+  { key: "label", name: "라벨" },
+  { key: "outlier", name: "아웃라이어" },
 ];
 
 export function TopicMapToolbar({
@@ -93,7 +93,7 @@ export function TopicMapToolbar({
             border: "1px solid var(--border)",
           }}
         >
-          Reset
+          초기화
         </button>
       </div>
     </div>

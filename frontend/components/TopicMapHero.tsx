@@ -7,9 +7,9 @@ interface TopicMapHeroProps {
 
 export function TopicMapHero({ date, articleCount, clusterCount, outlierCount }: TopicMapHeroProps) {
   const meta = [
-    { label: 'stories', value: articleCount },
-    { label: 'clusters', value: clusterCount },
-    { label: 'outliers', value: outlierCount },
+    { label: '기사', value: articleCount },
+    { label: '클러스터', value: clusterCount },
+    { label: '아웃라이어', value: outlierCount },
   ]
 
   return (
@@ -30,10 +30,10 @@ export function TopicMapHero({ date, articleCount, clusterCount, outlierCount }:
       </div>
 
       <h1 className="font-serif-kr text-3xl font-black leading-tight mb-2" style={{ color: 'var(--text)' }}>
-        {"Today's Lotte Story Landscape"}
+        {"오늘의 롯데 이슈 지형도"}
       </h1>
       <p className="text-sm leading-relaxed max-w-xl" style={{ color: 'var(--muted)' }}>
-        Points closer together cover similar stories. Points sharing the same color belong to the same issue cluster. Select a cluster to read its brief.
+        가까운 점들은 유사한 내용을 다룹니다. 같은 색상의 점들은 같은 이슈 클러스터에 속합니다. 클러스터를 선택하면 요약을 볼 수 있습니다.
       </p>
       <div className="h-px w-full mt-5" style={{ background: 'var(--border)' }} />
     </div>

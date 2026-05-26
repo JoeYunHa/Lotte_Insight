@@ -130,7 +130,7 @@ export function ArchiveCalendar({ reports, initialDate }: Props) {
           ))}
           <div className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--muted)' }}>
             <span className="w-2 h-2 rounded-full" style={{ background: 'var(--dim)' }} />
-            Unknown
+            정보 없음
           </div>
         </div>
       </div>
@@ -138,7 +138,7 @@ export function ArchiveCalendar({ reports, initialDate }: Props) {
       {selectedReport ? (
         <div className="mb-8">
           <p className="text-xs mb-2" style={{ color: 'var(--dim)' }}>
-            Selected date
+            선택된 날짜
           </p>
           <ArchiveReportCard report={selectedReport} isSelected />
         </div>
@@ -146,7 +146,7 @@ export function ArchiveCalendar({ reports, initialDate }: Props) {
 
       <div>
         <p className="text-xs mb-3" style={{ color: 'var(--dim)' }}>
-          Full history
+          전체 기록
         </p>
         <div className="space-y-2.5">
           {sortedReports.map((report) => (
@@ -185,7 +185,7 @@ function ArchiveReportCard({ report, isSelected }: { report: TeamDailyReport; is
           ) : null}
         </div>
         <span className="text-xs font-mono-code" style={{ color: 'var(--muted)' }}>
-          <span style={{ color: 'var(--dim)' }}>Stories </span>
+          <span style={{ color: 'var(--dim)' }}>기사 </span>
           {report.article_count}
         </span>
       </div>

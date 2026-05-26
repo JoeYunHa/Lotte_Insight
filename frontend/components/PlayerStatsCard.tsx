@@ -61,7 +61,7 @@ export function PlayerStatsCard({ stats, statsDate }: PlayerStatsCardProps) {
     return (
       <div className="rounded-lg p-4 mb-6" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
         <p className="text-xs" style={{ color: 'var(--dim)' }}>
-          No stats available
+          기록이 없습니다
         </p>
       </div>
     )
@@ -72,7 +72,7 @@ export function PlayerStatsCard({ stats, statsDate }: PlayerStatsCardProps) {
   return (
     <div className="rounded-lg p-4 mb-6" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
       <p className="text-xs mb-3" style={{ color: 'var(--dim)' }}>
-        Season stats &middot; {formatDate(statsDate)}
+        시즌 기록 &middot; {formatDate(statsDate)}
       </p>
       <div className="flex gap-6 flex-wrap">
         {statFields.map((field) => (

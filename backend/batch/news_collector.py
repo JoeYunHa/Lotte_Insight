@@ -11,11 +11,16 @@ import requests
 from core.config import settings
 from core.database import supabase
 from batch.gpt_summarizer import gpt_summarize_batch
+from batch.rss_collector import collect_from_rss_feeds
 from models.classifier import classify_batch
 from models.lotte_related_detector import detect_is_lotte_related_batch
 from models.player_stance_classifier import classify_player_stance_batch
 from models.stance_classifier import classify_stance_batch
-from services.article_utils import NormalizedNewsItem, normalize_naver_news_item
+from services.article_utils import (
+    NormalizedNewsItem,
+    normalize_naver_news_item,
+    normalize_url,
+)
 from services.player_catalog import build_player_alias_index, list_player_canonical_names
 
 _FETCH_WORKERS = 8
@@ -189,6 +194,7 @@ def _upsert_articles(enriched: list[dict]) -> int:
             "title": e["item"].title,
             "published_at": e["item"].published_at,
             "event_summary": e["event_summary_json"],
+            "collection_source": e.get("collection_source", "naver_api"),
         })
     if not rows:
         return 0
@@ -272,47 +278,95 @@ def run() -> int:
 
     logger.info("News collection started")
 
+    # Phase 1: Collect from Naver Search API
     base_keywords = [f"{settings.team_name_ko} 자이언츠"]
     keywords = base_keywords + [
         f"{settings.team_name_ko} {name}"
         for name in list_player_canonical_names(active_only=True)[: settings.article_keyword_limit]
     ]
 
-    all_items: list[dict] = []
+    naver_items: list[dict] = []
     with ThreadPoolExecutor(max_workers=_FETCH_WORKERS) as executor:
         future_to_keyword = {executor.submit(_fetch_news, kw): kw for kw in keywords}
         for future in as_completed(future_to_keyword):
             keyword = future_to_keyword[future]
             try:
                 items = future.result()
-                all_items.extend(items)
+                naver_items.extend(items)
                 logger.info("Collected %d items for keyword '%s'", len(items), keyword)
             except Exception as exc:
                 logger.error("Failed to collect keyword '%s': %s", keyword, exc)
 
-    seen: set[str] = set()
-    unique_items: list[dict] = []
-    for item in all_items:
-        url = item.get("originallink") or item.get("link", "")
-        if url and url not in seen:
-            seen.add(url)
-            unique_items.append(item)
-    logger.info("Dedup: %d raw → %d unique", len(all_items), len(unique_items))
+    logger.info("Naver API collection: %d raw items", len(naver_items))
 
-    normalized_items = _normalized_items(unique_items)
-    logger.info("Normalized: %d items (dropped %d)", len(normalized_items), len(unique_items) - len(normalized_items))
-    enriched = _run_inference(normalized_items)
+    # Phase 2: Collect from RSS feeds
+    rss_items_with_source = collect_from_rss_feeds(
+        description_snippet_length=settings.article_description_snippet_length
+    )
+    logger.info("RSS collection: %d items from all feeds", len(rss_items_with_source))
+
+    # Phase 3: Normalize and deduplicate across all sources
+    # Track (normalized_item, collection_source) tuples
+    all_normalized: list[tuple[NormalizedNewsItem, str]] = []
+
+    # Normalize Naver items
+    for item in naver_items:
+        normalized = normalize_naver_news_item(
+            item,
+            description_snippet_length=settings.article_description_snippet_length,
+        )
+        if normalized is not None:
+            all_normalized.append((normalized, "naver_api"))
+
+    # Add RSS items
+    all_normalized.extend(rss_items_with_source)
+
+    logger.info(
+        "Total items before dedup: %d (Naver: %d, RSS: %d)",
+        len(all_normalized),
+        len(naver_items),
+        len(rss_items_with_source),
+    )
+
+    # Deduplicate by normalized URL
+    seen_urls: set[str] = set()
+    unique_items_with_source: list[tuple[NormalizedNewsItem, str]] = []
+
+    for item, source in all_normalized:
+        normalized_link = normalize_url(item.link)
+        if normalized_link not in seen_urls:
+            seen_urls.add(normalized_link)
+            unique_items_with_source.append((item, source))
+
+    logger.info(
+        "Dedup: %d total → %d unique (removed %d duplicates)",
+        len(all_normalized),
+        len(unique_items_with_source),
+        len(all_normalized) - len(unique_items_with_source),
+    )
+
+    # Phase 4: Run inference pipeline
+    unique_items = [item for item, _ in unique_items_with_source]
+    enriched = _run_inference(unique_items)
+
+    # Add collection_source to enriched data
+    for i, (_, source) in enumerate(unique_items_with_source):
+        if i < len(enriched):
+            enriched[i]["collection_source"] = source
+
+    # Phase 5: Save to database
     _upsert_articles(enriched)
     id_map = _get_article_id_map(enriched)
     _save_labels_and_players(enriched, id_map)
 
+    # Phase 6: Sync game data
     today_kst = datetime.now(_KST).date()
     try:
         game_collector.sync_game(today_kst)
     except Exception as exc:
         logger.warning("경기 데이터 동기화 실패 (무시): %s", exc)
 
-    logger.info("News collection completed: %s items", len(unique_items))
+    logger.info("News collection completed: %d unique items", len(unique_items))
     return len(unique_items)
 
 
