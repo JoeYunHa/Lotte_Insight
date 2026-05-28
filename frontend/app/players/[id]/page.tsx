@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
 import { ArticleCard } from '@/components/ArticleCard'
+import { FanVoiceLayer } from '@/components/FanVoice/FanVoiceLayer'
 import { PageShell } from '@/components/PageShell'
 import { PlayerIdentityHeader, PlayerStatsCard } from '@/components/PlayerStatsCard'
 import { getArticles, getPlayer, getPlayerReport } from '@/lib/api'
@@ -39,6 +40,8 @@ export default async function PlayerPage({ params }: Props) {
   return (
     <PageShell headerActions={[{ href: '/players', label: '선수단' }, { href: '/', label: '오늘' }]}>
       <PlayerIdentityHeader playerName={player.name} playerNumber={player.number} playerPosition={player.position} playerStatus={player.status} />
+
+      <FanVoiceLayer contextType="player" contextId={id} />
 
       <PlayerStatsCard stats={stats} statsDate={today} />
 

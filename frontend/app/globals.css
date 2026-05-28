@@ -104,3 +104,102 @@ body {
   background: rgba(228, 0, 43, 0.3);
   color: var(--text);
 }
+
+@keyframes fan-voice-drift-right {
+  from {
+    transform: translate3d(calc(-100% - 32px), 0, 0);
+  }
+  to {
+    transform: translate3d(calc(100vw + 48px), 0, 0);
+  }
+}
+
+.fan-voice-shell {
+  position: relative;
+}
+
+.fan-voice-overlay {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.74), rgba(241, 232, 218, 0.68));
+}
+
+.fan-voice-lane {
+  position: relative;
+  height: 42px;
+}
+
+.fan-voice-lane + .fan-voice-lane {
+  margin-top: 8px;
+}
+
+.fan-voice-bubble {
+  position: absolute;
+  left: 0;
+  top: 6px;
+  max-width: min(480px, 75vw);
+  padding: 7px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.35;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  animation-name: fan-voice-drift-right;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+  will-change: transform;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.fan-voice-bubble:hover {
+  animation-play-state: paused;
+  border-color: var(--border-strong);
+}
+
+.fan-voice-badge {
+  margin-right: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--red);
+}
+
+.fan-voice-actions {
+  margin-left: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.fan-voice-action-btn {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 1px 5px;
+  font-size: 10px;
+  line-height: 1.2;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.fan-voice-action-btn:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fan-voice-bubble {
+    animation: none !important;
+    position: relative;
+    top: 0;
+    transform: none !important;
+    margin: 4px;
+  }
+}

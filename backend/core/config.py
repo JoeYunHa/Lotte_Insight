@@ -57,6 +57,9 @@ def _build_settings():
         is_lotte_related_threshold: float = 0.40
         gpt_summary_labels: list[str] = ["MATCH_RELATED", "INJURY_ROSTER", "TRANSACTION_CONTRACT"]
         redis_url: str = ""
+        fan_voice_enabled: bool = True
+        fan_voice_write_enabled: bool = True
+        fan_voice_contexts: list[str] = ["home", "player", "topic"]
 
         @field_validator("gpt_summary_labels", mode="before")
         @classmethod

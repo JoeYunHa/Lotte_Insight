@@ -1,3 +1,4 @@
+import { FanVoiceLayer } from '@/components/FanVoice/FanVoiceLayer'
 import { PageShell } from '@/components/PageShell'
 import { TopicMapExplorer } from '@/components/TopicMapExplorer'
 import { TopicMapHero } from '@/components/TopicMapHero'
@@ -35,6 +36,8 @@ export default async function TopicsPage() {
         clusterCount={clusterCount}
         outlierCount={outlierCount}
       />
+
+      <FanVoiceLayer contextType="topic" contextId={data?.map_date ?? today} />
 
       {fetchError ? (
         <div

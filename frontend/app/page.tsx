@@ -1,4 +1,5 @@
 import { ArticleFeed } from '@/components/ArticleFeed'
+import { FanVoiceLayer } from '@/components/FanVoice/FanVoiceLayer'
 import { FeaturedArticleCard } from '@/components/FeaturedArticleCard'
 import { HomeHeroDesk } from '@/components/HomeHeroDesk'
 import { PageShell } from '@/components/PageShell'
@@ -102,6 +103,8 @@ export default async function HomePage() {
       }
     >
       <HomeHeroDesk date={formatDateKo(today)} headline={headline} subcopy={subcopy} kicker={gameKicker} metaStat={article_count > 0 ? { label: 'stories', value: String(article_count) } : undefined} />
+
+      <FanVoiceLayer contextType="home" contextId="today" />
 
       <section className="mb-10 grid gap-4 lg:grid-cols-[1.45fr_0.95fr]">
         <FeaturedArticleCard article={featuredArticle} />
