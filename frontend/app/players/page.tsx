@@ -8,12 +8,12 @@ import {
   classifyPosition,
   groupPlayers,
   POSITION_GROUPS,
-} from "@/lib/player-position";
+} from "@/lib/player/player-position";
 import {
   isActiveStatus,
   PLAYER_STATUS_META,
   toKnownPlayerStatus,
-} from "@/lib/player-status";
+} from "@/lib/player/player-status";
 import type { Player } from "@/lib/types";
 
 export const dynamic = "force-dynamic";

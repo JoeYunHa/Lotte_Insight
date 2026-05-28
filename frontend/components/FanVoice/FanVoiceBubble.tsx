@@ -1,14 +1,18 @@
-'use client'
+"use client";
 
-import type { ActiveFanVoiceBubble } from '@/lib/fan-voice-lane-scheduler'
+import type { ActiveFanVoiceBubble } from "@/lib/fan-voice/fan-voice-lane-scheduler";
 
 interface FanVoiceBubbleProps {
-  bubble: ActiveFanVoiceBubble
-  onReact: (messageId: string) => void
-  onReport: (messageId: string) => void
+  bubble: ActiveFanVoiceBubble;
+  onReact: (messageId: string) => void;
+  onReport: (messageId: string) => void;
 }
 
-export function FanVoiceBubble({ bubble, onReact, onReport }: FanVoiceBubbleProps) {
+export function FanVoiceBubble({
+  bubble,
+  onReact,
+  onReport,
+}: FanVoiceBubbleProps) {
   return (
     <div
       className="fan-voice-bubble"
@@ -40,5 +44,5 @@ export function FanVoiceBubble({ bubble, onReact, onReport }: FanVoiceBubbleProp
         </button>
       </span>
     </div>
-  )
+  );
 }
