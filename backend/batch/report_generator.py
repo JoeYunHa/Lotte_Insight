@@ -3,8 +3,9 @@ Generate daily team and player reports.
 """
 
 import logging
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, datetime, timedelta, timezone
+
+from batch.parallel_utils import run_indexed_parallel
 
 from openai import OpenAI
 
@@ -141,7 +142,7 @@ def _generate_team_insight(user_prompt: str) -> str | None:
             temperature=0.4,
         )
         return response.choices[0].message.content.strip()
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - GPT fallback handled
         logger.error("Failed to generate team insight via GPT: %s", exc)
         return None
 
@@ -253,7 +254,7 @@ def _build_player_report(player_id: int, player_name: str, today: date) -> dict 
             temperature=settings.player_report_temperature,
         )
         insight = response.choices[0].message.content.strip()
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - GPT call boundary
         logger.error("Failed to generate player report for %s: %s", player_name, exc)
         return None
 
@@ -276,22 +277,32 @@ def run() -> dict:
     if team_report:
         report_repository.save_report("team_daily_report", team_report, on_conflict="date")
 
-    saved = 0
     players = report_repository.list_active_players()
-    with ThreadPoolExecutor(max_workers=_PLAYER_REPORT_WORKERS) as executor:
-        futures = {
-            executor.submit(_build_player_report, player["id"], player["name"], today): player
-            for player in players
-        }
-        for future in as_completed(futures):
-            report = future.result()
-            if report:
-                report_repository.save_report(
-                    "player_daily_report",
-                    report,
-                    on_conflict="player_id,date",
-                )
-                saved += 1
+
+    def _worker(player: dict) -> dict | None:
+        return _build_player_report(player["id"], player["name"], today)
+
+    def _on_player_error(idx: int, exc: Exception) -> dict | None:
+        player = players[idx]
+        logger.error("Player report failed for %s: %s", player["name"], exc)
+        return None
+
+    player_reports = run_indexed_parallel(
+        players,
+        _worker,
+        max_workers=_PLAYER_REPORT_WORKERS,
+        on_error=_on_player_error,
+    )
+
+    saved = 0
+    for report in player_reports:
+        if report:
+            report_repository.save_report(
+                "player_daily_report",
+                report,
+                on_conflict="player_id,date",
+            )
+            saved += 1
 
     team_saved = 1 if team_report else 0
     logger.info("Report generation completed: team=%s players=%s", team_saved, saved)

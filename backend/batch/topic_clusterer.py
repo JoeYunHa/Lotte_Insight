@@ -38,6 +38,7 @@ _EMBED_MAX_LENGTH = 128
 _EMBEDDING_MODEL_KEY = "koelectra_mean_pool_v1"
 _PROJECTION_MODEL_UMAP = "umap_v1"
 _PROJECTION_MODEL_PCA = "pca_v1"
+_MAX_AGGLOMERATIVE_ARTICLES = 400
 
 
 # ---------------------------------------------------------------------------
@@ -81,6 +82,8 @@ def _embed_texts(texts: list[str]) -> np.ndarray | None:
     artifacts = _embedder.get()
     if artifacts is None:
         return None
+    if not texts:
+        return np.empty((0, 0), dtype=float)
 
     import torch
 
@@ -100,6 +103,8 @@ def _embed_texts(texts: list[str]) -> np.ndarray | None:
         vecs = _mean_pool(outputs.last_hidden_state, enc["attention_mask"])
         all_vecs.append(vecs.cpu().numpy())
 
+    if not all_vecs:
+        return np.empty((0, 0), dtype=float)
     return np.vstack(all_vecs)
 
 
@@ -143,35 +148,63 @@ def _cluster_articles(embeddings: np.ndarray, threshold: float) -> np.ndarray:
     if n < 2:
         return np.zeros(n, dtype=int)
 
-    sim = _cosine_similarity_matrix(embeddings)
     try:
         from sklearn.cluster import AgglomerativeClustering
+        from sklearn.cluster import MiniBatchKMeans
 
-        distance = np.clip(1.0 - sim, 0.0, 2.0)
-        clustering = AgglomerativeClustering(
-            n_clusters=None,
-            metric="precomputed",
-            linkage="average",
-            distance_threshold=1.0 - threshold,
+        # Agglomerative clustering is O(n^2). Use it for moderate sizes only.
+        if n <= _MAX_AGGLOMERATIVE_ARTICLES:
+            clustering = AgglomerativeClustering(
+                n_clusters=None,
+                metric="cosine",
+                linkage="average",
+                distance_threshold=1.0 - threshold,
+            )
+            return clustering.fit_predict(embeddings)
+
+        # For large batches, use minibatch k-means to avoid quadratic memory/time.
+        cluster_count = max(2, int(np.sqrt(n / 2)))
+        logger.warning(
+            "Article count %d exceeds agglomerative threshold %d; using MiniBatchKMeans(k=%d).",
+            n,
+            _MAX_AGGLOMERATIVE_ARTICLES,
+            cluster_count,
         )
-        return clustering.fit_predict(distance)
+        model = MiniBatchKMeans(
+            n_clusters=cluster_count,
+            random_state=_UMAP_RANDOM_STATE,
+            batch_size=min(256, n),
+            n_init="auto",
+        )
+        return model.fit_predict(embeddings)
     except ImportError:
-        logger.warning("sklearn not installed; falling back to graph-connectivity clustering.")
-        labels = -np.ones(n, dtype=int)
-        cluster_id = 0
-        for i in range(n):
-            if labels[i] != -1:
-                continue
-            stack = [i]
-            labels[i] = cluster_id
-            while stack:
-                cur = stack.pop()
-                neighbors = np.where(sim[cur] >= threshold)[0]
-                for nb in neighbors:
-                    if labels[nb] == -1:
-                        labels[nb] = cluster_id
-                        stack.append(int(nb))
-            cluster_id += 1
+        logger.warning("sklearn not installed; using greedy centroid clustering fallback.")
+        # Greedy centroid assignment avoids building an O(n^2) similarity matrix.
+        norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
+        normalized = embeddings / np.where(norms > 0, norms, 1.0)
+        centroids: list[np.ndarray] = []
+        centroid_sizes: list[int] = []
+        labels = np.empty(n, dtype=int)
+
+        for i, vec in enumerate(normalized):
+            best_idx = -1
+            best_sim = -1.0
+            for idx, centroid in enumerate(centroids):
+                sim = float(np.dot(vec, centroid))
+                if sim > best_sim:
+                    best_sim = sim
+                    best_idx = idx
+
+            if best_idx >= 0 and best_sim >= threshold:
+                labels[i] = best_idx
+                size = centroid_sizes[best_idx]
+                centroids[best_idx] = (centroids[best_idx] * size + vec) / (size + 1)
+                centroid_sizes[best_idx] = size + 1
+            else:
+                labels[i] = len(centroids)
+                centroids.append(vec.copy())
+                centroid_sizes.append(1)
+
         return labels
 
 
@@ -410,7 +443,7 @@ def run_topic_clustering(target_date: date | None = None) -> None:
             sum(1 for p in point_rows if p["is_outlier"]),
             date_str,
         )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - DB write boundary
         logger.error("Failed to write topic map to DB: %s", exc)
 
 

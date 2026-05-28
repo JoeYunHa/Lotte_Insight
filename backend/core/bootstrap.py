@@ -1,21 +1,18 @@
-from types import SimpleNamespace
 import os
+from types import SimpleNamespace
+
+
+def _try_import_settings(module_path: str):
+    module = __import__(module_path, fromlist=["settings"])
+    return module.settings
 
 
 def load_settings():
-    try:
-        from core.config import settings as app_settings
-
-        return app_settings
-    except ModuleNotFoundError:
-        pass
-
-    try:
-        from backend.core.config import settings as app_settings
-
-        return app_settings
-    except ModuleNotFoundError:
-        pass
+    for module_path in ("core.config", "backend.core.config"):
+        try:
+            return _try_import_settings(module_path)
+        except ModuleNotFoundError:
+            continue
 
     return SimpleNamespace(
         crawl_user_agent=os.getenv("CRAWL_USER_AGENT", "LotteInsightBot/1.0"),

@@ -1,7 +1,8 @@
-from datetime import date
+﻿from datetime import date
 
 from fastapi import APIRouter, HTTPException, Query
 
+from core.config import settings
 from services import report_service
 
 router = APIRouter()
@@ -12,11 +13,10 @@ _DEFAULT_REPORT_LIST_LIMIT = 30
 def _resolve_limit(limit: int | None) -> int:
     if limit is not None:
         return limit
-    try:
-        from core.config import settings
-        return settings.report_list_limit
-    except Exception:
-        return _DEFAULT_REPORT_LIST_LIMIT
+    configured = getattr(settings, "report_list_limit", None)
+    if isinstance(configured, int) and configured > 0:
+        return configured
+    return _DEFAULT_REPORT_LIST_LIMIT
 
 
 @router.get("/team")

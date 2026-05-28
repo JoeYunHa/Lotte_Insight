@@ -1,7 +1,19 @@
-from datetime import date
+﻿from datetime import date
 
 from core.database import supabase
 from core.time_utils import utc_day_bounds
+
+
+def _fetch_article_player_rows(article_ids: list[int], select_clause: str) -> list[dict]:
+    if not article_ids:
+        return []
+    result = (
+        supabase.table("article_players")
+        .select(select_clause)
+        .in_("article_id", article_ids)
+        .execute()
+    )
+    return result.data
 
 
 def list_reports(
@@ -60,15 +72,7 @@ def fetch_articles_for_day(target_date: date) -> list[dict]:
 
 
 def fetch_player_mentions(article_ids: list[int]) -> list[dict]:
-    if not article_ids:
-        return []
-    result = (
-        supabase.table("article_players")
-        .select("player_id, players(name)")
-        .in_("article_id", article_ids)
-        .execute()
-    )
-    return result.data
+    return _fetch_article_player_rows(article_ids, "player_id, players(name)")
 
 
 def fetch_recent_player_articles(
@@ -103,11 +107,11 @@ def fetch_latest_player_stats(player_id: int) -> dict:
 
 
 def list_active_players() -> list[dict]:
-    # "active" is set by sync_players.py; "1군" handles legacy seeds before the sync ran.
+    # "active" is set by sync_players.py; "1\uad70" handles legacy seeds before the sync ran.
     result = (
         supabase.table("players")
         .select("id, name")
-        .in_("status", ["active", "1군"])
+        .in_("status", ["active", "1\uad70"])
         .execute()
     )
     return result.data
@@ -130,12 +134,4 @@ def fetch_game_for_day(target_date: date) -> dict | None:
 
 
 def fetch_player_mentions_with_position(article_ids: list[int]) -> list[dict]:
-    if not article_ids:
-        return []
-    result = (
-        supabase.table("article_players")
-        .select("player_id, players(id, name, position)")
-        .in_("article_id", article_ids)
-        .execute()
-    )
-    return result.data
+    return _fetch_article_player_rows(article_ids, "player_id, players(id, name, position)")

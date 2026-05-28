@@ -95,7 +95,7 @@ def _robot_parser() -> RobotFileParser:
         parser.set_url(f"{KBO_BASE_URL}/robots.txt")
         try:
             parser.read()
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - robots.txt optional
             logger.warning("Failed to read robots.txt, continuing cautiously: %s", exc)
         _robot_parser_instance = parser
     return _robot_parser_instance
@@ -118,7 +118,7 @@ def _select_team_and_get_html(
     try:
         page.goto(url, wait_until=wait_until, timeout=NAV_TIMEOUT_MS)
         page.wait_for_selector("table tbody tr", timeout=SELECT_TIMEOUT_MS)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - crawl boundary
         logger.error("Failed to load page %s: %s", url, exc)
         return None
 
@@ -127,11 +127,12 @@ def _select_team_and_get_html(
             page.select_option(selector, settings.team_code)
             try:
                 page.wait_for_load_state("networkidle", timeout=10_000)
-            except Exception:
-                pass
+            except Exception as exc:  # noqa: BLE001 - wait state optional
+                logger.debug("Load state wait failed on selector %s: %s", selector, exc)
             page.wait_for_selector("table tbody tr", timeout=SELECT_TIMEOUT_MS)
             return page.content()
-        except Exception:
+        except Exception as exc:  # noqa: BLE001 - selector fallback
+            logger.debug("Team selector failed (%s): %s", selector, exc)
             continue
 
     logger.warning("Could not select team on page: %s", url)
@@ -285,7 +286,7 @@ def fetch_roster() -> list[str]:
         names = _parse_register_names(html)
         logger.info("Fetched roster from register page: %s players", len(names))
         return sorted(names)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - crawl boundary
         logger.error("Failed to fetch register roster: %s", exc)
         return []
 

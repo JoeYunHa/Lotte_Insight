@@ -22,7 +22,7 @@ def clean_html(text: str) -> str:
 def extract_source_name(url: str) -> str:
     try:
         return urlparse(url).netloc.replace("www.", "")
-    except Exception:
+    except (AttributeError, ValueError, TypeError):
         return ""
 
 
@@ -64,7 +64,7 @@ def normalize_url(url: str) -> str:
         normalized = f"{scheme}://{netloc}{path}"
         return normalized
 
-    except Exception:
+    except (AttributeError, ValueError, TypeError):
         # Return original URL if parsing fails
         return url.strip().lower()
 

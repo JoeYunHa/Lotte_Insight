@@ -47,7 +47,7 @@ def fetch_month_games(year: int, month: int) -> list[dict]:
         resp = requests.get(url, timeout=15, headers={"User-Agent": settings.crawl_user_agent})
         resp.raise_for_status()
         resp.encoding = resp.apparent_encoding
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - boundary error handling
         logger.error("Failed to request giantsclub calendar: %s", exc)
         return []
 
