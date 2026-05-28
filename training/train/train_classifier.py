@@ -16,7 +16,7 @@ from transformers import (
     get_linear_schedule_with_warmup,
 )
 
-from label_schema import VALID_LABELS, VALID_LABEL_SET
+from training.collect.label_schema import VALID_LABELS, VALID_LABEL_SET
 from settings import (
     ARTICLE_SNIPPET_LENGTH,
     DATA_DIR,

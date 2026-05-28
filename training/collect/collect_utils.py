@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 
 import requests
 
-from label_schema import VALID_LABEL_SET
+from training.collect.label_schema import VALID_LABEL_SET
 from openai_utils import chat_json, require_openai_api_key
 from settings import (
     ARTICLE_SNIPPET_LENGTH,
@@ -849,7 +849,7 @@ def build_game_context_for_row(row: dict) -> str:
         except ValueError:
             return "해당 날짜 경기 없음"
 
-    from collect_game_results import format_game_context, lookup_game
+    from training.collect.collect_game_results import format_game_context, lookup_game
 
     game = lookup_game(parsed.date(), hour=parsed.hour)
     return format_game_context(game)

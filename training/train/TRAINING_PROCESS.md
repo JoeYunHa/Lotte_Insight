@@ -4,7 +4,7 @@
 
 The current pipeline under `training/` trains a KoELECTRA-based 8-label multi-label classifier for Lotte Giants news articles.
 
-The implementation is centered in [train_classifier.py](/C:/Users/yunha/Desktop/lotte-insight/training/train_classifier.py), with shared CSV utilities in [collect_utils.py](/C:/Users/yunha/Desktop/lotte-insight/training/collect_utils.py), label definitions in [label_schema.py](/C:/Users/yunha/Desktop/lotte-insight/training/label_schema.py), and default paths and hyperparameters in [settings.py](/C:/Users/yunha/Desktop/lotte-insight/training/settings.py).
+The implementation is centered in [train_classifier.py](/C:/Users/yunha/Desktop/lotte-insight/training/train/train_classifier.py), with shared CSV utilities in [collect_utils.py](/C:/Users/yunha/Desktop/lotte-insight/training/collect/collect_utils.py), label definitions in [label_schema.py](/C:/Users/yunha/Desktop/lotte-insight/training/collect/label_schema.py), and default paths and hyperparameters in [settings.py](/C:/Users/yunha/Desktop/lotte-insight/training/settings.py).
 
 ## Source Data
 
@@ -17,7 +17,7 @@ These are defined by `LABELED_TITLES_CSV` and `LABELED_PLAYERS_CSV` in [settings
 
 ## CSV Schema
 
-The shared CSV header is `CSV_HEADERS` in [collect_utils.py](/C:/Users/yunha/Desktop/lotte-insight/training/collect_utils.py).
+The shared CSV header is `CSV_HEADERS` in [collect_utils.py](/C:/Users/yunha/Desktop/lotte-insight/training/collect/collect_utils.py).
 
 | Field | Purpose |
 | --- | --- |
@@ -45,7 +45,7 @@ The remaining columns are metadata for collection, audit, and review.
 
 ## Label Set
 
-The fixed label order is defined in [label_schema.py](/C:/Users/yunha/Desktop/lotte-insight/training/label_schema.py):
+The fixed label order is defined in [label_schema.py](/C:/Users/yunha/Desktop/lotte-insight/training/collect/label_schema.py):
 
 ```text
 [
@@ -70,10 +70,10 @@ This order is used for:
 
 The training CSV files are produced by:
 
-- [collect_for_labeling.py](/C:/Users/yunha/Desktop/lotte-insight/training/collect_for_labeling.py)
-- [collect_players.py](/C:/Users/yunha/Desktop/lotte-insight/training/collect_players.py)
+- [collect_for_labeling.py](/C:/Users/yunha/Desktop/lotte-insight/training/collect/collect_for_labeling.py)
+- [collect_players.py](/C:/Users/yunha/Desktop/lotte-insight/training/collect/collect_players.py)
 
-Shared preprocessing happens in `item_to_row()` inside [collect_utils.py](/C:/Users/yunha/Desktop/lotte-insight/training/collect_utils.py):
+Shared preprocessing happens in `item_to_row()` inside [collect_utils.py](/C:/Users/yunha/Desktop/lotte-insight/training/collect/collect_utils.py):
 
 - strip HTML from title and description
 - truncate `description_snippet` to `ARTICLE_SNIPPET_LENGTH` (`120`)
@@ -97,7 +97,7 @@ Shared preprocessing happens in `item_to_row()` inside [collect_utils.py](/C:/Us
 
 ## Training Data Loading
 
-`load_data()` in [train_classifier.py](/C:/Users/yunha/Desktop/lotte-insight/training/train_classifier.py) performs the actual training-time filtering and normalization.
+`load_data()` in [train_classifier.py](/C:/Users/yunha/Desktop/lotte-insight/training/train/train_classifier.py) performs the actual training-time filtering and normalization.
 
 ### 1. Read and Filter Source CSVs
 
@@ -238,7 +238,7 @@ Important detail:
 
 ## Training Loop
 
-The main loop in [train_classifier.py](/C:/Users/yunha/Desktop/lotte-insight/training/train_classifier.py) is:
+The main loop in [train_classifier.py](/C:/Users/yunha/Desktop/lotte-insight/training/train/train_classifier.py) is:
 
 1. Set `torch.manual_seed(seed)`.
 2. Select `cuda` if available, otherwise `cpu`.
@@ -345,19 +345,19 @@ Example `label_encoder.json`:
 Train and then run full-data evaluation:
 
 ```bash
-python training/train_classifier.py
+python training/train/train_classifier.py
 ```
 
 Train with custom epochs / learning rate / batch size:
 
 ```bash
-python training/train_classifier.py --epochs 10 --lr 5e-5 --batch 16
+python training/train/train_classifier.py --epochs 10 --lr 5e-5 --batch 16
 ```
 
 Run evaluation only:
 
 ```bash
-python training/train_classifier.py --eval-only
+python training/train/train_classifier.py --eval-only
 ```
 
 ## Current Limitations

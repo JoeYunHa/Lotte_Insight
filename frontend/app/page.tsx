@@ -1,32 +1,32 @@
-import { ArticleFeed } from '@/components/ArticleFeed'
-import { FanVoiceLayer } from '@/components/FanVoice/FanVoiceLayer'
-import { FeaturedArticleCard } from '@/components/FeaturedArticleCard'
-import { HomeHeroDesk } from '@/components/HomeHeroDesk'
-import { PageShell } from '@/components/PageShell'
-import { RankingPanel } from '@/components/RankingPanel'
-import { SectionHeader } from '@/components/SectionHeader'
-import { SentimentBar, SignalCard } from '@/components/SignalCard'
-import { getArticles, getHomeReport } from '@/lib/api'
-import { LABEL_META } from '@/lib/label-config'
-import { formatDateKo, formatRelativeTime, getTodayKST } from '@/lib/time'
-import type { Article, HomeReport, LabelKey } from '@/lib/types'
+import { ArticleFeed } from "@/components/ArticleFeed";
+import { FanVoiceLayer } from "@/components/FanVoice/FanVoiceLayer";
+import { FeaturedArticleCard } from "@/components/FeaturedArticleCard";
+import { HomeHeroDesk } from "@/components/HomeHeroDesk";
+import { PageShell } from "@/components/Page/PageShell";
+import { RankingPanel } from "@/components/RankingPanel";
+import { SectionHeader } from "@/components/SectionHeader";
+import { SentimentBar, SignalCard } from "@/components/SignalCard";
+import { getArticles, getHomeReport } from "@/lib/api";
+import { LABEL_META } from "@/lib/label-config";
+import { formatDateKo, formatRelativeTime, getTodayKST } from "@/lib/time";
+import type { Article, HomeReport, LabelKey } from "@/lib/types";
 
-export const dynamic = 'force-dynamic'
+export const dynamic = "force-dynamic";
 
-const ARTICLE_FEED_LIMIT = 30
+const ARTICLE_FEED_LIMIT = 30;
 
 const LABEL_HEADLINE: Record<LabelKey, string> = {
-  MATCH_RELATED: '경기 소식',
-  INJURY_ROSTER: '엔트리 동향',
-  TRANSACTION_CONTRACT: '트레이드·계약',
-  PERFORMANCE_ANALYSIS: '성적 분석',
-  INTERVIEW: '인터뷰',
-  CLUB_OPERATION: '구단 소식',
-  ETC: '일반 소식',
-}
+  MATCH_RELATED: "경기 소식",
+  INJURY_ROSTER: "엔트리 동향",
+  TRANSACTION_CONTRACT: "트레이드·계약",
+  PERFORMANCE_ANALYSIS: "성적 분석",
+  INTERVIEW: "인터뷰",
+  CLUB_OPERATION: "구단 소식",
+  ETC: "일반 소식",
+};
 
 export default async function HomePage() {
-  const today = getTodayKST()
+  const today = getTodayKST();
 
   const emptyHome: HomeReport = {
     date: today,
@@ -47,31 +47,48 @@ export default async function HomePage() {
     top_players: [],
     team_report: null,
     game_context: null,
-  }
+  };
 
   const [homeResult, articlesResult] = await Promise.allSettled([
     getHomeReport(today),
     getArticles({ date: today, limit: ARTICLE_FEED_LIMIT }),
-  ])
-  const home: HomeReport = homeResult.status === 'fulfilled' ? homeResult.value : emptyHome
-  const articles: Article[] = articlesResult.status === 'fulfilled' ? articlesResult.value : []
+  ]);
+  const home: HomeReport =
+    homeResult.status === "fulfilled" ? homeResult.value : emptyHome;
+  const articles: Article[] =
+    articlesResult.status === "fulfilled" ? articlesResult.value : [];
 
-  const { article_count, label_counts, sentiment, lead_label, lead_summary, top_players, game_context } = home
+  const {
+    article_count,
+    label_counts,
+    sentiment,
+    lead_label,
+    lead_summary,
+    top_players,
+    game_context,
+  } = home;
 
-  const featuredArticle = (lead_label ? articles.find((article) => article.primary_label === lead_label) : null) ?? articles[0] ?? null
+  const featuredArticle =
+    (lead_label
+      ? articles.find((article) => article.primary_label === lead_label)
+      : null) ??
+    articles[0] ??
+    null;
 
   const headline = lead_label
     ? `오늘 롯데 여론은 ${LABEL_HEADLINE[lead_label]} 중심입니다`
     : article_count > 0
       ? "오늘의 롯데 데스크 보드"
-      : '다음 롯데 브리핑을 준비 중입니다'
+      : "다음 롯데 브리핑을 준비 중입니다";
 
   const subcopy =
     article_count > 0
       ? `오늘 ${article_count}건의 기사가 수집되었습니다. 주요 이슈, 선수 순위, 기사 피드 순으로 빠르게 스캔할 수 있습니다.`
-      : '아직 수집된 기사가 없습니다. 파이프라인이 완료되면 히어로 카드와 순위가 자동으로 채워집니다.'
+      : "아직 수집된 기사가 없습니다. 파이프라인이 완료되면 히어로 카드와 순위가 자동으로 채워집니다.";
 
-  const gameKicker = game_context ? `vs ${game_context.opponent} / ${game_context.home_away} / ${game_context.game_time ?? 'TBD'}` : 'SAJIK MATCHDAY BRIEFING'
+  const gameKicker = game_context
+    ? `vs ${game_context.opponent} / ${game_context.home_away} / ${game_context.game_time ?? "TBD"}`
+    : "SAJIK MATCHDAY BRIEFING";
 
   const playerRankingRows = top_players.slice(0, 5).map((mention) => ({
     id: String(mention.player.id),
@@ -79,30 +96,42 @@ export default async function HomePage() {
     meta: mention.player.position,
     value: String(mention.mention_count),
     href: `/players/${mention.player.id}`,
-  }))
+  }));
 
   const latestArticleRows = articles.slice(0, 5).map((article) => ({
     id: String(article.id),
     title: article.title,
     meta: `${article.source_name} / ${formatRelativeTime(article.published_at)}`,
-    value: article.primary_label ? LABEL_META[article.primary_label].name : 'Desk',
-  }))
+    value: article.primary_label
+      ? LABEL_META[article.primary_label].name
+      : "Desk",
+  }));
 
   return (
     <PageShell
       headerActions={[
-        { href: '/players', label: '선수단' },
-        { href: '/topics', label: '토픽' },
-        { href: '/archive', label: '아카이브' },
+        { href: "/players", label: "선수단" },
+        { href: "/topics", label: "토픽" },
+        { href: "/archive", label: "아카이브" },
       ]}
       seasonBadge="2026 KBO"
       footer={
-        <p className="text-xs" style={{ color: 'var(--dim)' }}>
+        <p className="text-xs" style={{ color: "var(--dim)" }}>
           메타데이터 기반 팬 브리핑 서비스. 전체 맥락은 원문 기사를 확인하세요.
         </p>
       }
     >
-      <HomeHeroDesk date={formatDateKo(today)} headline={headline} subcopy={subcopy} kicker={gameKicker} metaStat={article_count > 0 ? { label: 'stories', value: String(article_count) } : undefined} />
+      <HomeHeroDesk
+        date={formatDateKo(today)}
+        headline={headline}
+        subcopy={subcopy}
+        kicker={gameKicker}
+        metaStat={
+          article_count > 0
+            ? { label: "stories", value: String(article_count) }
+            : undefined
+        }
+      />
 
       <FanVoiceLayer contextType="home" contextId="today" />
 
@@ -114,14 +143,33 @@ export default async function HomePage() {
             title="수집 현황"
             eyebrow="오늘"
             value={String(article_count)}
-            detail={lead_label ? `${label_counts[lead_label]}건 ${LABEL_META[lead_label].name}` : '분류된 기사 대기 중'}
+            detail={
+              lead_label
+                ? `${label_counts[lead_label]}건 ${LABEL_META[lead_label].name}`
+                : "분류된 기사 대기 중"
+            }
             accent="red"
           />
-          <SignalCard title="여론 스냅샷" eyebrow="스탠스" value={sentiment.analyzed > 0 ? `${sentiment.analyzed}` : '0'} detail="스탠스 데이터 보유 기사" accent="gold">
+          <SignalCard
+            title="여론 스냅샷"
+            eyebrow="스탠스"
+            value={sentiment.analyzed > 0 ? `${sentiment.analyzed}` : "0"}
+            detail="스탠스 데이터 보유 기사"
+            accent="gold"
+          >
             {sentiment.analyzed > 0 ? (
-              <SentimentBar positive={sentiment.positive} neutral={sentiment.neutral} negative={sentiment.negative} analyzed={sentiment.analyzed} total={article_count} />
+              <SentimentBar
+                positive={sentiment.positive}
+                neutral={sentiment.neutral}
+                negative={sentiment.negative}
+                analyzed={sentiment.analyzed}
+                total={article_count}
+              />
             ) : (
-              <p className="mt-3 text-sm leading-7" style={{ color: 'var(--muted)' }}>
+              <p
+                className="mt-3 text-sm leading-7"
+                style={{ color: "var(--muted)" }}
+              >
                 관련 뉴스 파이프라인이 완료되면 감정 막대가 표시됩니다.
               </p>
             )}
@@ -162,11 +210,23 @@ export default async function HomePage() {
       {lead_label && lead_summary ? (
         <section className="mb-10">
           <SectionHeader label="주요 요약" accent="red" />
-          <div className="rounded-[24px] p-6" style={{ background: 'rgba(255,255,255,0.72)', border: '1px solid var(--border)' }}>
-            <p className="text-sm font-mono-code uppercase tracking-[0.18em]" style={{ color: 'var(--red)' }}>
+          <div
+            className="rounded-[24px] p-6"
+            style={{
+              background: "rgba(255,255,255,0.72)",
+              border: "1px solid var(--border)",
+            }}
+          >
+            <p
+              className="text-sm font-mono-code uppercase tracking-[0.18em]"
+              style={{ color: "var(--red)" }}
+            >
               {LABEL_META[lead_label].name}
             </p>
-            <p className="mt-4 text-base leading-8" style={{ color: 'var(--text)' }}>
+            <p
+              className="mt-4 text-base leading-8"
+              style={{ color: "var(--text)" }}
+            >
               {lead_summary}
             </p>
           </div>
@@ -178,5 +238,5 @@ export default async function HomePage() {
         <ArticleFeed articles={articles} />
       </section>
     </PageShell>
-  )
+  );
 }
