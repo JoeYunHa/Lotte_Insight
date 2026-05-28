@@ -8,7 +8,7 @@ RSS feeds are free, require no API keys, and provide good coverage of Korean spo
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from time import mktime
+from calendar import timegm
 from typing import Any
 
 import feedparser
@@ -105,7 +105,8 @@ def _parse_rss_pubdate(entry: Any) -> datetime:
 
     if time_struct:
         try:
-            timestamp = mktime(time_struct)
+            # feedparser returns UTC-like struct_time; use timegm to avoid local-time skew.
+            timestamp = timegm(time_struct)
             return datetime.fromtimestamp(timestamp, tz=timezone.utc)
         except (ValueError, OSError, OverflowError):
             pass

@@ -26,6 +26,9 @@ def _load_cached_report(
         return None if raw == _CACHE_EMPTY else raw
 
     data = loader()
+    today = _today_kst()
+    if data is None and ttl_date >= today:
+        return None
     cache.set_json(cache_key, _CACHE_EMPTY if data is None else data, cache.ttl_seconds(ttl_date))
     return data
 

@@ -95,6 +95,16 @@ class TestRSSPubdateParsing:
         diff = abs((result - now).total_seconds())
         assert diff < 5  # Within 5 seconds
 
+    def test_parse_rss_pubdate_uses_utc_epoch_conversion(self):
+        import time
+
+        entry = Mock()
+        entry.published_parsed = time.gmtime(0)  # 1970-01-01 00:00:00 UTC
+        entry.updated_parsed = None
+
+        result = _parse_rss_pubdate(entry)
+        assert result == datetime(1970, 1, 1, tzinfo=timezone.utc)
+
 
 class TestNormalizeRSSEntry:
     """Test RSS entry normalization to NormalizedNewsItem."""

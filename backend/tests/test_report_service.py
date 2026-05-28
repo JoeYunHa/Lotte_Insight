@@ -1,5 +1,5 @@
 """Unit tests for services/report_service.py."""
-from datetime import date
+from datetime import date, timedelta
 from unittest.mock import MagicMock, patch
 
 from services import report_service
@@ -26,12 +26,20 @@ class TestLoadCachedReport:
         assert result == {"fresh": True}
 
     def test_stores_empty_sentinel_when_loader_returns_none(self):
+        past = date.today() - timedelta(days=1)
         with patch("services.report_service.cache") as mock_cache:
             mock_cache.get_json.return_value = None
             mock_cache.ttl_seconds.return_value = 60
-            report_service._load_cached_report("key", date.today(), lambda: None)
+            report_service._load_cached_report("key", past, lambda: None)
         args = mock_cache.set_json.call_args[0]
         assert args[1] == report_service._CACHE_EMPTY
+
+    def test_does_not_cache_empty_for_today(self):
+        with patch("services.report_service.cache") as mock_cache:
+            mock_cache.get_json.return_value = None
+            result = report_service._load_cached_report("key", date.today(), lambda: None)
+        assert result is None
+        mock_cache.set_json.assert_not_called()
 
     def test_stores_data_when_loader_succeeds(self):
         with patch("services.report_service.cache") as mock_cache:

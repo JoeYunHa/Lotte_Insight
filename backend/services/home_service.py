@@ -124,7 +124,8 @@ def build_home_report(target_date: date) -> dict:
 
     mentions = report_repository.fetch_player_mentions_with_position(article_ids)
     team_report = report_repository.get_report("team_daily_report", target_date)
-    game = report_repository.fetch_game_for_day(target_date)
+    games = report_repository.fetch_games_for_day(target_date)
+    primary_game = games[0] if games else None
 
     label_counts = _compute_label_counts(articles)
     sentiment = _compute_sentiment(articles)
@@ -142,5 +143,6 @@ def build_home_report(target_date: date) -> dict:
         "lead_key_players": lead_key_players,
         "top_players": top_players,
         "team_report": team_report,
-        "game_context": game,
+        "game_context": primary_game,
+        "game_contexts": games,
     }

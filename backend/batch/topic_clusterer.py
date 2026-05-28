@@ -139,22 +139,40 @@ def _cosine_similarity_matrix(embeddings: np.ndarray) -> np.ndarray:
 
 
 def _cluster_articles(embeddings: np.ndarray, threshold: float) -> np.ndarray:
-    from sklearn.cluster import AgglomerativeClustering
-
     n = len(embeddings)
     if n < 2:
         return np.zeros(n, dtype=int)
 
     sim = _cosine_similarity_matrix(embeddings)
-    distance = np.clip(1.0 - sim, 0.0, 2.0)
+    try:
+        from sklearn.cluster import AgglomerativeClustering
 
-    clustering = AgglomerativeClustering(
-        n_clusters=None,
-        metric="precomputed",
-        linkage="average",
-        distance_threshold=1.0 - threshold,
-    )
-    return clustering.fit_predict(distance)
+        distance = np.clip(1.0 - sim, 0.0, 2.0)
+        clustering = AgglomerativeClustering(
+            n_clusters=None,
+            metric="precomputed",
+            linkage="average",
+            distance_threshold=1.0 - threshold,
+        )
+        return clustering.fit_predict(distance)
+    except ImportError:
+        logger.warning("sklearn not installed; falling back to graph-connectivity clustering.")
+        labels = -np.ones(n, dtype=int)
+        cluster_id = 0
+        for i in range(n):
+            if labels[i] != -1:
+                continue
+            stack = [i]
+            labels[i] = cluster_id
+            while stack:
+                cur = stack.pop()
+                neighbors = np.where(sim[cur] >= threshold)[0]
+                for nb in neighbors:
+                    if labels[nb] == -1:
+                        labels[nb] = cluster_id
+                        stack.append(int(nb))
+            cluster_id += 1
+        return labels
 
 
 # ---------------------------------------------------------------------------
@@ -179,11 +197,18 @@ def _project_2d(embeddings: np.ndarray) -> tuple[np.ndarray, str]:
         return coords, _PROJECTION_MODEL_UMAP
     except ImportError:
         logger.warning("umap-learn not installed; falling back to PCA for 2D projection.")
-        from sklearn.decomposition import PCA
+        try:
+            from sklearn.decomposition import PCA
 
-        pca = PCA(n_components=2, random_state=_UMAP_RANDOM_STATE)
-        coords = pca.fit_transform(embeddings).astype(float)
-        return coords, _PROJECTION_MODEL_PCA
+            pca = PCA(n_components=2, random_state=_UMAP_RANDOM_STATE)
+            coords = pca.fit_transform(embeddings).astype(float)
+            return coords, _PROJECTION_MODEL_PCA
+        except ImportError:
+            logger.warning("sklearn PCA unavailable; falling back to numpy SVD projection.")
+            centered = embeddings - embeddings.mean(axis=0, keepdims=True)
+            _, _, vt = np.linalg.svd(centered, full_matrices=False)
+            coords = centered @ vt[:2].T
+            return coords.astype(float), _PROJECTION_MODEL_PCA
 
 
 # ---------------------------------------------------------------------------

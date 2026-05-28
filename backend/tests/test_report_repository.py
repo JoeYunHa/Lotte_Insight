@@ -132,3 +132,34 @@ class TestFetchPlayerMentionsWithPosition:
             result = report_repository.fetch_player_mentions_with_position([])
         assert result == []
         db.table.assert_not_called()
+
+
+class TestFetchGameForDay:
+    def test_fetch_games_for_day_returns_all_rows(self):
+        data = [
+            {"date": "2026-05-22", "game_seq": 1, "opponent": "A"},
+            {"date": "2026-05-22", "game_seq": 2, "opponent": "B"},
+        ]
+        chain = _make_chain(data=data)
+        with patch.object(report_repository, "supabase", _mock_db(chain)):
+            result = report_repository.fetch_games_for_day(date(2026, 5, 22))
+        assert result == data
+
+    def test_fetch_games_for_day_returns_empty(self):
+        chain = _make_chain(data=[])
+        with patch.object(report_repository, "supabase", _mock_db(chain)):
+            result = report_repository.fetch_games_for_day(date(2026, 5, 22))
+        assert result == []
+
+    def test_returns_first_row_when_exists(self):
+        data = [{"date": "2026-05-22", "opponent": "A"}, {"date": "2026-05-22", "opponent": "B"}]
+        chain = _make_chain(data=data)
+        with patch.object(report_repository, "supabase", _mock_db(chain)):
+            result = report_repository.fetch_game_for_day(date(2026, 5, 22))
+        assert result == data[0]
+
+    def test_returns_none_when_empty(self):
+        chain = _make_chain(data=[])
+        with patch.object(report_repository, "supabase", _mock_db(chain)):
+            result = report_repository.fetch_game_for_day(date(2026, 5, 22))
+        assert result is None

@@ -156,12 +156,12 @@ class TestBuildHomeReport:
             patch.object(home_service.report_repository, "fetch_articles_for_day", return_value=[]),
             patch.object(home_service.report_repository, "fetch_player_mentions_with_position", return_value=[]),
             patch.object(home_service.report_repository, "get_report", return_value=None),
-            patch.object(home_service.report_repository, "fetch_game_for_day", return_value=None),
+            patch.object(home_service.report_repository, "fetch_games_for_day", return_value=[]),
         ):
             report = home_service.build_home_report(target)
         assert report["date"] == "2026-05-22"
         assert report["article_count"] == 0
-        for key in ("label_counts", "sentiment", "lead_label", "top_players", "team_report", "game_context"):
+        for key in ("label_counts", "sentiment", "lead_label", "top_players", "team_report", "game_context", "game_contexts"):
             assert key in report
 
     def test_passes_articles_to_sentiment(self):
@@ -171,7 +171,23 @@ class TestBuildHomeReport:
             patch.object(home_service.report_repository, "fetch_articles_for_day", return_value=articles),
             patch.object(home_service.report_repository, "fetch_player_mentions_with_position", return_value=[]),
             patch.object(home_service.report_repository, "get_report", return_value=None),
-            patch.object(home_service.report_repository, "fetch_game_for_day", return_value=None),
+            patch.object(home_service.report_repository, "fetch_games_for_day", return_value=[]),
         ):
             report = home_service.build_home_report(target)
         assert report["sentiment"]["positive"] == 1.0
+
+    def test_exposes_all_games_and_primary_game(self):
+        target = date(2026, 5, 22)
+        games = [
+            {"date": "2026-05-22", "game_seq": 1, "opponent": "A"},
+            {"date": "2026-05-22", "game_seq": 2, "opponent": "B"},
+        ]
+        with (
+            patch.object(home_service.report_repository, "fetch_articles_for_day", return_value=[]),
+            patch.object(home_service.report_repository, "fetch_player_mentions_with_position", return_value=[]),
+            patch.object(home_service.report_repository, "get_report", return_value=None),
+            patch.object(home_service.report_repository, "fetch_games_for_day", return_value=games),
+        ):
+            report = home_service.build_home_report(target)
+        assert report["game_context"] == games[0]
+        assert report["game_contexts"] == games

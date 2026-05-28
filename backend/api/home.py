@@ -24,5 +24,7 @@ def get_home_report(report_date: date | None = Query(default=None)):
         return cached
 
     result = home_service.build_home_report(target)
-    cache.set_json(cache_key, result, ttl=cache.ttl_seconds(target))
+    # Avoid freezing partial "today" snapshots before downstream batch jobs complete.
+    if not (target >= _today_kst() and (result.get("team_report") is None or result.get("article_count", 0) == 0)):
+        cache.set_json(cache_key, result, ttl=cache.ttl_seconds(target))
     return result

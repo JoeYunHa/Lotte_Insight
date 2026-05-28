@@ -3,6 +3,7 @@ Generate daily team and player reports.
 """
 
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, datetime, timedelta, timezone
 
 from openai import OpenAI
@@ -40,6 +41,7 @@ _TEAM_SYSTEM_PROMPT = (
 
 _TEAM_REPORT_MAX_TOKENS = 250
 _TEAM_EVENT_TEXT_LIMIT = 8
+_PLAYER_REPORT_WORKERS = 4
 
 
 def _get_openai() -> OpenAI:
@@ -275,15 +277,21 @@ def run() -> dict:
         report_repository.save_report("team_daily_report", team_report, on_conflict="date")
 
     saved = 0
-    for player in report_repository.list_active_players():
-        report = _build_player_report(player["id"], player["name"], today)
-        if report:
-            report_repository.save_report(
-                "player_daily_report",
-                report,
-                on_conflict="player_id,date",
-            )
-            saved += 1
+    players = report_repository.list_active_players()
+    with ThreadPoolExecutor(max_workers=_PLAYER_REPORT_WORKERS) as executor:
+        futures = {
+            executor.submit(_build_player_report, player["id"], player["name"], today): player
+            for player in players
+        }
+        for future in as_completed(futures):
+            report = future.result()
+            if report:
+                report_repository.save_report(
+                    "player_daily_report",
+                    report,
+                    on_conflict="player_id,date",
+                )
+                saved += 1
 
     team_saved = 1 if team_report else 0
     logger.info("Report generation completed: team=%s players=%s", team_saved, saved)

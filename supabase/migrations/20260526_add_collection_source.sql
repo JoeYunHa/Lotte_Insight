@@ -2,6 +2,7 @@
 -- Migration: 20260526_add_collection_source
 -- Purpose: Track whether articles were collected from Naver API, RSS feeds, or other sources
 -- Date: 2026-05-26
+-- 실행 완료 2026-05-28
 
 -- Add collection_source column with default value
 ALTER TABLE articles

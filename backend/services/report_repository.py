@@ -113,15 +113,20 @@ def list_active_players() -> list[dict]:
     return result.data
 
 
-def fetch_game_for_day(target_date: date) -> dict | None:
+def fetch_games_for_day(target_date: date) -> list[dict]:
     result = (
         supabase.table("games")
         .select("*")
         .eq("date", target_date.isoformat())
-        .maybe_single()
+        .order("game_seq")
         .execute()
     )
-    return result.data
+    return result.data or []
+
+
+def fetch_game_for_day(target_date: date) -> dict | None:
+    games = fetch_games_for_day(target_date)
+    return games[0] if games else None
 
 
 def fetch_player_mentions_with_position(article_ids: list[int]) -> list[dict]:

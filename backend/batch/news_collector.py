@@ -53,6 +53,17 @@ def _normalized_items(items: list[dict]) -> list[NormalizedNewsItem]:
     return normalized_items
 
 
+def _normalize_with_source(
+    naver_items: list[dict],
+    rss_items_with_source: list[tuple[NormalizedNewsItem, str]],
+) -> list[tuple[NormalizedNewsItem, str]]:
+    all_normalized: list[tuple[NormalizedNewsItem, str]] = []
+    for item in _normalized_items(naver_items):
+        all_normalized.append((item, "naver_api"))
+    all_normalized.extend(rss_items_with_source)
+    return all_normalized
+
+
 def _should_gpt_summarize(label_result: dict) -> bool:
     summarizable = set(settings.gpt_summary_labels)
     if label_result["label"] in summarizable:
@@ -189,7 +200,8 @@ def _upsert_articles(enriched: list[dict]) -> int:
     rows = []
     for e in enriched:
         rows.append({
-            "source_url": e["item"].link,
+            # Persist canonical URL so dedup semantics match DB upsert semantics.
+            "source_url": normalize_url(e["item"].link),
             "source_name": e["item"].source_name,
             "title": e["item"].title,
             "published_at": e["item"].published_at,
@@ -208,7 +220,7 @@ _ID_MAP_CHUNK_SIZE = 100
 
 
 def _get_article_id_map(enriched: list[dict]) -> dict[str, int]:
-    urls = [e["item"].link for e in enriched]
+    urls = [normalize_url(e["item"].link) for e in enriched]
     if not urls:
         return {}
     id_map: dict[str, int] = {}
@@ -233,7 +245,7 @@ def _save_labels_and_players(enriched: list[dict], id_map: dict[str, int]) -> No
         if not e["is_lotte_related"]:
             continue
         item = e["item"]
-        article_id = id_map.get(item.link)
+        article_id = id_map.get(normalize_url(item.link))
         if not article_id:
             continue
 
@@ -306,20 +318,7 @@ def run() -> int:
     logger.info("RSS collection: %d items from all feeds", len(rss_items_with_source))
 
     # Phase 3: Normalize and deduplicate across all sources
-    # Track (normalized_item, collection_source) tuples
-    all_normalized: list[tuple[NormalizedNewsItem, str]] = []
-
-    # Normalize Naver items
-    for item in naver_items:
-        normalized = normalize_naver_news_item(
-            item,
-            description_snippet_length=settings.article_description_snippet_length,
-        )
-        if normalized is not None:
-            all_normalized.append((normalized, "naver_api"))
-
-    # Add RSS items
-    all_normalized.extend(rss_items_with_source)
+    all_normalized = _normalize_with_source(naver_items, rss_items_with_source)
 
     logger.info(
         "Total items before dedup: %d (Naver: %d, RSS: %d)",
