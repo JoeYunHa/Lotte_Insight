@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
 
 interface HeaderAction {
@@ -21,21 +22,14 @@ export function PageShell({ children, footer, headerActions, seasonBadge }: Page
       <header className="sticky top-0 z-50 backdrop-blur-md" style={{ background: 'rgba(251, 246, 239, 0.9)', borderBottom: '1px solid var(--border)' }}>
         <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div
-              className="w-9 h-9 rounded-xl flex flex-col items-center justify-center gap-0.5 shrink-0"
-              style={{ background: 'var(--red)', color: '#fff' }}
-            >
-              <span
-                className="text-base font-black leading-none"
-                style={{
-                  fontFamily: 'var(--font-serif-kr), "Noto Serif KR", Georgia, serif',
-                  letterSpacing: '-0.02em',
-                }}
-              >
-                L
-              </span>
-              <span className="text-[6px] font-bold tracking-[0.14em] leading-none opacity-70">DESK</span>
-            </div>
+            <Image
+              src="/images/lotte_emblem.jpg"
+              alt="롯데 자이언츠"
+              width={56}
+              height={42}
+              className="shrink-0 object-contain"
+              priority
+            />
             <div className="flex flex-col">
               <span className="font-bold text-sm tracking-wide leading-none" style={{ color: 'var(--text)' }}>
                 Lotte Insight

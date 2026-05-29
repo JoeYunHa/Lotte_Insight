@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { Noto_Serif_KR, Noto_Sans_KR, Space_Mono } from 'next/font/google'
+import localFont from 'next/font/local'
 import './globals.css'
 
 const notoSerifKr = Noto_Serif_KR({
@@ -20,6 +21,19 @@ const spaceMono = Space_Mono({
   subsets: ['latin'],
 })
 
+const lotteGiants = localFont({
+  src: [
+    { path: '../public/fonts/Giants-Regular.otf', weight: '400', style: 'normal' },
+    { path: '../public/fonts/Giants-Bold.otf', weight: '700', style: 'normal' },
+  ],
+  variable: '--font-giants',
+})
+
+const lotteGiantsInline = localFont({
+  src: '../public/fonts/Giants-Inline.otf',
+  variable: '--font-giants-inline',
+})
+
 export const metadata: Metadata = {
   title: '롯데 인사이트 | 2026 KBO',
   description: '2026 롯데 자이언츠 팬을 위한 시즌 이슈 분석 플랫폼',
@@ -29,7 +43,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html
       lang="ko"
-      className={`${notoSerifKr.variable} ${notoSansKr.variable} ${spaceMono.variable}`}
+      className={`${notoSerifKr.variable} ${notoSansKr.variable} ${spaceMono.variable} ${lotteGiants.variable} ${lotteGiantsInline.variable}`}
     >
       <body className="min-h-dvh flex flex-col antialiased">
         {children}

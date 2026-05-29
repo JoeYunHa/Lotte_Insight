@@ -25,16 +25,15 @@ export function HomeHeroDesk({ date, headline, subcopy, kicker, metaStat, status
           top: '-16px',
           right: '-8px',
           fontSize: 'clamp(130px, 20vw, 210px)',
-          fontWeight: 900,
-          fontFamily: 'var(--font-serif-kr), "Noto Serif KR", Georgia, serif',
+          fontFamily: 'var(--font-giants-inline), var(--font-giants), serif',
           color: 'transparent',
-          WebkitTextStroke: '1px rgba(225, 6, 44, 0.07)',
+          WebkitTextStroke: '1px rgba(208, 15, 49, 0.09)',
           lineHeight: 1,
           letterSpacing: '-0.04em',
           userSelect: 'none',
         }}
       >
-        26
+        2026
       </div>
 
       {/* Top row: date + live kicker badge + status */}

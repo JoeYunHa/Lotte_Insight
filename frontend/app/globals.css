@@ -1,16 +1,19 @@
 @import "tailwindcss";
 
 @theme {
-  --color-navy-950: #000c1e;
-  --color-navy-900: #001228;
-  --color-navy-800: #001a3a;
-  --color-navy-700: #002455;
-  --color-navy-600: #0d2e6b;
-  --color-navy-500: #153a84;
+  /* Official Lotte Giants color palette */
+  --color-lotte-red: #D00F31;        /* Energetic Red  — PANTONE 199C / R208 G15 B49  */
+  --color-lotte-red-dark: #a50c27;
+  --color-lotte-red-light: #e8153a;
+  --color-lotte-blue: #6CACE4;       /* Heritage Blue  — PANTONE 284C / R108 G172 B228 */
+  --color-lotte-navy: #041E42;       /* Classic Navy   — PANTONE 289C / R4 G30 B66    */
 
-  --color-lotte-red: #e1062c;
-  --color-lotte-red-dark: #b90d28;
-  --color-lotte-red-light: #ff1a3e;
+  --color-navy-950: #000c1a;
+  --color-navy-900: #011226;
+  --color-navy-800: #021832;
+  --color-navy-700: #041E42;
+  --color-navy-600: #0c3060;
+  --color-navy-500: #163c7a;
 
   --color-gold-500: #c7a35a;
   --color-gold-400: #d4b866;
@@ -28,14 +31,15 @@
   --surface-3: #e7dbc9;
   --border: #d8c6ab;
   --border-strong: #bea27b;
-  --text: #16263f;
-  --muted: #53657c;
+  --text: #041E42;        /* Classic Navy */
+  --muted: #4a5e7a;
   --dim: #7d8da1;
-  --red: #e1062c;
-  --red-dark: #b90d28;
+  --red: #D00F31;         /* Energetic Red */
+  --red-dark: #a50c27;
+  --blue: #6CACE4;        /* Heritage Blue */
   --gold: #c7a35a;
   --win: #d8b15b;
-  --loss: #d94b5c;
+  --loss: #D00F31;
   --neutral: #99a3b3;
   --radius-sm: 10px;
   --radius-md: 14px;
@@ -92,17 +96,25 @@ html {
 
 body {
   background:
-    radial-gradient(circle at top left, rgba(225, 6, 44, 0.12), transparent 22%),
-    radial-gradient(circle at top right, rgba(199, 163, 90, 0.16), transparent 18%),
+    radial-gradient(circle at top left, rgba(208, 15, 49, 0.10), transparent 22%),
+    radial-gradient(circle at top right, rgba(108, 172, 228, 0.10), transparent 20%),
     linear-gradient(180deg, #fbf6ef 0%, #f2e8db 100%);
   color: var(--text);
-  font-family: var(--font-sans-kr), 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: var(--font-giants), var(--font-sans-kr), 'Noto Sans KR', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
+@utility font-giants {
+  font-family: var(--font-giants), var(--font-serif-kr), 'Noto Serif KR', Georgia, serif;
+}
+
+@utility font-giants-inline {
+  font-family: var(--font-giants-inline), var(--font-giants), serif;
+}
+
 @utility font-serif-kr {
-  font-family: var(--font-serif-kr), 'Noto Serif KR', Georgia, serif;
+  font-family: var(--font-giants), var(--font-serif-kr), 'Noto Serif KR', Georgia, serif;
 }
 
 @utility font-mono-code {
@@ -123,7 +135,7 @@ body {
 
 /* Selection */
 ::selection {
-  background: rgba(228, 0, 43, 0.3);
+  background: rgba(208, 15, 49, 0.25);
   color: var(--text);
 }
 
@@ -220,9 +232,9 @@ body {
 }
 
 .fan-voice-actions .fan-voice-action-btn:first-child:hover {
-  border-color: rgba(225, 6, 44, 0.3);
+  border-color: rgba(208, 15, 49, 0.3);
   color: var(--red);
-  background: rgba(225, 6, 44, 0.06);
+  background: rgba(208, 15, 49, 0.06);
 }
 
 @media (prefers-reduced-motion: reduce) {
