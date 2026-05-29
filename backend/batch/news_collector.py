@@ -103,12 +103,16 @@ def _run_inference(items: list[NormalizedNewsItem]) -> list[dict]:
     related_label_results = classify_batch(related_articles) if related_articles else []
     logger.info("Classification done: %d items", len(related_articles))
 
-    label_results = [{"label": "ETC", "confidence": 0.0, "secondary_labels": []} for _ in items]
+    label_results: list[dict] = [
+        {"label": "ETC", "confidence": 0.0, "secondary_labels": []} for _ in items
+    ]
     for idx, label_result in zip(lotte_indices, related_label_results):
         label_results[idx] = label_result
 
     stance_results_related = classify_stance_batch(related_articles) if related_articles else []
-    stance_results = [{"label": None, "confidence": 0.0, "source": "not_applicable"} for _ in items]
+    stance_results: list[dict] = [
+        {"label": None, "confidence": 0.0, "source": "not_applicable"} for _ in items
+    ]
     for idx, stance in zip(lotte_indices, stance_results_related):
         stance_results[idx] = stance
     logger.info("Stance classification done: %d items", len(related_articles))
@@ -116,7 +120,7 @@ def _run_inference(items: list[NormalizedNewsItem]) -> list[dict]:
     gpt_indices = [i for i in lotte_indices if _should_gpt_summarize(label_results[i])]
     gpt_inputs = [articles[i] for i in gpt_indices]
     gpt_results_list = gpt_summarize_batch(gpt_inputs) if gpt_inputs else []
-    gpt_results = [{} for _ in items]
+    gpt_results: list[dict] = [{} for _ in items]
     for idx, gpt_result in zip(gpt_indices, gpt_results_list):
         gpt_results[idx] = gpt_result
     logger.info("GPT summarization done: %d items", len(gpt_indices))
@@ -167,6 +171,7 @@ def _run_inference(items: list[NormalizedNewsItem]) -> list[dict]:
         enriched.append(
             {
                 "item": item,
+                "normalized_url": normalize_url(item.link),
                 "label_result": label_result,
                 "is_lotte_related": lr_result["is_lotte_related"],
                 "event_summary_json": event_summary_json,
@@ -180,7 +185,7 @@ def _run_inference(items: list[NormalizedNewsItem]) -> list[dict]:
 def _upsert_articles(enriched: list[dict]) -> tuple[int, dict[str, int]]:
     rows = [
         {
-            "source_url": normalize_url(e["item"].link),
+            "source_url": e["normalized_url"],
             "source_name": e["item"].source_name,
             "title": e["item"].title,
             "published_at": e["item"].published_at,
@@ -207,7 +212,7 @@ def _upsert_articles(enriched: list[dict]) -> tuple[int, dict[str, int]]:
 
 
 def _get_article_id_map(enriched: list[dict]) -> dict[str, int]:
-    urls = sorted({normalize_url(e["item"].link) for e in enriched})
+    urls = sorted({e["normalized_url"] for e in enriched})
     if not urls:
         return {}
 
@@ -232,7 +237,7 @@ def _save_labels_and_players(enriched: list[dict], id_map: dict[str, int]) -> No
     for e in enriched:
         if not e["is_lotte_related"]:
             continue
-        article_id = id_map.get(normalize_url(e["item"].link))
+        article_id = id_map.get(e["normalized_url"])
         if not article_id:
             continue
 
@@ -266,11 +271,8 @@ def _save_labels_and_players(enriched: list[dict], id_map: dict[str, int]) -> No
 
 
 def run() -> int:
-    from datetime import datetime, timedelta, timezone
-
     from batch import game_collector
-
-    kst = timezone(timedelta(hours=9))
+    from core.time_utils import today_kst
 
     logger.info("News collection started")
 
@@ -348,9 +350,9 @@ def run() -> int:
         id_map.update(_get_article_id_map(enriched))
     _save_labels_and_players(enriched, id_map)
 
-    today_kst = datetime.now(kst).date()
+    today = today_kst()
     try:
-        game_collector.sync_game(today_kst)
+        game_collector.sync_game(today)
     except (RuntimeError, ValueError, RequestException) as exc:
         logger.warning("경기 데이터 동기화 실패 (무시): %s", exc)
 

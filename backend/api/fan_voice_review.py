@@ -41,7 +41,7 @@ def get_opinion_review(
     """
     try:
         # Service layer handles date resolution logic
-        return fan_voice_review_service.get_daily_review(
+        result = fan_voice_review_service.get_daily_review(
             scope=scope,
             requested_date=report_date,
             context_type=context_type,
@@ -50,6 +50,10 @@ def get_opinion_review(
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    if result is None:
+        raise HTTPException(status_code=404, detail="review not found")
+    return result
 
 
 @router.get("/emotions/ranking")

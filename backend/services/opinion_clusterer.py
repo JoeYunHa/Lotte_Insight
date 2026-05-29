@@ -46,15 +46,18 @@ class OpinionClusterer:
         clusters: list[list[dict]] = []
 
         for item in normalized:
-            matched_index = -1
+            # Assign to the highest-similarity cluster above the threshold,
+            # not just the first match found (prevents drift on near-ties).
+            best_index = -1
+            best_score = self.similarity_threshold
             for idx, cluster in enumerate(clusters):
                 centroid = cluster[0]["_trigrams"]
                 score = self._jaccard_similarity(centroid, item["_trigrams"])
-                if score >= self.similarity_threshold:
-                    matched_index = idx
-                    break
-            if matched_index >= 0:
-                clusters[matched_index].append(item)
+                if score > best_score:
+                    best_score = score
+                    best_index = idx
+            if best_index >= 0:
+                clusters[best_index].append(item)
             else:
                 clusters.append([item])
 

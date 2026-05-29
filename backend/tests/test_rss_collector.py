@@ -196,13 +196,13 @@ class TestURLNormalization:
         url = "https://example.com/article/"
         assert normalize_url(url) == "https://example.com/article"
 
-    def test_normalize_url_lowercase(self):
+    def test_normalize_url_lowercases_scheme_and_host_only(self):
         url = "HTTPS://EXAMPLE.COM/Article"
-        assert normalize_url(url) == "https://example.com/article"
+        assert normalize_url(url) == "https://example.com/Article"
 
     def test_normalize_url_complex(self):
         url = "HTTP://WWW.EXAMPLE.COM/Article/?utm_source=rss#top"
-        assert normalize_url(url) == "https://example.com/article"
+        assert normalize_url(url) == "https://example.com/Article"
 
     def test_normalize_url_invalid_url_returns_original(self):
         url = "not a url"

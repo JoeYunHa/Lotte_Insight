@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timedelta, timezone
 
 from core.config import settings
 from core.session_utils import generate_session_token, hash_session_token
 from services import fan_voice_moderation, fan_voice_rate_limit, fan_voice_repository
+
+logger = logging.getLogger(__name__)
 
 _KST = timezone(timedelta(hours=9))
 _VALID_CONTEXT_TYPES = {"home", "player", "topic", "game", "label"}
@@ -60,14 +63,17 @@ def _is_enabled_context(context_type: str) -> bool:
             return False
         contexts = getattr(settings, "fan_voice_contexts", _VALID_CONTEXT_TYPES)
         return context_type in set(contexts)
-    except ModuleNotFoundError:
+    except ModuleNotFoundError as exc:
+        # Only swallow missing-config import errors; let real import bugs surface.
+        logger.warning("fan voice config module missing, defaulting to enabled: %s", exc)
         return True
 
 
 def _is_write_enabled() -> bool:
     try:
         return bool(getattr(settings, "fan_voice_write_enabled", True))
-    except ModuleNotFoundError:
+    except ModuleNotFoundError as exc:
+        logger.warning("fan voice write config missing, defaulting to enabled: %s", exc)
         return True
 
 

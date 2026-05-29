@@ -123,6 +123,7 @@ async def generate_stream_sse_events(
     limit: int,
 ):
     started = time.monotonic()
+    consecutive_errors = 0
     while True:
         if await request.is_disconnected():
             break
@@ -135,6 +136,7 @@ async def generate_stream_sse_events(
                 context_id=context_id,
                 limit=limit,
             )
+            consecutive_errors = 0
             data = json.dumps(payload, ensure_ascii=False)
             yield f"event: stream\ndata: {data}\n\n"
             wait_ms = int(payload.get("next_poll_after_ms", 5000))
@@ -149,7 +151,12 @@ async def generate_stream_sse_events(
             yield f"event: error\ndata: {error_data}\n\n"
             break
         except Exception:
-            # Keep the stream alive on transient failures.
+            # Keep the stream alive on transient failures, but abort the
+            # connection if errors persist so we don't loop forever.
+            consecutive_errors += 1
+            if consecutive_errors >= 3:
+                yield 'event: error\ndata: {"error": "stream_error"}\n\n'
+                return
             yield "event: heartbeat\ndata: {}\n\n"
             await asyncio.sleep(_SSE_HEARTBEAT_SEC)
 

@@ -218,12 +218,21 @@ class TestReshapePoints:
 # get_topic_map
 # ---------------------------------------------------------------------------
 
+def _patch_cache(miss=True):
+    """Return a context manager that mocks the cache module in topic_repository."""
+    mock_c = MagicMock()
+    mock_c.get_json.return_value = None if miss else {"map_date": "cached"}
+    mock_c.ttl_seconds.return_value = 3600
+    return patch("services.topic_repository.cache", mock_c), mock_c
+
+
 class TestGetTopicMap:
     def test_returns_none_when_no_clusters(self):
         from services import topic_repository
 
         mock_db = _make_supabase(clusters_data=[], points_data=[])
-        with patch.object(topic_repository, "supabase", mock_db):
+        ctx, mock_c = _patch_cache()
+        with ctx, patch.object(topic_repository, "supabase", mock_db):
             result = topic_repository.get_topic_map(date(2026, 5, 22))
         assert result is None
 
@@ -234,7 +243,8 @@ class TestGetTopicMap:
             clusters_data=[_cluster()],
             points_data=[_point(article=_article_row())],
         )
-        with patch.object(topic_repository, "supabase", mock_db):
+        ctx, mock_c = _patch_cache()
+        with ctx, patch.object(topic_repository, "supabase", mock_db):
             result = topic_repository.get_topic_map(date(2026, 5, 22))
         assert result is not None
         assert result["map_date"] == "2026-05-22"
@@ -242,7 +252,6 @@ class TestGetTopicMap:
     def test_clusters_sorted_by_article_count_desc(self):
         from services import topic_repository
 
-        # DB mock returns already in desc order (query uses .order)
         mock_db = _make_supabase(
             clusters_data=[
                 _cluster(id="2026-05-22_c01", article_count=10),
@@ -250,7 +259,8 @@ class TestGetTopicMap:
             ],
             points_data=[],
         )
-        with patch.object(topic_repository, "supabase", mock_db):
+        ctx, mock_c = _patch_cache()
+        with ctx, patch.object(topic_repository, "supabase", mock_db):
             result = topic_repository.get_topic_map(date(2026, 5, 22))
         assert result["clusters"][0]["article_count"] == 10
 
@@ -261,7 +271,8 @@ class TestGetTopicMap:
             clusters_data=[_cluster()],
             points_data=[_point(article=_article_row()), _point(article_id="zzzz", article=None)],
         )
-        with patch.object(topic_repository, "supabase", mock_db):
+        ctx, mock_c = _patch_cache()
+        with ctx, patch.object(topic_repository, "supabase", mock_db):
             result = topic_repository.get_topic_map(date(2026, 5, 22))
         assert len(result["points"]) == 2
 
@@ -269,7 +280,8 @@ class TestGetTopicMap:
         from services import topic_repository
 
         mock_db = _make_supabase(clusters_data=[_cluster()], points_data=[])
-        with patch.object(topic_repository, "supabase", mock_db):
+        ctx, mock_c = _patch_cache()
+        with ctx, patch.object(topic_repository, "supabase", mock_db):
             result = topic_repository.get_topic_map(date(2026, 5, 22))
         assert result is not None
         assert result["points"] == []
@@ -291,7 +303,8 @@ class TestGetTopicMap:
         mock_db = MagicMock()
         mock_db.table.side_effect = lambda name: clusters_table if name == "topic_clusters" else points_table
 
-        with patch.object(topic_repository, "supabase", mock_db):
+        ctx, mock_c = _patch_cache()
+        with ctx, patch.object(topic_repository, "supabase", mock_db):
             topic_repository.get_topic_map(date(2026, 5, 22))
 
         points_eq.order.assert_called_once_with("cluster_rank", nullsfirst=False)
@@ -301,19 +314,62 @@ class TestGetTopicMap:
 
         row = _point(article=_article_row(labels=[{"label": "UNKNOWN_LABEL", "confidence": 0.9}]))
         mock_db = _make_supabase(clusters_data=[_cluster()], points_data=[row])
-        with patch.object(topic_repository, "supabase", mock_db):
+        ctx, mock_c = _patch_cache()
+        with ctx, patch.object(topic_repository, "supabase", mock_db):
             result = topic_repository.get_topic_map(date(2026, 5, 22))
-        # Repository normalizes unknown labels to None to satisfy the LabelKey | null contract
         assert result["points"][0]["article"]["primary_label"] is None
 
     def test_queries_correct_date(self):
         from services import topic_repository
 
         mock_db = _make_supabase(clusters_data=[_cluster()], points_data=[])
-        with patch.object(topic_repository, "supabase", mock_db):
+        ctx, mock_c = _patch_cache()
+        with ctx, patch.object(topic_repository, "supabase", mock_db):
             topic_repository.get_topic_map(date(2026, 5, 22))
 
         calls = mock_db.table.call_args_list
         table_names = [c.args[0] for c in calls]
         assert "topic_clusters" in table_names
         assert "article_topic_points" in table_names
+
+    # --- cache behaviour ---
+
+    def test_cache_hit_skips_db(self):
+        from services import topic_repository
+
+        cached = {"map_date": "2026-05-22", "clusters": [], "points": []}
+        mock_c = MagicMock()
+        mock_c.get_json.return_value = cached
+        mock_db = MagicMock()
+
+        with patch("services.topic_repository.cache", mock_c), \
+             patch.object(topic_repository, "supabase", mock_db):
+            result = topic_repository.get_topic_map(date(2026, 5, 22))
+
+        assert result == cached
+        mock_db.table.assert_not_called()
+        mock_c.set_json.assert_not_called()
+
+    def test_cache_miss_writes_result(self):
+        from services import topic_repository
+
+        mock_db = _make_supabase(clusters_data=[_cluster()], points_data=[])
+        ctx, mock_c = _patch_cache(miss=True)
+        with ctx, patch.object(topic_repository, "supabase", mock_db):
+            result = topic_repository.get_topic_map(date(2026, 5, 22))
+
+        mock_c.set_json.assert_called_once()
+        key, value, ttl = mock_c.set_json.call_args[0]
+        assert key == "topic:map:2026-05-22"
+        assert value == result
+        assert ttl == 3600
+
+    def test_no_clusters_does_not_write_cache(self):
+        from services import topic_repository
+
+        mock_db = _make_supabase(clusters_data=[], points_data=[])
+        ctx, mock_c = _patch_cache(miss=True)
+        with ctx, patch.object(topic_repository, "supabase", mock_db):
+            topic_repository.get_topic_map(date(2026, 5, 22))
+
+        mock_c.set_json.assert_not_called()

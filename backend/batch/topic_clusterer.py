@@ -13,13 +13,13 @@ Run after news_collector.py, once per day:
 import logging
 import sys
 from collections import Counter
-from datetime import date, datetime, timedelta, timezone
+from datetime import date
 from pathlib import Path
 
 import numpy as np
 
 from core.database import supabase
-from core.time_utils import utc_day_bounds
+from core.time_utils import today_kst, utc_day_bounds
 from models.runtime import LazyArtifactsLoader, ModelArtifacts
 from services.article_utils import parse_event_summary_json
 
@@ -341,7 +341,7 @@ def run_topic_clustering(target_date: date | None = None) -> None:
       7. Delete existing map rows for the date, then insert fresh results
     """
     if target_date is None:
-        target_date = (datetime.now(timezone.utc) + timedelta(hours=9)).date()
+        target_date = today_kst()
 
     date_str = target_date.isoformat()
     start_at, end_at = utc_day_bounds(target_date)

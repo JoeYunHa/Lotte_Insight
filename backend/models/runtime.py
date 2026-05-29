@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 import logging
 import os
+import threading
 from pathlib import Path
 from typing import Any, Callable
 
@@ -41,6 +42,7 @@ class LazyArtifactsLoader:
         self._error_log = error_log
         self._loaded = False
         self._artifacts: ModelArtifacts | None = None
+        self._lock = threading.Lock()
 
     def _find_model_dir(self) -> Path | None:
         candidates = [os.environ.get(self._env_var, "")] + self._static_dirs
@@ -50,18 +52,25 @@ class LazyArtifactsLoader:
         return None
 
     def get(self) -> ModelArtifacts | None:
+        # Fast path without locking
         if self._loaded:
             return self._artifacts
 
-        model_dir = self._find_model_dir()
-        self._loaded = True
-        if model_dir is None:
-            logger.warning(self._missing_log)
-            return None
+        with self._lock:
+            # Double-checked locking
+            if self._loaded:
+                return self._artifacts
 
-        try:
-            self._artifacts = self._loader(model_dir)
-        except Exception as exc:
-            logger.error(self._error_log, exc)
-            self._artifacts = None
-        return self._artifacts
+            model_dir = self._find_model_dir()
+            if model_dir is None:
+                logger.warning(self._missing_log)
+                self._loaded = True
+                return None
+
+            try:
+                self._artifacts = self._loader(model_dir)
+            except Exception as exc:
+                logger.error(self._error_log, exc)
+                self._artifacts = None
+            self._loaded = True
+            return self._artifacts

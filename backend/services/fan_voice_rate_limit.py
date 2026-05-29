@@ -68,13 +68,27 @@ def mark_write(session_id: int) -> None:
     cache.set_json(key, _now_ts(), _ttl_seconds())
 
 
-def is_duplicate_message(session_id: int, message_normalized: str) -> bool:
-    now_ts = _now_ts()
+_RECENT_MESSAGE_RING_SIZE = 5
+
+
+def _read_recent_messages(session_id: int) -> list[dict]:
+    """Read the recent-messages ring buffer (back-compat with legacy dict)."""
     key = f"fanvoice:session:recent_msg:{session_id}"
     data = cache.get_json(key)
+    if isinstance(data, list):
+        return [d for d in data if isinstance(d, dict)]
     if isinstance(data, dict):
-        text = str(data.get("message", ""))
-        ts = int(data.get("ts", 0))
+        # Legacy single-entry format
+        return [data]
+    return []
+
+
+def is_duplicate_message(session_id: int, message_normalized: str) -> bool:
+    """Check the last N messages (ring buffer) to block A/B/A/B ping-pong."""
+    now_ts = _now_ts()
+    for entry in _read_recent_messages(session_id):
+        text = str(entry.get("message", ""))
+        ts = int(entry.get("ts", 0))
         if text == message_normalized and now_ts - ts <= _DUPLICATE_WINDOW_SEC:
             return True
     return False
@@ -82,4 +96,9 @@ def is_duplicate_message(session_id: int, message_normalized: str) -> bool:
 
 def mark_message(session_id: int, message_normalized: str) -> None:
     key = f"fanvoice:session:recent_msg:{session_id}"
-    cache.set_json(key, {"message": message_normalized, "ts": _now_ts()}, _ttl_seconds())
+    ring = _read_recent_messages(session_id)
+    ring.append({"message": message_normalized, "ts": _now_ts()})
+    # Trim to the most recent N entries (ring buffer)
+    if len(ring) > _RECENT_MESSAGE_RING_SIZE:
+        ring = ring[-_RECENT_MESSAGE_RING_SIZE:]
+    cache.set_json(key, ring, _ttl_seconds())

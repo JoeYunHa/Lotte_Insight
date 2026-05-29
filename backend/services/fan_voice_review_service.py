@@ -61,7 +61,15 @@ def generate_daily_review(
         }
 
     clusterer = OpinionClusterer()
-    opinions = clusterer.cluster_by_jaccard_trigram(messages, max_opinions=5)
+    # Cap clustering input to avoid O(N^2) blowups on viral days. We keep the
+    # most-reacted messages so the dominant opinions still surface.
+    _MAX_CLUSTER_INPUT = 2000
+    clustering_input = sorted(
+        messages,
+        key=lambda m: int(m.get("reaction_count") or 0),
+        reverse=True,
+    )[:_MAX_CLUSTER_INPUT]
+    opinions = clusterer.cluster_by_jaccard_trigram(clustering_input, max_opinions=5)
     emotion_ranking = fan_voice_review_repository.aggregate_emotion_ranking(
         game_date=game_date,
         context_type=context_type,
@@ -119,7 +127,7 @@ def generate_daily_review(
         "emotion_ranking": emotion_ranking,
         "player_ranking": player_ranking,
     }
-    cache.set_json(cache_key, response, 600)
+    cache.set_json(cache_key, response, cache.ttl_seconds(game_date))
     return response
 
 
@@ -130,12 +138,14 @@ def get_daily_review(
     context_type: str = "home",
     context_id: str = "today",
     review_type: str = "final",
-) -> dict:
+) -> dict | None:
     """
-    Retrieve existing daily review (read-only, cached).
+    Retrieve existing daily review (READ-only, cached).
 
-    This is the READ path - delegates date resolution to resolve_target_game_date
-    to eliminate duplication with API layer.
+    This is a pure read path. On cache miss, it queries the database for an
+    existing review. If no review exists, returns None — the caller is
+    responsible for handling absence (e.g. 404). Generation is only performed
+    by the batch path via `generate_daily_review`.
     """
     # Delegate date resolution to service layer (no duplication)
     game_date, is_fallback, source_scope = resolve_target_game_date(
@@ -155,16 +165,52 @@ def get_daily_review(
     if cached:
         return cached
 
-    # If not cached, return the last generated review (this is GET, not POST)
-    # In production, this would query the database for existing review
-    # For now, delegate to generate (this maintains backwards compatibility)
-    return generate_daily_review(
-        scope=scope,
-        requested_date=requested_date,
-        context_type=context_type,
-        context_id=context_id,
+    # Cache miss → read existing review from DB (NEVER write here).
+    context_key = f"{context_type}:{context_id}"
+    review_row = fan_voice_review_repository.fetch_daily_review(
+        game_date=game_date,
+        context_key=context_key,
         review_type=review_type,
     )
+    if review_row is None:
+        return None
+
+    opinions = fan_voice_review_repository.fetch_daily_opinions(
+        review_id=review_row["id"]
+    )
+    emotion_ranking = fan_voice_review_repository.aggregate_emotion_ranking(
+        game_date=game_date,
+        context_type=context_type,
+        context_id=context_id,
+        limit=5,
+    )
+    player_ranking = fan_voice_review_repository.aggregate_player_ranking(
+        game_date=game_date,
+        context_type=context_type,
+        context_id=context_id,
+        limit=10,
+    )
+
+    response = {
+        "review_id": review_row["id"],
+        "game_date": game_date.isoformat(),
+        "is_fallback": is_fallback,
+        "source_scope": source_scope,
+        "review_type": review_type,
+        "summary": {
+            "title": review_row.get("summary_title"),
+            "body": review_row.get("summary_body"),
+        },
+        "metrics": {
+            "message_count": review_row.get("message_count", 0),
+            "unique_user_count": review_row.get("unique_user_count", 0),
+        },
+        "top_opinions": opinions,
+        "emotion_ranking": emotion_ranking,
+        "player_ranking": player_ranking,
+    }
+    cache.set_json(cache_key, response, cache.ttl_seconds(game_date))
+    return response
 
 
 def _build_summary(*, opinions: list[dict], message_count: int) -> str:

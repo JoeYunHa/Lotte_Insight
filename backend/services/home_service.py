@@ -6,7 +6,11 @@ import logging
 from datetime import date
 
 from services import report_repository
-from services.article_utils import parse_event_summary_json, select_primary_label
+from services.article_utils import (
+    VALID_LABEL_KEYS,
+    parse_event_summary_json,
+    select_primary_label,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -15,18 +19,26 @@ def _primary_label(article: dict) -> str | None:
     return select_primary_label(article.get("article_labels") or [])
 
 
-def _compute_label_counts(articles: list[dict]) -> dict[str, int]:
-    counts: dict[str, int] = {
-        "MATCH_RELATED": 0,
-        "INJURY_ROSTER": 0,
-        "TRANSACTION_CONTRACT": 0,
-        "PERFORMANCE_ANALYSIS": 0,
-        "INTERVIEW": 0,
-        "CLUB_OPERATION": 0,
-        "ETC": 0,
-    }
+def _enrich_articles(articles: list[dict]) -> list[dict]:
+    """Attach parsed event_summary and primary_label once per article.
+
+    Avoids re-parsing the JSON blob in every downstream helper (I4).
+    """
+    enriched: list[dict] = []
     for article in articles:
-        label = _primary_label(article)
+        parsed = parse_event_summary_json(article.get("event_summary"))
+        enriched.append({
+            **article,
+            "_parsed_event_summary": parsed,
+            "_primary_label": _primary_label(article),
+        })
+    return enriched
+
+
+def _compute_label_counts(articles: list[dict]) -> dict[str, int]:
+    counts: dict[str, int] = {key: 0 for key in VALID_LABEL_KEYS}
+    for article in articles:
+        label = article.get("_primary_label") or _primary_label(article)
         if label in counts:
             counts[label] += 1
     return counts
@@ -35,7 +47,9 @@ def _compute_label_counts(articles: list[dict]) -> dict[str, int]:
 def _compute_sentiment(articles: list[dict]) -> dict:
     positive = neutral = negative = 0
     for article in articles:
-        parsed = parse_event_summary_json(article.get("event_summary"))
+        parsed = article.get("_parsed_event_summary") or parse_event_summary_json(
+            article.get("event_summary")
+        )
         stance = parsed.get("lotte_stance", "")
         if stance == "positive":
             positive += 1
@@ -68,14 +82,16 @@ def _get_lead_story(
 
     lead_articles = [
         a for a in articles
-        if _primary_label(a) == lead_label
+        if (a.get("_primary_label") or _primary_label(a)) == lead_label
     ]
 
     summaries: list[str] = []
     all_key_players: list[str] = []
 
     for a in lead_articles:
-        parsed = parse_event_summary_json(a.get("event_summary"))
+        parsed = a.get("_parsed_event_summary") or parse_event_summary_json(
+            a.get("event_summary")
+        )
         summary = parsed.get("event_summary") or ""
         if summary:
             summaries.append(summary)
@@ -119,7 +135,8 @@ def _compute_top_players(mentions: list[dict], limit: int = 4) -> list[dict]:
 
 
 def build_home_report(target_date: date) -> dict:
-    articles = report_repository.fetch_articles_for_day(target_date)
+    raw_articles = report_repository.fetch_articles_for_day(target_date)
+    articles = _enrich_articles(raw_articles)
     article_ids = [a["id"] for a in articles]
 
     mentions = report_repository.fetch_player_mentions_with_position(article_ids)

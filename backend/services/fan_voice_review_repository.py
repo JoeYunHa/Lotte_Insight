@@ -85,6 +85,35 @@ def aggregate_player_ranking(
     return result.data or []
 
 
+def fetch_daily_review(
+    *, game_date: date, context_key: str, review_type: str
+) -> dict | None:
+    """Read an existing daily review row (read-only path for GET)."""
+    result = (
+        supabase.table("fan_voice_daily_reviews")
+        .select("*")
+        .eq("game_date", game_date.isoformat())
+        .eq("context_key", context_key)
+        .eq("review_type", review_type)
+        .limit(1)
+        .execute()
+    )
+    rows = result.data or []
+    return rows[0] if rows else None
+
+
+def fetch_daily_opinions(*, review_id: int) -> list[dict]:
+    """Read opinions for a given review (read-only path for GET)."""
+    result = (
+        supabase.table("fan_voice_daily_opinions")
+        .select("*")
+        .eq("review_id", review_id)
+        .order("score", desc=True)
+        .execute()
+    )
+    return result.data or []
+
+
 def upsert_daily_review(payload: dict) -> dict:
     """
     Upsert a daily review record.

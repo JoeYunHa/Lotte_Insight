@@ -47,8 +47,17 @@ def fetch_month_games(year: int, month: int) -> list[dict]:
         resp = requests.get(url, timeout=15, headers={"User-Agent": settings.crawl_user_agent})
         resp.raise_for_status()
         resp.encoding = resp.apparent_encoding
-    except Exception as exc:  # noqa: BLE001 - boundary error handling
-        logger.error("Failed to request giantsclub calendar: %s", exc)
+    except requests.Timeout as exc:
+        logger.error("Timeout requesting giantsclub calendar (year=%d month=%d): %s", year, month, exc)
+        return []
+    except requests.ConnectionError as exc:
+        logger.error("Connection error to giantsclub calendar (year=%d month=%d): %s", year, month, exc)
+        return []
+    except requests.HTTPError as exc:
+        logger.error("HTTP error from giantsclub calendar (year=%d month=%d): %s", year, month, exc)
+        return []
+    except requests.RequestException as exc:
+        logger.error("Request failure for giantsclub calendar (year=%d month=%d): %s", year, month, exc)
         return []
 
     soup = BeautifulSoup(resp.text, "lxml")

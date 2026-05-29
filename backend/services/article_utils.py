@@ -29,44 +29,46 @@ def extract_source_name(url: str) -> str:
 def normalize_url(url: str) -> str:
     """Normalize URL for deduplication.
 
-    Removes query parameters, fragments, and normalizes the URL structure
-    to improve duplicate detection across different sources.
+    Only the scheme and host are lowercased — the path is preserved as-is
+    because many CMS systems use case-sensitive paths (e.g. article slugs).
+    Query parameters and fragments are dropped, trailing slashes stripped,
+    and `www.` is removed.
 
     Args:
         url: Raw URL string
 
     Returns:
         Normalized URL string
-
-    Examples:
-        >>> normalize_url("https://example.com/article?utm_source=rss#section1")
-        'https://example.com/article'
-        >>> normalize_url("http://www.example.com/article")
-        'https://example.com/article'
     """
     try:
         url_stripped = url.strip()
         if not url_stripped:
             return ""
 
-        parsed = urlparse(url_stripped.lower())
+        parsed = urlparse(url_stripped)
 
-        # Normalize scheme to https
-        scheme = "https" if parsed.scheme in ("http", "https") else parsed.scheme
+        # Lowercase scheme & host, but preserve path case.
+        scheme = parsed.scheme.lower()
+        if scheme in ("http", "https"):
+            scheme = "https"
 
-        # Remove www. prefix (already lowercase from above)
-        netloc = parsed.netloc.replace("www.", "")
+        netloc = parsed.netloc.lower()
+        if netloc.startswith("www."):
+            netloc = netloc[4:]
 
-        # Remove trailing slash from path
-        path = parsed.path.rstrip("/") if parsed.path != "/" else parsed.path
+        path = parsed.path
+        # Keep root "/" but trim trailing slashes on real paths
+        if path and path != "/":
+            path = path.rstrip("/")
 
         # Reconstruct URL without query params and fragments
-        normalized = f"{scheme}://{netloc}{path}"
-        return normalized
+        if not scheme and not netloc:
+            return url_stripped.rstrip("/")
+        return f"{scheme}://{netloc}{path}"
 
     except (AttributeError, ValueError, TypeError):
         # Return original URL if parsing fails
-        return url.strip().lower()
+        return url.strip()
 
 
 def parse_naver_pubdate(pub_date: str) -> datetime | None:
@@ -116,7 +118,7 @@ def parse_event_summary_json(raw: str | None) -> dict:
         return {}
 
 
-VALID_LABEL_KEYS: frozenset[str] = frozenset({
+LABEL_PRIORITY: list[str] = [
     "INJURY_ROSTER",
     "TRANSACTION_CONTRACT",
     "MATCH_RELATED",
@@ -124,18 +126,32 @@ VALID_LABEL_KEYS: frozenset[str] = frozenset({
     "INTERVIEW",
     "CLUB_OPERATION",
     "ETC",
-})
+]
+
+VALID_LABEL_KEYS: frozenset[str] = frozenset(LABEL_PRIORITY)
 
 
 def select_primary_label_and_confidence(labels: list[dict]) -> tuple[str | None, float | None]:
-    """Return (label, confidence) for the highest-confidence row."""
+    """Return (label, confidence) for the highest-confidence row.
+
+    Ties on confidence are broken by `LABEL_PRIORITY` (highest priority wins).
+    """
     if not labels:
         return None, None
-    best = max(labels, key=lambda x: x.get("confidence") or 0.0)
-    return best.get("label"), best.get("confidence")
+    max_conf = max((row.get("confidence") or 0.0) for row in labels)
+    top = [row for row in labels if (row.get("confidence") or 0.0) == max_conf]
+    if len(top) == 1:
+        return top[0].get("label"), top[0].get("confidence")
+    # Tiebreak by declared label priority order
+    for priority_label in LABEL_PRIORITY:
+        for row in top:
+            if row.get("label") == priority_label:
+                return priority_label, row.get("confidence")
+    fallback = top[0]
+    return fallback.get("label"), fallback.get("confidence")
 
 
 def select_primary_label(labels: list[dict]) -> str | None:
-    """Return the label with the highest confidence from article_labels rows."""
+    """Return the label with the highest confidence (priority tiebreak)."""
     label, _ = select_primary_label_and_confidence(labels)
     return label

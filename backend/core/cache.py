@@ -6,26 +6,42 @@ Redis가 없거나 연결 실패 시 캐시 없이 정상 동작한다 (graceful
 
 import json
 import logging
+import time
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 logger = logging.getLogger(__name__)
 
 _client = None
-_client_checked = False
+_last_check_time: float = 0.0
+_CHECK_INTERVAL = 60.0  # seconds between reconnect attempts when Redis is down
+_url_missing_logged = False
 
 
 def _get_client():
-    global _client, _client_checked
-    if _client_checked:
+    """
+    Get or (re)connect the Redis client.
+
+    Unlike the previous implementation, a failed ping does NOT permanently
+    disable the cache — we retry every `_CHECK_INTERVAL` seconds so the
+    application recovers automatically once Redis is back online.
+    """
+    global _client, _last_check_time, _url_missing_logged
+
+    if _client is not None:
         return _client
 
-    _client_checked = True
+    now = time.time()
+    if now - _last_check_time < _CHECK_INTERVAL:
+        return None
+    _last_check_time = now
 
     from core.config import settings
     url = getattr(settings, "redis_url", "")
     if not url:
-        logger.info("REDIS_URL 미설정 — 캐시 비활성화")
+        if not _url_missing_logged:
+            logger.info("REDIS_URL 미설정 — 캐시 비활성화")
+            _url_missing_logged = True
         return None
 
     try:
@@ -35,7 +51,11 @@ def _get_client():
         _client = c
         logger.info("Redis 연결 완료: %s", url.split("@")[-1])
     except Exception as exc:
-        logger.warning("Redis 연결 실패 (%s) — 캐시 없이 동작", exc)
+        logger.warning(
+            "Redis 연결 실패 (%s) — 캐시 없이 동작 (다음 재시도 %.0fs)",
+            exc,
+            _CHECK_INTERVAL,
+        )
 
     return _client
 

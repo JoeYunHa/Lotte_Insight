@@ -29,6 +29,8 @@ def create_session(session_token_hash: str, session_alias: str) -> dict:
         )
         .execute()
     )
+    if not result.data:
+        raise RuntimeError("create_session insert returned no data")
     return result.data[0]
 
 
@@ -75,6 +77,8 @@ def create_message(
         )
         .execute()
     )
+    if not result.data:
+        raise RuntimeError("create_message insert returned no data")
     return result.data[0]
 
 

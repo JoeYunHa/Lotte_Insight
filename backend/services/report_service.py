@@ -1,13 +1,9 @@
-from datetime import date, datetime, timedelta, timezone
+from datetime import date
 
 from core import cache
+from core.time_utils import today_kst
 from services import report_repository
-
-_KST = timezone(timedelta(hours=9))
-
-
-def _today_kst() -> date:
-    return datetime.now(_KST).date()
+from services.cache_keys import CacheKeyBuilder
 
 TEAM_REPORT_TABLE = "team_daily_report"
 PLAYER_REPORT_TABLE = "player_daily_report"
@@ -26,7 +22,7 @@ def _load_cached_report(
         return None if raw == _CACHE_EMPTY else raw
 
     data = loader()
-    today = _today_kst()
+    today = today_kst()
     if data is None and ttl_date >= today:
         return None
     cache.set_json(cache_key, _CACHE_EMPTY if data is None else data, cache.ttl_seconds(ttl_date))
@@ -34,16 +30,16 @@ def _load_cached_report(
 
 
 def list_team_reports(limit: int) -> list[dict]:
-    cache_key = f"report:team:list:{limit}"
+    cache_key = CacheKeyBuilder.team_report_list(limit=limit)
     return _load_cached_report(
         cache_key,
-        _today_kst(),
+        today_kst(),
         lambda: report_repository.list_reports(TEAM_REPORT_TABLE, limit=limit),
     )
 
 
 def get_team_report(report_date: date) -> dict | None:
-    cache_key = f"report:team:{report_date.isoformat()}"
+    cache_key = CacheKeyBuilder.team_report(report_date=report_date)
     return _load_cached_report(
         cache_key,
         report_date,
@@ -52,10 +48,10 @@ def get_team_report(report_date: date) -> dict | None:
 
 
 def list_player_reports(player_id: int, limit: int) -> list[dict]:
-    cache_key = f"report:player:{player_id}:list:{limit}"
+    cache_key = CacheKeyBuilder.player_report_list(player_id=player_id, limit=limit)
     return _load_cached_report(
         cache_key,
-        _today_kst(),
+        today_kst(),
         lambda: report_repository.list_reports(
             PLAYER_REPORT_TABLE,
             limit=limit,
@@ -65,7 +61,7 @@ def list_player_reports(player_id: int, limit: int) -> list[dict]:
 
 
 def get_player_report(player_id: int, report_date: date) -> dict | None:
-    cache_key = f"report:player:{player_id}:{report_date.isoformat()}"
+    cache_key = CacheKeyBuilder.player_report(player_id=player_id, report_date=report_date)
     return _load_cached_report(
         cache_key,
         report_date,

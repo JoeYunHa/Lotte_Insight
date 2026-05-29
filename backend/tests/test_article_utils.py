@@ -80,9 +80,9 @@ class TestNormalizeURL:
         url = "https://example.com/article/"
         assert normalize_url(url) == "https://example.com/article"
 
-    def test_converts_to_lowercase(self):
+    def test_lowercases_scheme_and_host_only(self):
         url = "HTTPS://EXAMPLE.COM/Article"
-        assert normalize_url(url) == "https://example.com/article"
+        assert normalize_url(url) == "https://example.com/Article"
 
     def test_keeps_root_path_slash(self):
         url = "https://example.com/"
@@ -90,7 +90,7 @@ class TestNormalizeURL:
 
     def test_full_normalization(self):
         url = "HTTP://WWW.EXAMPLE.COM/Article/?utm=test#top"
-        assert normalize_url(url) == "https://example.com/article"
+        assert normalize_url(url) == "https://example.com/Article"
 
     def test_handles_invalid_url_gracefully(self):
         url = "not-a-url"

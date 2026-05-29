@@ -121,7 +121,7 @@ def classify_player_stance_batch(articles: list[dict]) -> list[dict]:
     import torch
 
     labels = artifacts.extras.get("labels") or _DEFAULT_LABELS
-    results: list[dict] = [dict(_MODEL_ERROR)] * len(articles)
+    results: list[dict] = [dict(_MODEL_ERROR) for _ in articles]
 
     for start in range(0, len(articles), _CHUNK_SIZE):
         end = start + _CHUNK_SIZE

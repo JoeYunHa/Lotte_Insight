@@ -97,18 +97,65 @@ class CacheKeyBuilder:
         date_str = report_date.isoformat() if isinstance(report_date, date) else str(report_date)
         return f"{CacheKeyBuilder.NAMESPACE_REPORT}:{CacheKeyBuilder.ENTITY_PLAYER}:{player_id}:{date_str}"
 
+    @staticmethod
+    def home_report(*, report_date: date) -> str:
+        """
+        Generate cache key for home aggregate report.
+
+        Format: report:home:{date}
+        Example: report:home:2026-05-28
+        """
+        date_str = report_date.isoformat() if isinstance(report_date, date) else str(report_date)
+        return f"{CacheKeyBuilder.NAMESPACE_REPORT}:home:{date_str}"
+
+    @staticmethod
+    def team_report_list(*, limit: int) -> str:
+        """Format: report:team:list:{limit}"""
+        return f"{CacheKeyBuilder.NAMESPACE_REPORT}:{CacheKeyBuilder.ENTITY_TEAM}:list:{limit}"
+
+    @staticmethod
+    def player_report_list(*, player_id: int, limit: int) -> str:
+        """Format: report:player:{player_id}:list:{limit}"""
+        return f"{CacheKeyBuilder.NAMESPACE_REPORT}:{CacheKeyBuilder.ENTITY_PLAYER}:{player_id}:list:{limit}"
+
+    @staticmethod
+    def topic_map(*, map_date: date) -> str:
+        """Format: topic:map:{date}"""
+        date_str = map_date.isoformat() if isinstance(map_date, date) else str(map_date)
+        return f"topic:map:{date_str}"
+
+    @staticmethod
+    def player_list(*, status: str | None) -> str:
+        """Format: player:list:{status|all}"""
+        return f"player:list:{status or 'all'}"
+
+    @staticmethod
+    def player_detail(*, player_id: int, stats_date: date | None) -> str:
+        """Format: player:{player_id}:stats:{date|latest}"""
+        date_str = stats_date.isoformat() if stats_date else "latest"
+        return f"player:{player_id}:stats:{date_str}"
+
 
 # Convenience aliases
 def fanvoice_review_key(**kwargs) -> str:
-    """Convenience wrapper for fan_voice_review cache key."""
     return CacheKeyBuilder.fan_voice_review(**kwargs)
 
 
 def team_report_key(**kwargs) -> str:
-    """Convenience wrapper for team_report cache key."""
     return CacheKeyBuilder.team_report(**kwargs)
 
 
 def player_report_key(**kwargs) -> str:
-    """Convenience wrapper for player_report cache key."""
     return CacheKeyBuilder.player_report(**kwargs)
+
+
+def home_report_key(**kwargs) -> str:
+    return CacheKeyBuilder.home_report(**kwargs)
+
+
+def team_report_list_key(**kwargs) -> str:
+    return CacheKeyBuilder.team_report_list(**kwargs)
+
+
+def player_report_list_key(**kwargs) -> str:
+    return CacheKeyBuilder.player_report_list(**kwargs)

@@ -1,8 +1,10 @@
 from datetime import date
 import logging
 
+from core import cache
 from core.database import supabase
 from services.article_utils import VALID_LABEL_KEYS, select_primary_label_and_confidence
+from services.cache_keys import CacheKeyBuilder
 
 logger = logging.getLogger(__name__)
 
@@ -11,7 +13,13 @@ def get_topic_map(map_date: date) -> dict | None:
     """Fetch clusters and article points for the given KST date.
 
     Returns None when no clusters exist for the date (pipeline not yet run).
+    Negative results (None) are not cached — the batch may not have run yet.
     """
+    cache_key = CacheKeyBuilder.topic_map(map_date=map_date)
+    cached = cache.get_json(cache_key)
+    if cached is not None:
+        return cached
+
     date_str = map_date.isoformat()
 
     clusters_res = (
@@ -41,11 +49,13 @@ def get_topic_map(map_date: date) -> dict | None:
     )
     raw_points = points_res.data or []
 
-    return {
+    result = {
         "map_date": date_str,
         "clusters": _reshape_clusters(clusters),
         "points": _reshape_points(raw_points),
     }
+    cache.set_json(cache_key, result, cache.ttl_seconds(map_date))
+    return result
 
 
 def _reshape_clusters(clusters: list[dict]) -> list[dict]:
