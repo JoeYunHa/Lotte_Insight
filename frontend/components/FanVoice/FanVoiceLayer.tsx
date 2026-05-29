@@ -117,6 +117,8 @@ export function FanVoiceLayer({ contextType, contextId }: FanVoiceLayerProps) {
         return;
       }
 
+      if (cancelled) return;
+
       try {
         const url = getFanVoiceSseUrl({
           contextType,
@@ -194,12 +196,15 @@ export function FanVoiceLayer({ contextType, contextId }: FanVoiceLayerProps) {
   async function handleReact(messageId: string) {
     if (reactingIdsRef.current.has(messageId)) return;
     reactingIdsRef.current.add(messageId);
+    let prevCount = 0;
     setStreamMessages((prev) =>
-      prev.map((msg) =>
-        msg.id === messageId
-          ? { ...msg, reaction_count: msg.reaction_count + 1 }
-          : msg,
-      ),
+      prev.map((msg) => {
+        if (msg.id === messageId) {
+          prevCount = msg.reaction_count;
+          return { ...msg, reaction_count: prevCount + 1 };
+        }
+        return msg;
+      }),
     );
     try {
       const res = await postFanVoiceReaction({
@@ -216,9 +221,7 @@ export function FanVoiceLayer({ contextType, contextId }: FanVoiceLayerProps) {
     } catch {
       setStreamMessages((prev) =>
         prev.map((msg) =>
-          msg.id === messageId
-            ? { ...msg, reaction_count: Math.max(0, msg.reaction_count - 1) }
-            : msg,
+          msg.id === messageId ? { ...msg, reaction_count: prevCount } : msg,
         ),
       );
     } finally {
@@ -227,12 +230,18 @@ export function FanVoiceLayer({ contextType, contextId }: FanVoiceLayerProps) {
   }
 
   async function handleReport(messageId: string) {
-    const previous = streamMessages;
-    setStreamMessages((prev) => prev.filter((msg) => msg.id !== messageId));
+    let removedMsg: FanVoiceMessage | undefined;
+    setStreamMessages((prev) => {
+      removedMsg = prev.find((msg) => msg.id === messageId);
+      return prev.filter((msg) => msg.id !== messageId);
+    });
     try {
       await postFanVoiceReport({ message_id: messageId, reason: "spam" });
     } catch {
-      setStreamMessages(previous);
+      if (removedMsg) {
+        const captured = removedMsg;
+        setStreamMessages((prev) => [...prev, captured]);
+      }
     }
   }
 

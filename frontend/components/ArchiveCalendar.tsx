@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { LABEL_META } from '@/lib/label-config'
 import { inferGameResult } from '@/lib/report-result'
 import type { TeamDailyReport } from '@/lib/types'
@@ -57,7 +57,10 @@ export function ArchiveCalendar({ reports, initialDate }: Props) {
     setViewMonth((month) => month + 1)
   }
 
-  const sortedReports = [...reports].sort((a, b) => b.date.localeCompare(a.date))
+  const sortedReports = useMemo(
+    () => [...reports].sort((a, b) => b.date.localeCompare(a.date)),
+    [reports],
+  )
 
   return (
     <div>

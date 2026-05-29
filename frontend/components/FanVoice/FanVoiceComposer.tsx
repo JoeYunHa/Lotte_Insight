@@ -3,7 +3,10 @@
 import { useState } from "react";
 
 import { postFanVoiceMessage } from "@/lib/fan-voice/fan-voice-api";
-import type { FanVoiceContextType } from "@/lib/fan-voice/fan-voice-types";
+import type {
+  FanVoiceContextType,
+  FanVoiceEmotion,
+} from "@/lib/fan-voice/fan-voice-types";
 
 interface FanVoiceComposerProps {
   contextType: FanVoiceContextType;
@@ -12,14 +15,16 @@ interface FanVoiceComposerProps {
   onSubmitted?: () => void;
 }
 
-const EMOTIONS = [
+type EmotionOption = { value: FanVoiceEmotion | ""; label: string };
+
+const EMOTIONS: EmotionOption[] = [
   { value: "", label: "No Emotion" },
   { value: "CHEER", label: "Cheer" },
   { value: "EXPECT", label: "Expect" },
   { value: "FRUSTRATED", label: "Frustrated" },
   { value: "MOVED", label: "Moved" },
   { value: "ANGRY", label: "Angry" },
-] as const;
+];
 
 export function FanVoiceComposer({
   contextType,
@@ -28,8 +33,7 @@ export function FanVoiceComposer({
   onSubmitted,
 }: FanVoiceComposerProps) {
   const [message, setMessage] = useState("");
-  const [emotion, setEmotion] =
-    useState<(typeof EMOTIONS)[number]["value"]>("");
+  const [emotion, setEmotion] = useState<FanVoiceEmotion | "">("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -72,9 +76,7 @@ export function FanVoiceComposer({
         className="rounded-md border px-2 py-1 text-xs"
         style={{ borderColor: "var(--border)", color: "var(--muted)" }}
         value={emotion}
-        onChange={(e) =>
-          setEmotion(e.target.value as (typeof EMOTIONS)[number]["value"])
-        }
+        onChange={(e) => setEmotion(e.target.value as FanVoiceEmotion | "")}
         disabled={disabled || submitting}
       >
         {EMOTIONS.map((option) => (

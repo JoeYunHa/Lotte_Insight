@@ -17,7 +17,7 @@ export function FanVoiceLane({
   onReport,
 }: FanVoiceLaneProps) {
   return (
-    <div className="fan-voice-lane" data-lane={laneIndex}>
+    <div className="fan-voice-lane">
       {bubbles.map((bubble) => (
         <FanVoiceBubble
           key={bubble.localId}

@@ -28,10 +28,13 @@ export function TopicMapExplorer({ data }: TopicMapExplorerProps) {
 
   const hasOutliers = points.some((p) => p.is_outlier)
 
-  const outlierCount = points.filter((p) => p.is_outlier).length
-  const largestCluster = clusters.reduce(
-    (max, c) => (c.article_count > max ? c.article_count : max),
-    0
+  const outlierCount = useMemo(
+    () => points.filter((p) => p.is_outlier).length,
+    [points],
+  )
+  const largestCluster = useMemo(
+    () => clusters.reduce((max, c) => (c.article_count > max ? c.article_count : max), 0),
+    [clusters],
   )
 
   function handleReset() {
