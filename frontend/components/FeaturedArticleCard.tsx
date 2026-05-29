@@ -74,7 +74,7 @@ export function FeaturedArticleCard({
           href={article.source_url}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center rounded-full px-4 py-2 text-sm font-semibold transition-colors"
+          className="group/link inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-all"
           style={{
             background: 'rgba(255,255,255,0.7)',
             color: 'var(--text)',
@@ -82,6 +82,12 @@ export function FeaturedArticleCard({
           }}
         >
           원문 기사 보기
+          <span
+            className="inline-block transition-transform group-hover/link:translate-x-0.5"
+            aria-hidden="true"
+          >
+            →
+          </span>
         </a>
       </div>
     </section>

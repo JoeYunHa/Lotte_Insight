@@ -52,6 +52,16 @@
   to   { opacity: 1; }
 }
 
+@keyframes expandWidth {
+  from { transform: scaleX(0); transform-origin: left center; }
+  to   { transform: scaleX(1); transform-origin: left center; }
+}
+
+@keyframes pulseDot {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.2; }
+}
+
 @utility animate-fade-up {
   animation: fadeUp 0.45s ease both;
 }
@@ -59,6 +69,18 @@
 @utility animate-fade-in {
   animation: fadeIn 0.35s ease both;
 }
+
+@utility animate-expand-width {
+  animation: expandWidth 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@utility animate-live-dot {
+  animation: pulseDot 1.6s ease-in-out infinite;
+}
+
+@utility animate-stagger-1 { animation-delay: 120ms; }
+@utility animate-stagger-2 { animation-delay: 240ms; }
+@utility animate-stagger-3 { animation-delay: 380ms; }
 
 *, *::before, *::after {
   box-sizing: border-box;
@@ -124,6 +146,7 @@ body {
   border: 1px solid var(--border);
   border-radius: 18px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.74), rgba(241, 232, 218, 0.68));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 2px 16px rgba(96, 62, 27, 0.05);
 }
 
 .fan-voice-lane {
@@ -162,14 +185,16 @@ body {
 .fan-voice-bubble:hover {
   animation-play-state: paused;
   border-color: var(--border-strong);
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 4px 18px rgba(96, 62, 27, 0.12);
+  z-index: 10;
 }
 
 .fan-voice-badge {
-  margin-right: 8px;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  color: var(--red);
+  margin-right: 4px;
+  font-size: 14px;
+  line-height: 1;
+  flex-shrink: 0;
 }
 
 .fan-voice-actions {
@@ -192,6 +217,12 @@ body {
 .fan-voice-action-btn:hover {
   border-color: var(--border-strong);
   color: var(--text);
+}
+
+.fan-voice-actions .fan-voice-action-btn:first-child:hover {
+  border-color: rgba(225, 6, 44, 0.3);
+  color: var(--red);
+  background: rgba(225, 6, 44, 0.06);
 }
 
 @media (prefers-reduced-motion: reduce) {

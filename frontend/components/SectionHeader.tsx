@@ -27,6 +27,12 @@ export function SectionHeader({ label, accent = 'neutral', dense = false }: Sect
           style={{ background: 'var(--gold)' }}
         />
       ) : null}
+      {accent === 'red' ? (
+        <span
+          className="w-0.5 h-3.5 rounded-sm shrink-0"
+          style={{ background: 'var(--red)' }}
+        />
+      ) : null}
       <span
         className="text-[10px] font-bold tracking-widest uppercase font-mono-code shrink-0"
         style={{ color: labelColor }}

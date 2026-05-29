@@ -16,14 +16,25 @@ interface PageShellProps {
 export function PageShell({ children, footer, headerActions, seasonBadge }: PageShellProps) {
   return (
     <div className="min-h-dvh" style={{ background: 'var(--bg)' }}>
-      <div className="h-[3px] w-full" style={{ background: 'var(--red)' }} />
+      <div className="h-[4px] w-full" style={{ background: 'var(--red)' }} />
 
       <header className="sticky top-0 z-50 backdrop-blur-md" style={{ background: 'rgba(251, 246, 239, 0.9)', borderBottom: '1px solid var(--border)' }}>
         <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl flex flex-col items-center justify-center gap-0 shrink-0" style={{ background: 'var(--red)', color: '#fff' }}>
-              <span className="text-sm font-bold leading-none">L</span>
-              <span className="text-[7px] font-bold tracking-widest leading-none opacity-80">DESK</span>
+            <div
+              className="w-9 h-9 rounded-xl flex flex-col items-center justify-center gap-0.5 shrink-0"
+              style={{ background: 'var(--red)', color: '#fff' }}
+            >
+              <span
+                className="text-base font-black leading-none"
+                style={{
+                  fontFamily: 'var(--font-serif-kr), "Noto Serif KR", Georgia, serif',
+                  letterSpacing: '-0.02em',
+                }}
+              >
+                L
+              </span>
+              <span className="text-[6px] font-bold tracking-[0.14em] leading-none opacity-70">DESK</span>
             </div>
             <div className="flex flex-col">
               <span className="font-bold text-sm tracking-wide leading-none" style={{ color: 'var(--text)' }}>
@@ -45,7 +56,7 @@ export function PageShell({ children, footer, headerActions, seasonBadge }: Page
                 <Link
                   key={action.href}
                   href={action.href}
-                  className="text-xs transition-colors px-3 py-1.5 rounded-full"
+                  className="text-xs transition-all px-3 py-1.5 rounded-full hover:-translate-y-px"
                   style={{
                     color: 'var(--muted)',
                     border: '1px solid var(--border)',

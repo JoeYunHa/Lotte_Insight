@@ -12,13 +12,33 @@ interface HomeHeroDeskProps {
 export function HomeHeroDesk({ date, headline, subcopy, kicker, metaStat, statusBadge }: HomeHeroDeskProps) {
   return (
     <div
-      className="pt-10 pb-10"
+      className="relative pt-10 pb-10 overflow-hidden"
       style={{
         background: 'radial-gradient(ellipse at 15% 60%, rgba(225,6,44,0.06) 0%, transparent 55%)',
       }}
     >
-      {/* Top: date + kicker + optional status badge */}
-      <div className="flex items-center gap-3 mb-4 animate-fade-in">
+      {/* Decorative season watermark */}
+      <div
+        className="pointer-events-none absolute select-none"
+        aria-hidden="true"
+        style={{
+          top: '-16px',
+          right: '-8px',
+          fontSize: 'clamp(130px, 20vw, 210px)',
+          fontWeight: 900,
+          fontFamily: 'var(--font-serif-kr), "Noto Serif KR", Georgia, serif',
+          color: 'transparent',
+          WebkitTextStroke: '1px rgba(225, 6, 44, 0.07)',
+          lineHeight: 1,
+          letterSpacing: '-0.04em',
+          userSelect: 'none',
+        }}
+      >
+        26
+      </div>
+
+      {/* Top row: date + live kicker badge + status */}
+      <div className="flex items-center gap-3 mb-4 animate-fade-in flex-wrap">
         <p
           className="text-xs font-mono-code tracking-widest uppercase"
           style={{ color: 'var(--dim)' }}
@@ -26,15 +46,24 @@ export function HomeHeroDesk({ date, headline, subcopy, kicker, metaStat, status
           {date}
         </p>
         {kicker ? (
-          <>
-            <span style={{ color: 'var(--border-strong)' }}>·</span>
+          <div
+            className="inline-flex items-center gap-2 rounded-full px-2.5 py-1"
+            style={{
+              background: 'rgba(225, 6, 44, 0.07)',
+              border: '1px solid rgba(225, 6, 44, 0.16)',
+            }}
+          >
+            <span
+              className="w-1.5 h-1.5 rounded-full shrink-0 animate-live-dot"
+              style={{ background: 'var(--red)' }}
+            />
             <p
               className="text-xs font-mono-code tracking-widest uppercase"
               style={{ color: 'var(--red)' }}
             >
               {kicker}
             </p>
-          </>
+          </div>
         ) : null}
         {statusBadge ? <div className="ml-auto">{statusBadge}</div> : null}
       </div>
@@ -47,8 +76,11 @@ export function HomeHeroDesk({ date, headline, subcopy, kicker, metaStat, status
         {headline}
       </h1>
 
-      {/* Red rule */}
-      <div className="h-[2px] w-10 mb-5" style={{ background: 'var(--red)' }} />
+      {/* Animated red rule */}
+      <div
+        className="h-[2px] w-10 mb-5 animate-expand-width"
+        style={{ background: 'var(--red)', animationDelay: '150ms' }}
+      />
 
       {/* Subcopy + metaStat */}
       <div

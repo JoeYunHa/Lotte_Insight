@@ -60,22 +60,25 @@ export function RankingPanel({
       ) : (
         <div className="mt-5 space-y-3">
           {rows.map((row, index) => {
+            const isTop = index === 0
             const content = (
               <div
                 className="flex items-start gap-4 rounded-[20px] px-4 py-3 transition-colors"
                 style={{
-                  background: index === 0 ? 'rgba(255,255,255,0.82)' : 'rgba(255,255,255,0.58)',
-                  border: '1px solid var(--border)',
+                  background: isTop
+                    ? 'linear-gradient(135deg, rgba(199,163,90,0.11) 0%, rgba(255,255,255,0.88) 100%)'
+                    : 'rgba(255,255,255,0.58)',
+                  border: isTop ? '1px solid rgba(199,163,90,0.28)' : '1px solid var(--border)',
                 }}
               >
                 <div
                   className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-mono-code font-bold"
                   style={{
-                    background: index === 0 ? 'rgba(225,6,44,0.12)' : 'var(--surface-2)',
-                    color: index === 0 ? 'var(--text)' : 'var(--muted)',
+                    background: isTop ? 'rgba(199,163,90,0.18)' : 'var(--surface-2)',
+                    color: isTop ? 'var(--gold)' : 'var(--muted)',
                   }}
                 >
-                  {String(index + 1).padStart(2, '0')}
+                  {isTop ? '★' : String(index + 1).padStart(2, '0')}
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold leading-6" style={{ color: 'var(--text)' }}>

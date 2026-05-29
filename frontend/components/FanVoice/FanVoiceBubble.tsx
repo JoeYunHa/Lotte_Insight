@@ -1,6 +1,15 @@
 "use client";
 
 import type { ActiveFanVoiceBubble } from "@/lib/fan-voice/fan-voice-lane-scheduler";
+import type { FanVoiceEmotion } from "@/lib/fan-voice/fan-voice-types";
+
+const EMOTION_SYMBOL: Record<FanVoiceEmotion, string> = {
+  CHEER: "📣",
+  EXPECT: "⭐",
+  FRUSTRATED: "😤",
+  MOVED: "🥺",
+  ANGRY: "🔥",
+};
 
 interface FanVoiceBubbleProps {
   bubble: ActiveFanVoiceBubble;
@@ -13,16 +22,21 @@ export function FanVoiceBubble({
   onReact,
   onReport,
 }: FanVoiceBubbleProps) {
+  const symbol = bubble.message.emotion_tag
+    ? EMOTION_SYMBOL[bubble.message.emotion_tag]
+    : null;
+  const count = bubble.message.reaction_count;
+
   return (
     <div
       className="fan-voice-bubble"
-      style={{
-        animationDuration: `${bubble.durationSec}s`,
-      }}
+      style={{ animationDuration: `${bubble.durationSec}s` }}
       title={bubble.message.session_alias}
     >
-      {bubble.message.emotion_tag ? (
-        <span className="fan-voice-badge">{bubble.message.emotion_tag}</span>
+      {symbol ? (
+        <span className="fan-voice-badge" aria-hidden="true">
+          {symbol}
+        </span>
       ) : null}
       <span>{bubble.message.message}</span>
       <span className="fan-voice-actions">
@@ -32,7 +46,7 @@ export function FanVoiceBubble({
           onClick={() => onReact(bubble.message.id)}
           title="React"
         >
-          +1
+          ♥{count > 0 ? ` ${count}` : ""}
         </button>
         <button
           type="button"
@@ -40,7 +54,7 @@ export function FanVoiceBubble({
           onClick={() => onReport(bubble.message.id)}
           title="Report"
         >
-          !
+          ⚑
         </button>
       </span>
     </div>

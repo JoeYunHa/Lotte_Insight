@@ -43,7 +43,7 @@ export function SignalCard({ title, value, detail, delay = 0, children, accent =
       </p>
       {value ? (
         <p
-          className="text-2xl font-bold font-mono-code leading-none mb-1"
+          className="text-3xl font-bold font-mono-code leading-none mb-1"
           style={{ color: valueColor }}
         >
           {value}
