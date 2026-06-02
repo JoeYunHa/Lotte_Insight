@@ -210,34 +210,39 @@ body {
   box-shadow: var(--shadow-soft);
 }
 
+/* Viewport-fixed overlay: bubbles float across the entire screen */
 .fan-voice-overlay {
-  position: relative;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 70px;
+  pointer-events: none;
+  z-index: 40;
   overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: 18px;
-  background: linear-gradient(180deg, rgba(var(--lotte-white-rgb), 0.82), rgba(var(--lotte-blue-rgb), 0.08));
-  box-shadow: var(--shadow-soft);
+  display: flex;
+  flex-direction: column;
 }
 
 .fan-voice-lane {
+  flex: 1;
   position: relative;
-  height: 42px;
-}
-
-.fan-voice-lane + .fan-voice-lane {
-  margin-top: 8px;
+  min-height: 0;
 }
 
 .fan-voice-bubble {
+  pointer-events: auto;
   position: absolute;
   left: 0;
-  top: 6px;
+  top: 0;
+  bottom: 0;
+  margin-top: auto;
+  margin-bottom: auto;
+  height: fit-content;
   max-width: min(480px, 75vw);
   padding: 7px 12px;
-  border: 1px solid var(--border);
+  border: 1px solid transparent;
   border-radius: 999px;
-  background: var(--surface-glass-strong);
-  color: var(--text);
   font-size: 12px;
   line-height: 1.35;
   white-space: nowrap;
@@ -250,14 +255,15 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
 }
 
 .fan-voice-bubble:hover {
   animation-play-state: paused;
-  border-color: var(--border-strong);
-  background: var(--surface-glass);
-  box-shadow: 0 4px 18px rgba(var(--lotte-navy-rgb), 0.12);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.15);
   z-index: 10;
+  filter: brightness(1.1);
 }
 
 .fan-voice-badge {
@@ -275,24 +281,33 @@ body {
 }
 
 .fan-voice-action-btn {
-  border: 1px solid var(--border);
+  border: 1px solid currentColor;
   border-radius: 999px;
   padding: 1px 5px;
   font-size: 10px;
   line-height: 1.2;
-  color: var(--muted);
-  background: var(--surface-glass-strong);
+  color: inherit;
+  background: rgba(255, 255, 255, 0.15);
+  opacity: 0.7;
 }
 
 .fan-voice-action-btn:hover {
-  border-color: var(--border-strong);
-  color: var(--text);
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.25);
 }
 
-.fan-voice-actions .fan-voice-action-btn:first-child:hover {
-  border-color: var(--red-border);
-  color: var(--red);
-  background: rgba(var(--lotte-red-rgb), 0.06);
+/* Fixed composer bar at viewport bottom */
+.fan-voice-composer-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  padding: 10px 16px 12px;
+  background: var(--surface-glass-strong);
+  border-top: 1px solid var(--border);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }
 
 @media (prefers-reduced-motion: reduce) {

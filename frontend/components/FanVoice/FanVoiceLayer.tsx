@@ -172,33 +172,26 @@ export function FanVoiceLayer({ contextType, contextId }: FanVoiceLayerProps) {
   }
 
   return (
-    <section className="fan-voice-shell mb-8">
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <p
-          className="text-xs font-semibold uppercase tracking-[0.16em]"
-          style={{ color: "var(--muted)" }}
-        >
-          팬 보이스 {slowMode ? "(느린 모드)" : ""}
-        </p>
-        <FanVoiceToggle cleanMode={cleanMode} onToggle={toggleCleanMode} />
-      </div>
+    <>
+      {/* Inline section: header + highlights */}
+      <section className="fan-voice-shell mb-8">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <p
+            className="text-xs font-semibold uppercase tracking-[0.16em]"
+            style={{ color: "var(--muted)" }}
+          >
+            팬 보이스 {slowMode ? "(느린 모드)" : ""}
+          </p>
+          <FanVoiceToggle cleanMode={cleanMode} onToggle={toggleCleanMode} />
+        </div>
+        <FanVoiceHighlights messages={streamMessages} />
+        {/* spacer so page content isn't obscured by the fixed composer bar */}
+        <div style={{ height: 72 }} aria-hidden="true" />
+      </section>
 
-      <FanVoiceComposer
-        contextType={contextType}
-        contextId={contextId}
-        disabled={slowMode}
-        onSubmitted={() => {
-          // next poll will pick up the latest message
-        }}
-      />
-
-      <FanVoiceHighlights messages={streamMessages} />
-
-      {!cleanMode ? (
-        <div
-          className="fan-voice-overlay mt-3"
-          style={{ height: laneCount * 42 + (laneCount - 1) * 8 }}
-        >
+      {/* Viewport-fixed bubble overlay — pointer-events disabled except on bubbles */}
+      {!cleanMode && (
+        <div className="fan-voice-overlay">
           {laneBubbles.map((bubbles, laneIndex) => (
             <FanVoiceLane
               key={laneIndex}
@@ -208,7 +201,17 @@ export function FanVoiceLayer({ contextType, contextId }: FanVoiceLayerProps) {
             />
           ))}
         </div>
-      ) : null}
-    </section>
+      )}
+
+      {/* Fixed composer bar at viewport bottom */}
+      <div className="fan-voice-composer-bar">
+        <FanVoiceComposer
+          contextType={contextType}
+          contextId={contextId}
+          disabled={slowMode}
+          onSubmitted={() => {}}
+        />
+      </div>
+    </>
   );
 }

@@ -1,7 +1,8 @@
 "use client";
 
-import { FanVoiceBubble } from "./FanVoiceBubble";
+import { getBubbleColor } from "@/lib/fan-voice/fan-voice-colors";
 import type { ActiveFanVoiceBubble } from "@/lib/fan-voice/fan-voice-lane-scheduler";
+import { FanVoiceBubble } from "./FanVoiceBubble";
 
 interface FanVoiceLaneProps {
   bubbles: ActiveFanVoiceBubble[];
@@ -20,6 +21,7 @@ export function FanVoiceLane({
         <FanVoiceBubble
           key={bubble.localId}
           bubble={bubble}
+          color={getBubbleColor(bubble.message.session_alias)}
           onReact={onReact}
           onReport={onReport}
         />

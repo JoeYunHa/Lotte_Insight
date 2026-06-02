@@ -13,12 +13,14 @@ const EMOTION_SYMBOL: Record<FanVoiceEmotion, string> = {
 
 interface FanVoiceBubbleProps {
   bubble: ActiveFanVoiceBubble;
+  color: { border: string; bg: string; text: string };
   onReact: (messageId: string) => void;
   onReport: (messageId: string) => void;
 }
 
 export function FanVoiceBubble({
   bubble,
+  color,
   onReact,
   onReport,
 }: FanVoiceBubbleProps) {
@@ -30,7 +32,12 @@ export function FanVoiceBubble({
   return (
     <div
       className="fan-voice-bubble"
-      style={{ animationDuration: `${bubble.durationSec}s` }}
+      style={{
+        animationDuration: `${bubble.durationSec}s`,
+        borderColor: color.border,
+        background: color.bg,
+        color: color.text,
+      }}
       title={bubble.message.session_alias}
     >
       {symbol ? (
