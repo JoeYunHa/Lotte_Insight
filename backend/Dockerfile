@@ -38,7 +38,11 @@ RUN playwright install chromium --with-deps
 WORKDIR /app
 COPY . .
 
+# 빌드 시 모델을 이미지에 포함 — API 서버와 크론 잡이 동일 이미지를 공유하므로
+# 런타임 다운로드 없이 모든 서비스에서 모델을 사용할 수 있다.
+ARG HF_TOKEN
+RUN HF_TOKEN=${HF_TOKEN} python scripts/download_models.py
+
 EXPOSE 8000
 
-# 기동 시 1회 모델 다운로드 후 서버 시작
-CMD ["sh", "-c", "python scripts/download_models.py && uvicorn main:app --host 0.0.0.0 --port $PORT"]
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port $PORT"]
