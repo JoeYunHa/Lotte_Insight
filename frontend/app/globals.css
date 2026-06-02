@@ -152,6 +152,20 @@ body {
   position: relative;
 }
 
+.card-surface {
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.chip-surface {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
+.panel-elevated {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 2px 16px rgba(96, 62, 27, 0.05);
+}
+
 .fan-voice-overlay {
   position: relative;
   overflow: hidden;

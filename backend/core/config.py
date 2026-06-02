@@ -1,7 +1,9 @@
 import json
+import threading
 from pathlib import Path
 
 _settings_instance = None
+_settings_lock = threading.Lock()
 
 
 def _build_settings():
@@ -90,7 +92,9 @@ class _LazySettings:
     def __getattr__(self, name: str):
         global _settings_instance
         if _settings_instance is None:
-            _settings_instance = _build_settings()
+            with _settings_lock:
+                if _settings_instance is None:
+                    _settings_instance = _build_settings()
         return getattr(_settings_instance, name)
 
 

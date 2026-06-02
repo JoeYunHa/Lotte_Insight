@@ -69,74 +69,72 @@ class TestReshapeArticle:
         assert result["key_players"] == []
 
 
-class TestArticleIdsForRelationTruncation:
-    def test_warning_logged_when_cap_hit(self, caplog):
+class TestListArticlesServerSideFilter:
+    """list_articles now uses !inner JOIN for server-side filtering."""
+
+    def _mock_chain(self, data):
+        chain = MagicMock()
+        chain.select.return_value = chain
+        chain.eq.return_value = chain
+        chain.gte.return_value = chain
+        chain.lte.return_value = chain
+        chain.order.return_value = chain
+        chain.range.return_value = chain
+        chain.execute.return_value = MagicMock(data=data)
+        return chain
+
+    def test_label_filter_uses_inner_join(self):
         from services import article_repository
 
-        page = article_repository._RELATION_PAGE_SIZE
-        cap = article_repository._RELATION_MAX_ROWS
-
-        class _Table:
-            def __init__(self):
-                self.start = 0
-
-            def select(self, *_args, **_kwargs):
-                return self
-
-            def eq(self, *_args, **_kwargs):
-                return self
-
-            def range(self, start, _end):
-                self.start = start
-                return self
-
-            def execute(self):
-                if self.start < cap:
-                    return MagicMock(data=[{"article_id": self.start + i} for i in range(page)])
-                return MagicMock(data=[])
-
+        chain = self._mock_chain([])
         mock_db = MagicMock()
-        mock_db.table.return_value = _Table()
+        mock_db.table.return_value = chain
 
         with patch.object(article_repository, "supabase", mock_db):
-            with caplog.at_level(logging.WARNING, logger="services.article_repository"):
-                result = article_repository._article_ids_for_relation(
-                    "article_labels", "label", "MATCH_RELATED"
-                )
+            article_repository.list_articles(label="MATCH_RELATED")
 
-        assert len(result) == cap
-        assert any("cap" in msg.lower() or str(cap) in msg for msg in caplog.messages)
+        select_call = chain.select.call_args[0][0]
+        assert "article_labels!inner" in select_call
+        # eq was called with the label filter
+        eq_calls = [str(c) for c in chain.eq.call_args_list]
+        assert any("article_labels.label" in str(c) for c in chain.eq.call_args_list)
 
-    def test_no_warning_when_under_cap(self, caplog):
+    def test_player_filter_uses_inner_join(self):
         from services import article_repository
 
-        class _Table:
-            def __init__(self):
-                self.called = False
-
-            def select(self, *_args, **_kwargs):
-                return self
-
-            def eq(self, *_args, **_kwargs):
-                return self
-
-            def range(self, *_args, **_kwargs):
-                return self
-
-            def execute(self):
-                if not self.called:
-                    self.called = True
-                    return MagicMock(data=[{"article_id": i} for i in range(5)])
-                return MagicMock(data=[])
-
+        chain = self._mock_chain([])
         mock_db = MagicMock()
-        mock_db.table.return_value = _Table()
+        mock_db.table.return_value = chain
 
         with patch.object(article_repository, "supabase", mock_db):
-            with caplog.at_level(logging.WARNING, logger="services.article_repository"):
-                result = article_repository._article_ids_for_relation(
-                    "article_labels", "label", "MATCH_RELATED"
-                )
+            article_repository.list_articles(player_id=42)
 
-        assert result == [0, 1, 2, 3, 4]
-        assert not caplog.records
+        select_call = chain.select.call_args[0][0]
+        assert "article_players!inner" in select_call
+        assert any("article_players.player_id" in str(c) for c in chain.eq.call_args_list)
+
+    def test_no_filter_uses_left_join(self):
+        from services import article_repository
+
+        chain = self._mock_chain([])
+        mock_db = MagicMock()
+        mock_db.table.return_value = chain
+
+        with patch.object(article_repository, "supabase", mock_db):
+            article_repository.list_articles()
+
+        select_call = chain.select.call_args[0][0]
+        assert "article_labels!inner" not in select_call
+        assert "article_players!inner" not in select_call
+
+    def test_returns_empty_list_when_no_data(self):
+        from services import article_repository
+
+        chain = self._mock_chain(None)  # SDK returns None
+        mock_db = MagicMock()
+        mock_db.table.return_value = chain
+
+        with patch.object(article_repository, "supabase", mock_db):
+            result = article_repository.list_articles()
+
+        assert result == []

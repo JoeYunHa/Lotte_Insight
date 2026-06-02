@@ -171,7 +171,6 @@ def _run_inference(items: list[NormalizedNewsItem]) -> list[dict]:
         enriched.append(
             {
                 "item": item,
-                "normalized_url": normalize_url(item.link),
                 "label_result": label_result,
                 "is_lotte_related": lr_result["is_lotte_related"],
                 "event_summary_json": event_summary_json,
@@ -324,12 +323,12 @@ def run() -> int:
     )
 
     seen_urls: set[str] = set()
-    unique_items_with_source: list[tuple[NormalizedNewsItem, str]] = []
+    unique_items_with_source: list[tuple[NormalizedNewsItem, str, str]] = []
     for item, source in all_normalized:
         normalized_link = normalize_url(item.link)
         if normalized_link not in seen_urls:
             seen_urls.add(normalized_link)
-            unique_items_with_source.append((item, source))
+            unique_items_with_source.append((item, source, normalized_link))
 
     logger.info(
         "Dedup: %d total -> %d unique (removed %d duplicates)",
@@ -338,15 +337,17 @@ def run() -> int:
         len(all_normalized) - len(unique_items_with_source),
     )
 
-    unique_items = [item for item, _ in unique_items_with_source]
+    unique_items = [item for item, _, _ in unique_items_with_source]
     enriched = _run_inference(unique_items)
 
-    for i, (_, source) in enumerate(unique_items_with_source):
-        if i < len(enriched):
-            enriched[i]["collection_source"] = source
+    for enriched_item, (_, source, normalized_link) in zip(enriched, unique_items_with_source, strict=True):
+        enriched_item["collection_source"] = source
+        enriched_item["normalized_url"] = normalized_link
 
     _, id_map = _upsert_articles(enriched)
     if len(id_map) < len(enriched):
+        missing = len(enriched) - len(id_map)
+        logger.warning("Upsert returned %d/%d IDs; falling back to re-query for %d missing", len(id_map), len(enriched), missing)
         id_map.update(_get_article_id_map(enriched))
     _save_labels_and_players(enriched, id_map)
 

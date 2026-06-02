@@ -4,8 +4,8 @@ import { PageIntro } from "@/components/Page/PageIntro";
 import { PageShell } from "@/components/Page/PageShell";
 import { SectionHeader } from "@/components/SectionHeader";
 import { getPlayers } from "@/lib/api";
+import { withFallback } from "@/lib/server-data";
 import {
-  classifyPosition,
   groupPlayers,
   POSITION_GROUPS,
 } from "@/lib/player/player-position";
@@ -26,10 +26,8 @@ function PlayerCard({ player }: { player: Player }) {
   return (
     <Link
       href={`/players/${player.id}`}
-      className="block rounded-lg p-3.5 transition-all duration-200 group"
+      className="card-surface block rounded-lg p-3.5 transition-all duration-200 group"
       style={{
-        background: "var(--surface)",
-        border: "1px solid var(--border)",
         opacity: isActive ? 1 : 0.55,
       }}
     >
@@ -68,12 +66,7 @@ function PlayerCard({ player }: { player: Player }) {
 }
 
 export default async function PlayersPage() {
-  let players: Player[] = [];
-  try {
-    players = await getPlayers();
-  } catch {
-    players = [];
-  }
+  const players = await withFallback(() => getPlayers(), [], "players:getPlayers");
 
   const groups = groupPlayers(players);
   const activeCount = players.filter((player) =>

@@ -16,11 +16,9 @@ export default function Error({ error, reset }: Props) {
       </p>
       <button
         onClick={reset}
-        className="text-xs px-4 py-2 rounded transition-colors"
+        className="card-surface text-xs px-4 py-2 rounded transition-colors"
         style={{
-          background: 'var(--surface)',
           color: 'var(--muted)',
-          border: '1px solid var(--border)',
         }}
       >
         Retry

@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 
 from core import cache
+from core.time_utils import KST
+from services.cache_keys import CacheKeyBuilder
 
-_KST = timezone(timedelta(hours=9))
 _WINDOW_SEC = 300
 _SLOW_MODE_THRESHOLD = 50
 _WRITE_COOLDOWN_SEC = 10
@@ -13,48 +14,29 @@ _DUPLICATE_WINDOW_SEC = 60
 
 
 def _now_ts() -> int:
-    return int(datetime.now(_KST).timestamp())
+    return int(datetime.now(KST).timestamp())
 
 
 def _ttl_seconds() -> int:
     return _WINDOW_SEC + 60
 
 
-def _read_timestamps(key: str) -> list[int]:
-    data = cache.get_json(key)
-    if isinstance(data, list):
-        return [int(x) for x in data if isinstance(x, int | float)]
-    return []
-
-
-def _write_timestamps(key: str, values: list[int]) -> None:
-    cache.set_json(key, values, _ttl_seconds())
-
-
-def _filter_recent_timestamps(values: list[int], window_sec: int, now_ts: int) -> list[int]:
-    return [x for x in values if now_ts - x <= window_sec]
-
 
 def detect_slow_mode(context_type: str, context_id: str) -> bool:
-    now_ts = _now_ts()
-    key = f"fanvoice:writes:{context_type}:{context_id}"
-    values = _filter_recent_timestamps(_read_timestamps(key), _WINDOW_SEC, now_ts)
-    return len(values) >= _SLOW_MODE_THRESHOLD
+    key = CacheKeyBuilder.rate_limit_context_writes(context_type, context_id)
+    return cache.get_counter(key) >= _SLOW_MODE_THRESHOLD
 
 
 def record_context_write(context_type: str, context_id: str) -> bool:
-    now_ts = _now_ts()
-    key = f"fanvoice:writes:{context_type}:{context_id}"
-    values = _filter_recent_timestamps(_read_timestamps(key), _WINDOW_SEC, now_ts)
-    values.append(now_ts)
-    _write_timestamps(key, values)
-    return len(values) >= _SLOW_MODE_THRESHOLD
+    key = CacheKeyBuilder.rate_limit_context_writes(context_type, context_id)
+    count = cache.incr(key, _WINDOW_SEC + 60)
+    return count >= _SLOW_MODE_THRESHOLD
 
 
 def can_write(session_id: int, *, slow_mode: bool) -> tuple[bool, int]:
     now_ts = _now_ts()
     cooldown = _WRITE_COOLDOWN_SLOW_SEC if slow_mode else _WRITE_COOLDOWN_SEC
-    key = f"fanvoice:session:last_write:{session_id}"
+    key = CacheKeyBuilder.rate_limit_session_last_write(session_id)
     data = cache.get_json(key)
     if isinstance(data, int):
         elapsed = now_ts - data
@@ -64,7 +46,7 @@ def can_write(session_id: int, *, slow_mode: bool) -> tuple[bool, int]:
 
 
 def mark_write(session_id: int) -> None:
-    key = f"fanvoice:session:last_write:{session_id}"
+    key = CacheKeyBuilder.rate_limit_session_last_write(session_id)
     cache.set_json(key, _now_ts(), _ttl_seconds())
 
 
@@ -73,7 +55,7 @@ _RECENT_MESSAGE_RING_SIZE = 5
 
 def _read_recent_messages(session_id: int) -> list[dict]:
     """Read the recent-messages ring buffer (back-compat with legacy dict)."""
-    key = f"fanvoice:session:recent_msg:{session_id}"
+    key = CacheKeyBuilder.rate_limit_session_recent_msg(session_id)
     data = cache.get_json(key)
     if isinstance(data, list):
         return [d for d in data if isinstance(d, dict)]
@@ -95,7 +77,7 @@ def is_duplicate_message(session_id: int, message_normalized: str) -> bool:
 
 
 def mark_message(session_id: int, message_normalized: str) -> None:
-    key = f"fanvoice:session:recent_msg:{session_id}"
+    key = CacheKeyBuilder.rate_limit_session_recent_msg(session_id)
     ring = _read_recent_messages(session_id)
     ring.append({"message": message_normalized, "ts": _now_ts()})
     # Trim to the most recent N entries (ring buffer)

@@ -10,7 +10,7 @@ import logging
 from pathlib import Path
 
 from core.config import settings
-from models.runtime import LazyArtifactsLoader, ModelArtifacts
+from models.runtime import LazyArtifactsLoader, ModelArtifacts, infer_batch, infer_single
 
 logger = logging.getLogger(__name__)
 
@@ -62,30 +62,9 @@ def classify_stance(title: str, description_snippet: str = "") -> dict:
         return dict(_NOT_APPLICABLE)
 
     try:
-        import torch
-
         labels = artifacts.extras.get("labels") or _DEFAULT_STANCE_LABELS
         snippet = (description_snippet or "")[: settings.article_description_snippet_length].strip()
-        enc = artifacts.tokenizer(
-            title,
-            snippet,
-            truncation="only_second",
-            padding="max_length",
-            max_length=128,
-            return_tensors="pt",
-        )
-        enc = {k: v.to(artifacts.device) for k, v in enc.items()}
-
-        with torch.no_grad():
-            logits = artifacts.model(**enc).logits[0]
-            probs = torch.softmax(logits, dim=-1).cpu().tolist()
-
-        best_idx = int(max(range(len(probs)), key=lambda i: probs[i]))
-        return {
-            "label": labels[best_idx],
-            "confidence": round(probs[best_idx], 4),
-            "source": "koelectra",
-        }
+        return infer_single(artifacts, title, snippet, labels)
     except Exception as exc:
         logger.error("Stance classification failed: %s", exc)
         return dict(_MODEL_ERROR)
@@ -106,45 +85,19 @@ def classify_stance_batch(articles: list[dict]) -> list[dict]:
     if artifacts is None:
         return [dict(_NOT_APPLICABLE) for _ in articles]
 
-    import torch
-
     labels = artifacts.extras.get("labels") or _DEFAULT_STANCE_LABELS
-    results: list[dict] = [dict(_MODEL_ERROR) for _ in articles]
-
-    for start in range(0, len(articles), _STANCE_CHUNK_SIZE):
-        end = start + _STANCE_CHUNK_SIZE
-        chunk = articles[start:end]
-        titles = [a["title"] for a in chunk]
-        snippets = [
-            (a.get("description_snippet") or "")[: settings.article_description_snippet_length].strip()
-            for a in chunk
-        ]
-        try:
-            enc = artifacts.tokenizer(
-                titles,
-                snippets,
-                truncation="only_second",
-                padding=True,
-                max_length=128,
-                return_tensors="pt",
-            )
-            enc = {k: v.to(artifacts.device) for k, v in enc.items()}
-
-            with torch.no_grad():
-                logits = artifacts.model(**enc).logits
-                probs_batch = torch.softmax(logits, dim=-1).cpu().tolist()
-
-            for i, probs in enumerate(probs_batch):
-                best_idx = int(max(range(len(probs)), key=lambda j: probs[j]))
-                results[start + i] = {
-                    "label": labels[best_idx],
-                    "confidence": round(probs[best_idx], 4),
-                    "source": "koelectra",
-                }
-        except Exception as exc:
-            logger.error(
-                "Stance batch inference failed for chunk [%d:%d] (%s); returning model_error.",
-                start, end, exc,
-            )
-
-    return results
+    pairs = [
+        (
+            a["title"],
+            (a.get("description_snippet") or "")[: settings.article_description_snippet_length].strip(),
+        )
+        for a in articles
+    ]
+    return infer_batch(
+        artifacts,
+        pairs,
+        labels,
+        chunk_size=_STANCE_CHUNK_SIZE,
+        error_log_prefix="Stance batch inference failed",
+        module_logger=logger,
+    )

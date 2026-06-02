@@ -1,9 +1,14 @@
+import threading
 from dataclasses import dataclass
 
 from core.database import supabase
 
+# Process-local in-memory cache. Each Railway worker process holds its own copy;
+# invalidate_cache() only affects the calling process. If multi-process deployment
+# requires cross-process invalidation, migrate this cache to Redis.
 _players_cache: list[dict] | None = None
 _alias_index_cache: "PlayerAliasIndex | None" = None
+_cache_lock = threading.Lock()
 
 
 @dataclass(frozen=True)
@@ -45,14 +50,22 @@ def _player_aliases(player: dict) -> tuple[str, ...]:
 
 def list_players(*, use_cache: bool = True) -> list[dict]:
     global _players_cache
-    if not use_cache or _players_cache is None:
+    if use_cache and _players_cache is not None:
+        return _players_cache
+    with _cache_lock:
+        if use_cache and _players_cache is not None:
+            return _players_cache
         _players_cache = _fetch_players()
     return _players_cache
 
 
 def build_player_alias_index(*, use_cache: bool = True) -> PlayerAliasIndex:
     global _alias_index_cache
-    if not use_cache or _alias_index_cache is None:
+    if use_cache and _alias_index_cache is not None:
+        return _alias_index_cache
+    with _cache_lock:
+        if use_cache and _alias_index_cache is not None:
+            return _alias_index_cache
         aliases_by_player_id = {
             player["id"]: _player_aliases(player)
             for player in list_players(use_cache=use_cache)

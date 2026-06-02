@@ -8,38 +8,16 @@ import type {
   TeamDailyReport,
   TopicMapData,
 } from './types'
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? ''
+import { requestJson, requestJsonOrNull } from './http-client'
 
 const FETCH_OPTIONS: RequestInit = { next: { revalidate: 300 } }
 
-async function get<T>(path: string): Promise<T> {
-  if (!API_BASE) throw new Error('NEXT_PUBLIC_API_URL is not configured')
-  const res = await fetch(`${API_BASE}${path}`, FETCH_OPTIONS)
-  if (!res.ok) {
-    throw new Error(`GET ${path} failed with HTTP ${res.status}`)
-  }
-  return res.json() as Promise<T>
-}
-
-async function getOrNull<T>(path: string): Promise<T | null> {
-  if (!API_BASE) throw new Error('NEXT_PUBLIC_API_URL is not configured')
-  const res = await fetch(`${API_BASE}${path}`, FETCH_OPTIONS)
-  if (res.status === 404) {
-    return null
-  }
-  if (!res.ok) {
-    throw new Error(`GET ${path} failed with HTTP ${res.status}`)
-  }
-  return res.json() as Promise<T>
-}
-
 export async function getTeamReport(date: string): Promise<TeamDailyReport | null> {
-  return getOrNull<TeamDailyReport>(`/reports/team/${date}`)
+  return requestJsonOrNull<TeamDailyReport>(`/reports/team/${date}`, FETCH_OPTIONS)
 }
 
 export async function getTeamReports(limit = 60): Promise<TeamDailyReport[]> {
-  return get<TeamDailyReport[]>(`/reports/team?limit=${limit}`)
+  return requestJson<TeamDailyReport[]>(`/reports/team?limit=${limit}`, FETCH_OPTIONS)
 }
 
 export async function getArticles(params: {
@@ -57,29 +35,32 @@ export async function getArticles(params: {
   if (params.offset != null) qs.set('offset', String(params.offset))
 
   const suffix = qs.toString() ? `?${qs.toString()}` : ''
-  return get<Article[]>(`/articles${suffix}`)
+  return requestJson<Article[]>(`/articles${suffix}`, FETCH_OPTIONS)
 }
 
 export async function getPlayers(): Promise<Player[]> {
-  return get<Player[]>('/players')
+  return requestJson<Player[]>('/players', FETCH_OPTIONS)
 }
 
 export async function getPlayer(id: string, statsDate?: string): Promise<PlayerDetail | null> {
   const qs = statsDate ? `?stats_date=${statsDate}` : ''
-  return getOrNull<PlayerDetail>(`/players/${id}${qs}`)
+  return requestJsonOrNull<PlayerDetail>(`/players/${id}${qs}`, FETCH_OPTIONS)
 }
 
 export async function getPlayerReport(
   playerId: string,
   date: string
 ): Promise<PlayerDailyReport | null> {
-  return getOrNull<PlayerDailyReport>(`/reports/players/${playerId}/${date}`)
+  return requestJsonOrNull<PlayerDailyReport>(
+    `/reports/players/${playerId}/${date}`,
+    FETCH_OPTIONS,
+  )
 }
 
 export async function getHomeReport(date: string): Promise<HomeReport> {
-  return get<HomeReport>(`/reports/home?report_date=${date}`)
+  return requestJson<HomeReport>(`/reports/home?report_date=${date}`, FETCH_OPTIONS)
 }
 
 export async function getTopicMap(date: string): Promise<TopicMapData | null> {
-  return getOrNull<TopicMapData>(`/topics?map_date=${date}`)
+  return requestJsonOrNull<TopicMapData>(`/topics?map_date=${date}`, FETCH_OPTIONS)
 }

@@ -24,8 +24,7 @@ export function TopicArticleList({ points }: TopicArticleListProps) {
         return (
           <div
             key={p.article_id}
-            className="rounded-xl px-3 py-2.5"
-            style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
+            className="card-surface rounded-xl px-3 py-2.5"
           >
             <p className="text-xs font-medium leading-snug mb-1.5" style={{ color: 'var(--text)' }}>
               {article.title}

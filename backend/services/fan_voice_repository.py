@@ -4,8 +4,6 @@ from datetime import datetime, timedelta, timezone
 
 from core.database import supabase
 
-_KST = timezone(timedelta(hours=9))
-
 
 def get_session_by_hash(session_token_hash: str) -> dict | None:
     result = (
@@ -35,7 +33,7 @@ def create_session(session_token_hash: str, session_alias: str) -> dict:
 
 
 def touch_session(session_id: int) -> None:
-    supabase.table("fan_sessions").update({"last_seen_at": datetime.now(_KST).isoformat()}).eq(
+    supabase.table("fan_sessions").update({"last_seen_at": datetime.now(timezone.utc).isoformat()}).eq(
         "id", session_id
     ).execute()
 
@@ -57,7 +55,7 @@ def create_message(
     game_date: str | None,
     expires_hours: int = 48,
 ) -> dict:
-    expires_at = datetime.now(_KST) + timedelta(hours=expires_hours)
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=expires_hours)
     result = (
         supabase.table("fan_voice_messages")
         .insert(

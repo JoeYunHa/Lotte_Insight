@@ -71,7 +71,24 @@ STAT_MAP = {
 }
 
 _robot_parser_instance: RobotFileParser | None = None
-settings = load_settings()
+
+
+class _LazySettingsProxy:
+    """Defer load_settings() until first attribute access to avoid eager env validation at import time."""
+    __slots__ = ("_impl",)
+
+    def __init__(self) -> None:
+        object.__setattr__(self, "_impl", None)
+
+    def __getattr__(self, name: str):
+        impl = object.__getattribute__(self, "_impl")
+        if impl is None:
+            impl = load_settings()
+            object.__setattr__(self, "_impl", impl)
+        return getattr(impl, name)
+
+
+settings = _LazySettingsProxy()
 
 REGISTER_URL = f"{KBO_BASE_URL}/Player/Register.aspx"
 REGISTER_TEAM_FIELD = "ctl00$ctl00$ctl00$cphContents$cphContents$cphContents$hfSearchTeam"

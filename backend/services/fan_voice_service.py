@@ -1,15 +1,14 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 
 from core.config import settings
 from core.session_utils import generate_session_token, hash_session_token
+from core.time_utils import KST
 from services import fan_voice_moderation, fan_voice_rate_limit, fan_voice_repository
 
 logger = logging.getLogger(__name__)
-
-_KST = timezone(timedelta(hours=9))
 _VALID_CONTEXT_TYPES = {"home", "player", "topic", "game", "label"}
 _VALID_REACTION_TYPES = {"like", "fire", "agree"}
 _VALID_REPORT_REASONS = {"abuse", "spam", "hate", "other"}
@@ -22,7 +21,7 @@ _NORMAL_MODE_POLL_MS = 5000
 
 def _generate_alias() -> str:
     # deterministic uniqueness is not required in phase 0
-    value = int(datetime.now(_KST).timestamp() * 1000) % 1000
+    value = int(datetime.now(KST).timestamp() * 1000) % 1000
     return f"Giants Fan {value:03d}"
 
 
@@ -164,10 +163,16 @@ def create_message(
         cluster_id=cluster_id,
         game_date=game_date,
     )
-    fan_voice_repository.increment_write_count(session["id"])
-    fan_voice_rate_limit.mark_write(session["id"])
-    fan_voice_rate_limit.mark_message(session["id"], text.lower())
-    fan_voice_rate_limit.record_context_write(context_type, context_id)
+    try:
+        fan_voice_repository.increment_write_count(session["id"])
+    except Exception as exc:
+        logger.warning("increment_write_count failed for session %s: %s", session["id"], exc)
+    finally:
+        # Rate-limit state MUST be updated even when the DB counter call fails,
+        # so that a partial write cannot be used to bypass the write cooldown.
+        fan_voice_rate_limit.mark_write(session["id"])
+        fan_voice_rate_limit.mark_message(session["id"], text.lower())
+        fan_voice_rate_limit.record_context_write(context_type, context_id)
     return created
 
 

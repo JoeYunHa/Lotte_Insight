@@ -7,7 +7,8 @@ import {
   PlayerStatsCard,
 } from "@/components/Player/PlayerStatsCard";
 import { getArticles, getPlayer, getPlayerReport } from "@/lib/api";
-import type { Article, PlayerDailyReport, PlayerDetail } from "@/lib/types";
+import { withFallback, withResult } from "@/lib/server-data";
+import type { Article, PlayerDailyReport } from "@/lib/types";
 import { getTodayKST } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
@@ -20,26 +21,29 @@ export default async function PlayerPage({ params }: Props) {
   const { id } = await params;
   const today = getTodayKST();
 
-  let player: PlayerDetail | null = null;
-  try {
-    player = await getPlayer(id, today);
-  } catch {
+  const playerResult = await withResult(
+    () => getPlayer(id, today),
+    `players[id]:getPlayer:${id}`,
+  );
+  if (!playerResult.ok) {
     notFound();
   }
+  const player = playerResult.data;
   if (!player) notFound();
 
   // Optional sections should never force a 404.
-  let report: PlayerDailyReport | null = null;
-  let playerArticles: Article[] = [];
-  try {
-    [report, playerArticles] = await Promise.all([
-      getPlayerReport(id, today),
-      getArticles({ player_id: id, limit: 10 }),
-    ]);
-  } catch {
-    report = null;
-    playerArticles = [];
-  }
+  const [report, playerArticles] = await Promise.all([
+    withFallback(
+      () => getPlayerReport(id, today),
+      null as PlayerDailyReport | null,
+      `players[id]:getPlayerReport:${id}`,
+    ),
+    withFallback(
+      () => getArticles({ player_id: id, limit: 10 }),
+      [] as Article[],
+      `players[id]:getArticles:${id}`,
+    ),
+  ]);
 
   const stats = player.stats?.[0] ?? null;
 

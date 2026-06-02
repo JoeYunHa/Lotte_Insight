@@ -21,8 +21,8 @@ export function TopicMapHero({ date, articleCount, clusterCount, outlierCount }:
         {meta.map(({ label, value }) => (
           <span
             key={label}
-            className="text-xs font-mono-code px-2 py-0.5 rounded-full"
-            style={{ background: 'var(--surface-2)', color: 'var(--dim)', border: '1px solid var(--border)' }}
+            className="chip-surface text-xs font-mono-code px-2 py-0.5 rounded-full"
+            style={{ color: 'var(--dim)' }}
           >
             {value} {label}
           </span>

@@ -173,10 +173,10 @@ def classify_batch(articles: list[dict]) -> list[dict]:
                 probs_batch = torch.sigmoid(runtime.model(**encoded).logits).cpu().numpy()
             for i, probs in enumerate(probs_batch):
                 results[start + i] = _predict_from_probs(probs, label_classes, label_thresholds)
-        except Exception as exc:
-            logger.error(
-                "Classifier batch inference failed for chunk [%d:%d] (%s); using keyword fallback.",
-                start, end, exc,
+        except Exception:
+            logger.exception(
+                "Classifier batch inference failed for chunk [%d:%d]; using keyword fallback.",
+                start, end,
             )
             for i, (t, s) in enumerate(zip(chunk_titles, chunk_snippets)):
                 results[start + i] = _keyword_classify((t + " " + s).strip())
@@ -216,6 +216,6 @@ def classify(title: str, description_snippet: str = "") -> dict:
         label_classes: list[str] = runtime.extras["label_classes"]
         label_thresholds: dict[str, float] = runtime.extras.get("label_thresholds", {})
         return _predict_from_probs(probs, label_classes, label_thresholds)
-    except Exception as exc:
-        logger.error("Classifier inference failed (%s); using keyword fallback.", exc)
+    except Exception:
+        logger.exception("Classifier inference failed; using keyword fallback.")
         return _keyword_classify(text)

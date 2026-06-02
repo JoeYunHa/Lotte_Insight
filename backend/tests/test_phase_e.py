@@ -5,9 +5,9 @@ is_lotte_related 하이브리드 게이트, lotte_stance KoELECTRA, GPT event_su
 내장 샘플로 검증한다.
 
 실행 방법:
-  python backend/batch/test_phase_e.py           # 모델 검증 (GPT mock)
-  python backend/batch/test_phase_e.py --live    # GPT 실제 호출 포함
-  python -m pytest backend/batch/test_phase_e.py -v
+  python backend/tests/test_phase_e.py           # 모델 검증 (GPT mock)
+  python backend/tests/test_phase_e.py --live    # GPT 실제 호출 포함
+  python -m pytest backend/tests/test_phase_e.py -v
 
 모델이 없는 환경에서는 rule-based/graceful-degradation 결과만 검증한다.
 """

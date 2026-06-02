@@ -24,8 +24,8 @@ export function startFanVoiceSse(options: StartFanVoiceSseOptions): () => void {
     try {
       const payload = JSON.parse((event as MessageEvent<string>).data) as FanVoiceStreamPayload
       options.onStream(payload)
-    } catch {
-      // ignore malformed payload and keep stream alive
+    } catch (error) {
+      console.error('[fan-voice] malformed SSE payload', error)
     }
   })
 

@@ -43,27 +43,30 @@ class OpinionClusterer:
         # Defensive validation (prevent production crashes)
         self._validate_messages(messages)
         normalized = [self._prepare_message(item) for item in messages]
-        clusters: list[list[dict]] = []
+        # Each record: {"members": list[dict], "trigrams": set[str]}
+        # trigrams is the union of all member trigrams, used as the cluster centroid.
+        # Union-based centroid ensures late-arriving similar messages are not
+        # rejected due to drift from the founding member (single-linkage semantics).
+        cluster_records: list[dict] = []
 
         for item in normalized:
-            # Assign to the highest-similarity cluster above the threshold,
-            # not just the first match found (prevents drift on near-ties).
             best_index = -1
             best_score = self.similarity_threshold
-            for idx, cluster in enumerate(clusters):
-                centroid = cluster[0]["_trigrams"]
-                score = self._jaccard_similarity(centroid, item["_trigrams"])
+            for idx, record in enumerate(cluster_records):
+                score = self._jaccard_similarity(record["trigrams"], item["_trigrams"])
                 if score > best_score:
                     best_score = score
                     best_index = idx
             if best_index >= 0:
-                clusters[best_index].append(item)
+                cluster_records[best_index]["members"].append(item)
+                cluster_records[best_index]["trigrams"] |= item["_trigrams"]
             else:
-                clusters.append([item])
+                cluster_records.append({"members": [item], "trigrams": set(item["_trigrams"])})
 
         ranked: list[dict] = []
         cluster_idx = 0
-        for cluster in clusters:
+        for record in cluster_records:
+            cluster = record["members"]
             if len(cluster) < self.min_cluster_size:
                 continue
             cluster_idx += 1

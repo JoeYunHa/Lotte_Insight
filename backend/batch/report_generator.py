@@ -2,19 +2,19 @@
 Generate daily team and player reports.
 """
 
+import functools
 import logging
-from datetime import date, datetime, timedelta, timezone
-
-from batch.parallel_utils import run_indexed_parallel
+from datetime import date, datetime, timedelta
 
 from openai import OpenAI
 
+from batch.parallel_utils import run_indexed_parallel
 from core.config import settings
+from core.time_utils import KST
 from services import report_repository
 from services.article_utils import parse_event_summary_json, select_primary_label
 
 logger = logging.getLogger(__name__)
-_openai_client: OpenAI | None = None
 
 _LABEL_NAMES_KO: dict[str, str] = {
     "MATCH_RELATED": "경기",
@@ -45,11 +45,9 @@ _TEAM_EVENT_TEXT_LIMIT = 8
 _PLAYER_REPORT_WORKERS = 4
 
 
+@functools.lru_cache(maxsize=1)
 def _get_openai() -> OpenAI:
-    global _openai_client
-    if _openai_client is None:
-        _openai_client = OpenAI(api_key=settings.openai_api_key)
-    return _openai_client
+    return OpenAI(api_key=settings.openai_api_key)
 
 
 def _extract_event_summary(raw_summary: str | None) -> str:
@@ -105,17 +103,24 @@ def _build_team_event_texts(articles: list[dict]) -> list[str]:
     return texts[:_TEAM_EVENT_TEXT_LIMIT]
 
 
+def _format_label_summary(label_counts: dict[str, int]) -> str:
+    return (
+        ", ".join(
+            f"{_LABEL_NAMES_KO.get(label, label)} {count}건"
+            for label, count in sorted(label_counts.items(), key=lambda x: -x[1])
+            if count > 0
+        )
+        or "없음"
+    )
+
+
 def _build_team_gpt_prompt(
     article_count: int,
     label_counts: dict[str, int],
     player_mentions: dict[str, int],
     event_texts: list[str],
 ) -> str:
-    label_summary = ", ".join(
-        f"{_LABEL_NAMES_KO.get(label, label)} {count}건"
-        for label, count in sorted(label_counts.items(), key=lambda x: -x[1])
-        if count > 0
-    ) or "없음"
+    label_summary = _format_label_summary(label_counts)
     top_players = sorted(player_mentions.items(), key=lambda x: -x[1])[:5]
     player_summary = ", ".join(f"{name}({count}회)" for name, count in top_players) or "없음"
     texts_block = "\n".join(f"- {t}" for t in event_texts) or "- (이슈 요약 없음)"
@@ -162,11 +167,7 @@ def _format_team_report(today: date, articles: list[dict], mentions: list[dict])
 
     if not insight:
         # GPT 실패 시 템플릿 fallback
-        label_summary = ", ".join(
-            f"{_LABEL_NAMES_KO.get(l, l)} {c}건"
-            for l, c in sorted(label_counts.items(), key=lambda x: -x[1])
-            if c > 0
-        ) or "없음"
+        label_summary = _format_label_summary(label_counts)
         top_players = sorted(player_mentions.items(), key=lambda x: -x[1])[:5]
         player_summary = ", ".join(f"{name}({cnt})" for name, cnt in top_players) or "없음"
         insight = (
@@ -266,11 +267,8 @@ def _build_player_report(player_id: int, player_name: str, today: date) -> dict 
     }
 
 
-_KST = timezone(timedelta(hours=9))
-
-
 def run() -> dict:
-    today = datetime.now(_KST).date()
+    today = datetime.now(KST).date()
     logger.info("Report generation started: %s", today)
 
     team_report = _build_team_report(today)

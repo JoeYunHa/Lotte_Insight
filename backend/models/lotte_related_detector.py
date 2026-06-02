@@ -269,10 +269,10 @@ def detect_is_lotte_related_batch(articles: list[dict]) -> list[dict]:
                     "confidence": round(prob, 4),
                     "source": "classifier",
                 }
-        except Exception as exc:
-            logger.error(
-                "lotte_related batch inference failed [%d:%d] (%s)",
-                start, start + len(chunk_indices), exc,
+        except Exception:
+            logger.exception(
+                "lotte_related batch inference failed [%d:%d]",
+                start, start + len(chunk_indices),
             )
             for idx in chunk_indices:
                 results[idx] = {"is_lotte_related": False, "confidence": 0.0, "source": "classifier_error"}
@@ -316,6 +316,6 @@ def detect_is_lotte_related(article: dict) -> dict:
             "confidence": round(prob, 4),
             "source": "classifier",
         }
-    except Exception as exc:
-        logger.error("lotte_related inference failed (%s)", exc)
+    except Exception:
+        logger.exception("lotte_related inference failed")
         return {"is_lotte_related": False, "confidence": 0.0, "source": "classifier_error"}

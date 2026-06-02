@@ -10,6 +10,15 @@ from services import fan_voice_review_service
 router = APIRouter()
 
 
+def _resolve_date_or_400(scope: str, requested_date: date | None):
+    try:
+        return fan_voice_review_service.resolve_target_game_date(
+            scope=scope, requested_date=requested_date
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 class ReviewGenerationOptions(BaseModel):
     clustering_algorithm: str = "jaccard_trigram_v1"
     min_cluster_size: int = Field(default=2, ge=1, le=50)
@@ -40,7 +49,6 @@ def get_opinion_review(
     Date resolution is delegated to service layer (no duplication).
     """
     try:
-        # Service layer handles date resolution logic
         result = fan_voice_review_service.get_daily_review(
             scope=scope,
             requested_date=report_date,
@@ -65,32 +73,17 @@ def get_emotion_ranking(
     limit: int = Query(default=5, ge=1, le=20),
     min_mentions: int = Query(default=0, ge=0, le=10000),
 ):
-    """
-    Get emotion ranking.
-    Date resolution delegated to service layer (no duplication).
-    """
     try:
-        # Service layer handles all date resolution logic
-        target_date, is_fallback, source_scope = fan_voice_review_service.resolve_target_game_date(
+        return fan_voice_review_service.get_emotion_ranking(
             scope=scope,
-            requested_date=report_date,  # No conditional - service handles it
+            requested_date=report_date,
+            context_type=context_type,
+            context_id=context_id,
+            min_mentions=min_mentions,
+            limit=limit,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    ranking = fan_voice_review_service.fan_voice_review_repository.aggregate_emotion_ranking(
-        game_date=target_date,
-        context_type=context_type,
-        context_id=context_id,
-        min_mentions=min_mentions,
-        limit=limit,
-    )
-    return {
-        "game_date": target_date.isoformat(),
-        "is_fallback": is_fallback,
-        "source_scope": source_scope,
-        "ranking": ranking,
-    }
 
 
 @router.get("/players/ranking")
@@ -103,33 +96,18 @@ def get_player_ranking(
     min_mentions: int = Query(default=0, ge=0, le=10000),
     sentiment_filter: str | None = Query(default=None),
 ):
-    """
-    Get player mention ranking.
-    Date resolution delegated to service layer (no duplication).
-    """
     try:
-        # Service layer handles all date resolution logic
-        target_date, is_fallback, source_scope = fan_voice_review_service.resolve_target_game_date(
+        return fan_voice_review_service.get_player_ranking(
             scope=scope,
-            requested_date=report_date,  # No conditional - service handles it
+            requested_date=report_date,
+            context_type=context_type,
+            context_id=context_id,
+            min_mentions=min_mentions,
+            limit=limit,
+            sentiment_filter=sentiment_filter,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    ranking = fan_voice_review_service.fan_voice_review_repository.aggregate_player_ranking(
-        game_date=target_date,
-        context_type=context_type,
-        context_id=context_id,
-        min_mentions=min_mentions,
-        limit=limit,
-        sentiment_filter=sentiment_filter,
-    )
-    return {
-        "game_date": target_date.isoformat(),
-        "is_fallback": is_fallback,
-        "source_scope": source_scope,
-        "ranking": ranking,
-    }
 
 
 @router.post("/opinion-review/generate")

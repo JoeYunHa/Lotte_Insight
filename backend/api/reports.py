@@ -13,10 +13,7 @@ _DEFAULT_REPORT_LIST_LIMIT = 30
 def _resolve_limit(limit: int | None) -> int:
     if limit is not None:
         return limit
-    try:
-        configured = getattr(settings, "report_list_limit", None)
-    except ModuleNotFoundError:
-        configured = None
+    configured = getattr(settings, "report_list_limit", None)
     if isinstance(configured, int) and configured > 0:
         return configured
     return _DEFAULT_REPORT_LIST_LIMIT

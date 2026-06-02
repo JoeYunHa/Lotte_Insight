@@ -10,9 +10,12 @@ from fastapi import Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+import logging
+
 from services import fan_voice_service
 from core.config import settings
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 _SESSION_COOKIE_NAME = "fan_session"
@@ -131,10 +134,12 @@ async def generate_stream_sse_events(
             yield "event: timeout\ndata: {}\n\n"
             break
         try:
-            payload = fan_voice_service.get_stream(
-                context_type=context_type,
-                context_id=context_id,
-                limit=limit,
+            payload = await asyncio.to_thread(
+                lambda: fan_voice_service.get_stream(
+                    context_type=context_type,
+                    context_id=context_id,
+                    limit=limit,
+                )
             )
             consecutive_errors = 0
             data = json.dumps(payload, ensure_ascii=False)
@@ -154,6 +159,12 @@ async def generate_stream_sse_events(
             # Keep the stream alive on transient failures, but abort the
             # connection if errors persist so we don't loop forever.
             consecutive_errors += 1
+            logger.exception(
+                "SSE stream error (consecutive=%d) context=%s:%s",
+                consecutive_errors,
+                context_type,
+                context_id,
+            )
             if consecutive_errors >= 3:
                 yield 'event: error\ndata: {"error": "stream_error"}\n\n'
                 return

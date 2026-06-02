@@ -3,20 +3,16 @@ import { PageShell } from "@/components/Page/PageShell";
 import { TopicMapExplorer } from "@/components/Topic/TopicMapExplorer";
 import { TopicMapHero } from "@/components/Topic/TopicMapHero";
 import { getTopicMap } from "@/lib/api";
+import { withResult } from "@/lib/server-data";
 import { formatDateKo, getTodayKST } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
 
 export default async function TopicsPage() {
   const today = getTodayKST();
-
-  let data = null;
-  let fetchError = false;
-  try {
-    data = await getTopicMap(today);
-  } catch {
-    fetchError = true;
-  }
+  const result = await withResult(() => getTopicMap(today), "topics:getTopicMap");
+  const data = result.data;
+  const fetchError = !result.ok;
 
   const clusterCount = data?.clusters.length ?? 0;
   const outlierCount = data?.points.filter((p) => p.is_outlier).length ?? 0;

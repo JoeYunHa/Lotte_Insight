@@ -20,7 +20,7 @@ def list_players(*, status: str | None = None) -> list[dict]:
     if status:
         query = query.eq("status", status)
     result = query.order("name").execute()
-    data = result.data
+    data = result.data or []
 
     cache.set_json(cache_key, data, _PLAYER_LIST_TTL)
     return data

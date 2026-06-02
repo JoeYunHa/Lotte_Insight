@@ -2,8 +2,8 @@
 Integration smoke test for the KBO crawler.
 
 실행 방법:
-  python -m pytest backend/batch/test_kbo_crawler_integration.py -v
-  python backend/batch/test_kbo_crawler_integration.py [--save]
+  python -m pytest backend/tests/test_kbo_crawler_integration.py -v
+  python backend/tests/test_kbo_crawler_integration.py [--save]
 
 playwright, pydantic_settings 가 설치되지 않은 환경에서는 파일 전체가 skip된다.
 """

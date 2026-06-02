@@ -13,7 +13,7 @@ def _fetch_article_player_rows(article_ids: list[int], select_clause: str) -> li
         .in_("article_id", article_ids)
         .execute()
     )
-    return result.data
+    return result.data or []
 
 
 def list_reports(
@@ -26,7 +26,7 @@ def list_reports(
     if player_id is not None:
         query = query.eq("player_id", player_id)
     result = query.order("date", desc=True).limit(limit).execute()
-    return result.data
+    return result.data or []
 
 
 def get_report(
@@ -54,8 +54,15 @@ def report_exists(
     return bool(query.maybe_single().execute().data)
 
 
+import logging as _logging
+
+_repo_logger = _logging.getLogger(__name__)
+
+
 def save_report(table: str, row: dict, *, on_conflict: str) -> None:
-    supabase.table(table).upsert(row, on_conflict=on_conflict).execute()
+    result = supabase.table(table).upsert(row, on_conflict=on_conflict).execute()
+    if not result.data:
+        _repo_logger.warning("save_report upsert returned no data (table=%s, on_conflict=%s)", table, on_conflict)
 
 
 def fetch_articles_for_day(target_date: date) -> list[dict]:
@@ -68,7 +75,7 @@ def fetch_articles_for_day(target_date: date) -> list[dict]:
         .order("published_at", desc=True)
         .execute()
     )
-    return result.data
+    return result.data or []
 
 
 def fetch_player_mentions(article_ids: list[int]) -> list[dict]:
@@ -91,7 +98,7 @@ def fetch_recent_player_articles(
         .limit(limit)
         .execute()
     )
-    return result.data
+    return result.data or []
 
 
 def fetch_latest_player_stats(player_id: int) -> dict:

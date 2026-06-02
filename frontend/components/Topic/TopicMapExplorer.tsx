@@ -79,8 +79,7 @@ export function TopicMapExplorer({ data }: TopicMapExplorerProps) {
           {/* Bottom stats bar */}
           {clusters.length > 0 ? (
             <div
-              className="rounded-2xl px-4 py-3 flex flex-wrap items-center gap-x-5 gap-y-1.5"
-              style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
+              className="card-surface rounded-2xl px-4 py-3 flex flex-wrap items-center gap-x-5 gap-y-1.5"
             >
               <span className="text-xs font-mono-code" style={{ color: 'var(--muted)' }}>
                 <span style={{ color: 'var(--text)', fontWeight: 700 }}>{clusters.length}</span> clusters

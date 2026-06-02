@@ -57,7 +57,8 @@ export function FanVoiceComposer({
       setMessage("");
       setEmotion("");
       onSubmitted?.();
-    } catch {
+    } catch (error) {
+      console.error("[fan-voice] post message failed", error);
       setError("Failed to post message");
     } finally {
       setSubmitting(false);

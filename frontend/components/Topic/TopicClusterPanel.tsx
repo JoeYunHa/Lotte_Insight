@@ -25,7 +25,7 @@ export function TopicClusterPanel({
 
   if (clusters.length === 0) {
     return (
-      <div className="rounded-[24px] p-5" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+      <div className="card-surface rounded-[24px] p-5">
         <p className="text-xs text-center py-8" style={{ color: 'var(--dim)' }}>
           이 날짜의 클러스터가 없습니다.
         </p>

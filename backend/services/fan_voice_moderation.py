@@ -4,9 +4,30 @@ import re
 from html import unescape
 
 _PROFANITY_WORDS = {
+    # English
     "fuck",
     "shit",
     "bitch",
+    # Korean profanity (common terms used in sports commentary)
+    "씨발",
+    "시발",
+    "ㅅㅂ",
+    "개새끼",
+    "개새",
+    "ㄱㅅㄲ",
+    "병신",
+    "ㅂㅅ",
+    "지랄",
+    "ㅈㄹ",
+    "미친놈",
+    "미친년",
+    "새끼",
+    "ㅅㄲ",
+    "닥쳐",
+    "꺼져",
+    "존나",
+    "ㅈㄴ",
+    "개같은",
 }
 
 _URL_RE = re.compile(r"https?://|www\.|\.com|\.net|\.kr", re.IGNORECASE)

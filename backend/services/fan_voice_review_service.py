@@ -9,6 +9,8 @@ from services.cache_keys import fanvoice_review_key
 from services.opinion_clusterer import OpinionClusterer
 
 _DEFAULT_MIN_MESSAGES = 20
+_NULL_SENTINEL = {"_null_result": True}
+_NULL_RESULT_TTL = 60  # seconds — cache "no review" to avoid repeated DB round-trips
 
 
 def resolve_target_game_date(
@@ -105,28 +107,26 @@ def generate_daily_review(
         opinions=opinions,
     )
 
-    # Use centralized cache key builder (consistent naming)
     cache_key = fanvoice_review_key(
         context_type=context_type,
         context_id=context_id,
         game_date=game_date,
         review_type=review_type,
     )
-    response = {
-        "review_id": review_row["id"],
-        "game_date": game_date.isoformat(),
-        "is_fallback": is_fallback,
-        "source_scope": source_scope,
-        "review_type": review_type,
-        "summary": {"title": summary_title, "body": summary_body},
-        "metrics": {
-            "message_count": message_count,
-            "unique_user_count": unique_user_count,
-        },
-        "top_opinions": opinions,
-        "emotion_ranking": emotion_ranking,
-        "player_ranking": player_ranking,
-    }
+    response = _build_review_response(
+        review_id=review_row["id"],
+        game_date=game_date,
+        is_fallback=is_fallback,
+        source_scope=source_scope,
+        review_type=review_type,
+        summary_title=summary_title,
+        summary_body=summary_body,
+        message_count=message_count,
+        unique_user_count=unique_user_count,
+        top_opinions=opinions,
+        emotion_ranking=emotion_ranking,
+        player_ranking=player_ranking,
+    )
     cache.set_json(cache_key, response, cache.ttl_seconds(game_date))
     return response
 
@@ -162,7 +162,9 @@ def get_daily_review(
 
     # Try cache first
     cached = cache.get_json(cache_key)
-    if cached:
+    if cached is not None:
+        if cached == _NULL_SENTINEL:
+            return None
         return cached
 
     # Cache miss → read existing review from DB (NEVER write here).
@@ -173,6 +175,8 @@ def get_daily_review(
         review_type=review_type,
     )
     if review_row is None:
+        # Cache the absence so repeated 404s skip the DB.
+        cache.set_json(cache_key, _NULL_SENTINEL, _NULL_RESULT_TTL)
         return None
 
     opinions = fan_voice_review_repository.fetch_daily_opinions(
@@ -191,26 +195,54 @@ def get_daily_review(
         limit=10,
     )
 
-    response = {
-        "review_id": review_row["id"],
+    response = _build_review_response(
+        review_id=review_row["id"],
+        game_date=game_date,
+        is_fallback=is_fallback,
+        source_scope=source_scope,
+        review_type=review_type,
+        summary_title=review_row.get("summary_title"),
+        summary_body=review_row.get("summary_body"),
+        message_count=review_row.get("message_count", 0),
+        unique_user_count=review_row.get("unique_user_count", 0),
+        top_opinions=opinions,
+        emotion_ranking=emotion_ranking,
+        player_ranking=player_ranking,
+    )
+    cache.set_json(cache_key, response, cache.ttl_seconds(game_date))
+    return response
+
+
+def _build_review_response(
+    *,
+    review_id: str,
+    game_date: date,
+    is_fallback: bool,
+    source_scope: str,
+    review_type: str,
+    summary_title: str | None,
+    summary_body: str | None,
+    message_count: int,
+    unique_user_count: int,
+    top_opinions: list[dict],
+    emotion_ranking: list[dict],
+    player_ranking: list[dict],
+) -> dict:
+    return {
+        "review_id": review_id,
         "game_date": game_date.isoformat(),
         "is_fallback": is_fallback,
         "source_scope": source_scope,
         "review_type": review_type,
-        "summary": {
-            "title": review_row.get("summary_title"),
-            "body": review_row.get("summary_body"),
-        },
+        "summary": {"title": summary_title, "body": summary_body},
         "metrics": {
-            "message_count": review_row.get("message_count", 0),
-            "unique_user_count": review_row.get("unique_user_count", 0),
+            "message_count": message_count,
+            "unique_user_count": unique_user_count,
         },
-        "top_opinions": opinions,
+        "top_opinions": top_opinions,
         "emotion_ranking": emotion_ranking,
         "player_ranking": player_ranking,
     }
-    cache.set_json(cache_key, response, cache.ttl_seconds(game_date))
-    return response
 
 
 def _build_summary(*, opinions: list[dict], message_count: int) -> str:
@@ -221,3 +253,58 @@ def _build_summary(*, opinions: list[dict], message_count: int) -> str:
         f"총 {message_count}개 의견 중 '{top['opinion_title']}' 흐름이 가장 강했습니다. "
         f"(언급 {top['mention_count']}회, 반응 {top['reaction_sum']}회)"
     )
+
+
+def _ranking_envelope(target_date: date, is_fallback: bool, source_scope: str, ranking: list[dict]) -> dict:
+    return {
+        "game_date": target_date.isoformat(),
+        "is_fallback": is_fallback,
+        "source_scope": source_scope,
+        "ranking": ranking,
+    }
+
+
+def get_emotion_ranking(
+    *,
+    scope: str = "today_or_latest",
+    requested_date: date | None = None,
+    context_type: str = "home",
+    context_id: str = "today",
+    min_mentions: int = 0,
+    limit: int = 5,
+) -> dict:
+    game_date, is_fallback, source_scope = resolve_target_game_date(
+        scope=scope, requested_date=requested_date
+    )
+    ranking = fan_voice_review_repository.aggregate_emotion_ranking(
+        game_date=game_date,
+        context_type=context_type,
+        context_id=context_id,
+        min_mentions=min_mentions,
+        limit=limit,
+    )
+    return _ranking_envelope(game_date, is_fallback, source_scope, ranking)
+
+
+def get_player_ranking(
+    *,
+    scope: str = "today_or_latest",
+    requested_date: date | None = None,
+    context_type: str = "home",
+    context_id: str = "today",
+    min_mentions: int = 0,
+    limit: int = 10,
+    sentiment_filter: str | None = None,
+) -> dict:
+    game_date, is_fallback, source_scope = resolve_target_game_date(
+        scope=scope, requested_date=requested_date
+    )
+    ranking = fan_voice_review_repository.aggregate_player_ranking(
+        game_date=game_date,
+        context_type=context_type,
+        context_id=context_id,
+        min_mentions=min_mentions,
+        limit=limit,
+        sentiment_filter=sentiment_filter,
+    )
+    return _ranking_envelope(game_date, is_fallback, source_scope, ranking)

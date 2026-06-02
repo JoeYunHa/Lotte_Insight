@@ -37,6 +37,10 @@ class CacheKeyBuilder:
     ENTITY_PLAYER = "player"
 
     @staticmethod
+    def _date_str(d: "date | str") -> str:
+        return d.isoformat() if isinstance(d, date) else str(d)
+
+    @staticmethod
     def fan_voice_review(
         *,
         context_type: str,
@@ -59,8 +63,7 @@ class CacheKeyBuilder:
         Returns:
             Cache key string
         """
-        date_str = game_date.isoformat() if isinstance(game_date, date) else str(game_date)
-        return f"{CacheKeyBuilder.NAMESPACE_REVIEW}:{CacheKeyBuilder.ENTITY_FANVOICE}:{context_type}:{context_id}:{date_str}:{review_type}"
+        return f"{CacheKeyBuilder.NAMESPACE_REVIEW}:{CacheKeyBuilder.ENTITY_FANVOICE}:{context_type}:{context_id}:{CacheKeyBuilder._date_str(game_date)}:{review_type}"
 
     @staticmethod
     def team_report(*, report_date: date) -> str:
@@ -76,8 +79,7 @@ class CacheKeyBuilder:
         Returns:
             Cache key string
         """
-        date_str = report_date.isoformat() if isinstance(report_date, date) else str(report_date)
-        return f"{CacheKeyBuilder.NAMESPACE_REPORT}:{CacheKeyBuilder.ENTITY_TEAM}:{date_str}"
+        return f"{CacheKeyBuilder.NAMESPACE_REPORT}:{CacheKeyBuilder.ENTITY_TEAM}:{CacheKeyBuilder._date_str(report_date)}"
 
     @staticmethod
     def player_report(*, player_id: int, report_date: date) -> str:
@@ -94,8 +96,7 @@ class CacheKeyBuilder:
         Returns:
             Cache key string
         """
-        date_str = report_date.isoformat() if isinstance(report_date, date) else str(report_date)
-        return f"{CacheKeyBuilder.NAMESPACE_REPORT}:{CacheKeyBuilder.ENTITY_PLAYER}:{player_id}:{date_str}"
+        return f"{CacheKeyBuilder.NAMESPACE_REPORT}:{CacheKeyBuilder.ENTITY_PLAYER}:{player_id}:{CacheKeyBuilder._date_str(report_date)}"
 
     @staticmethod
     def home_report(*, report_date: date) -> str:
@@ -105,8 +106,7 @@ class CacheKeyBuilder:
         Format: report:home:{date}
         Example: report:home:2026-05-28
         """
-        date_str = report_date.isoformat() if isinstance(report_date, date) else str(report_date)
-        return f"{CacheKeyBuilder.NAMESPACE_REPORT}:home:{date_str}"
+        return f"{CacheKeyBuilder.NAMESPACE_REPORT}:home:{CacheKeyBuilder._date_str(report_date)}"
 
     @staticmethod
     def team_report_list(*, limit: int) -> str:
@@ -121,8 +121,7 @@ class CacheKeyBuilder:
     @staticmethod
     def topic_map(*, map_date: date) -> str:
         """Format: topic:map:{date}"""
-        date_str = map_date.isoformat() if isinstance(map_date, date) else str(map_date)
-        return f"topic:map:{date_str}"
+        return f"topic:map:{CacheKeyBuilder._date_str(map_date)}"
 
     @staticmethod
     def player_list(*, status: str | None) -> str:
@@ -132,8 +131,23 @@ class CacheKeyBuilder:
     @staticmethod
     def player_detail(*, player_id: int, stats_date: date | None) -> str:
         """Format: player:{player_id}:stats:{date|latest}"""
-        date_str = stats_date.isoformat() if stats_date else "latest"
+        date_str = CacheKeyBuilder._date_str(stats_date) if stats_date else "latest"
         return f"player:{player_id}:stats:{date_str}"
+
+    @staticmethod
+    def rate_limit_context_writes(context_type: str, context_id: str) -> str:
+        """Format: fanvoice:writes:{context_type}:{context_id}"""
+        return f"fanvoice:writes:{context_type}:{context_id}"
+
+    @staticmethod
+    def rate_limit_session_last_write(session_id: int) -> str:
+        """Format: fanvoice:session:last_write:{session_id}"""
+        return f"fanvoice:session:last_write:{session_id}"
+
+    @staticmethod
+    def rate_limit_session_recent_msg(session_id: int) -> str:
+        """Format: fanvoice:session:recent_msg:{session_id}"""
+        return f"fanvoice:session:recent_msg:{session_id}"
 
 
 # Convenience aliases

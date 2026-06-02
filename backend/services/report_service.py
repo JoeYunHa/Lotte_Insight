@@ -35,7 +35,7 @@ def list_team_reports(limit: int) -> list[dict]:
         cache_key,
         today_kst(),
         lambda: report_repository.list_reports(TEAM_REPORT_TABLE, limit=limit),
-    )
+    ) or []
 
 
 def get_team_report(report_date: date) -> dict | None:
@@ -57,7 +57,7 @@ def list_player_reports(player_id: int, limit: int) -> list[dict]:
             limit=limit,
             player_id=player_id,
         ),
-    )
+    ) or []
 
 
 def get_player_report(player_id: int, report_date: date) -> dict | None:

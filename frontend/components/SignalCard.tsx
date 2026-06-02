@@ -19,10 +19,8 @@ export function SignalCard({ title, value, detail, delay = 0, children, accent =
 
   return (
     <div
-      className="rounded-lg p-4 animate-fade-up"
+      className="card-surface rounded-lg p-4 animate-fade-up"
       style={{
-        background: 'var(--surface)',
-        border: '1px solid var(--border)',
         borderTop: topBorder,
         animationDelay: `${delay}ms`,
       }}
@@ -96,11 +94,9 @@ export function SentimentBar({ positive, neutral, negative, analyzed, total }: S
         </span>
         {isPartial ? (
           <span
-            className="text-[9px] font-mono-code px-1 rounded"
+            className="chip-surface text-[9px] font-mono-code px-1 rounded"
             style={{
-              background: 'var(--surface-2)',
               color: 'var(--gold)',
-              border: '1px solid var(--border)',
               lineHeight: '16px',
             }}
           >

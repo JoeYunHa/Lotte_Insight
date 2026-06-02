@@ -16,7 +16,7 @@ export function ArticleCard({ article, variant = 'default', showKeyPlayers = tru
   const isCompact = variant === 'compact'
 
   return (
-    <article className="group relative rounded-2xl overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_6px_20px_rgba(96,62,27,0.09)]" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+    <article className="card-surface group relative rounded-2xl overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_6px_20px_rgba(96,62,27,0.09)]">
       <div className="absolute top-0 left-0 h-full w-[3px] group-hover:w-[4px] transition-all duration-200" style={{ background: labelDot }} />
       <div className={isCompact ? 'pl-4 pr-4 pt-3 pb-3' : 'pl-4 pr-4 pt-3.5 pb-3.5'}>
         <div className="flex items-center gap-1.5 mb-2 flex-wrap">
@@ -42,13 +42,8 @@ export function ArticleCard({ article, variant = 'default', showKeyPlayers = tru
             {article.key_players.map((name) => (
               <span
                 key={name}
-                className="text-[10px] px-1.5 py-0 rounded"
-                style={{
-                  background: 'var(--surface-2)',
-                  color: 'var(--dim)',
-                  border: '1px solid var(--border)',
-                  lineHeight: '18px',
-                }}
+                className="chip-surface text-[10px] px-1.5 py-0 rounded"
+                style={{ color: 'var(--dim)', lineHeight: '18px' }}
               >
                 {name}
               </span>

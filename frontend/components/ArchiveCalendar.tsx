@@ -64,12 +64,12 @@ export function ArchiveCalendar({ reports, initialDate }: Props) {
 
   return (
     <div>
-      <div className="rounded-lg p-4 mb-6" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+      <div className="card-surface rounded-lg p-4 mb-6">
         <div className="flex items-center justify-between mb-4">
           <button
             onClick={prevMonth}
-            className="w-8 h-8 rounded flex items-center justify-center text-sm"
-            style={{ color: 'var(--muted)', background: 'var(--surface-2)' }}
+            className="chip-surface w-8 h-8 rounded flex items-center justify-center text-sm"
+            style={{ color: 'var(--muted)' }}
           >
             &lsaquo;
           </button>
@@ -78,8 +78,8 @@ export function ArchiveCalendar({ reports, initialDate }: Props) {
           </span>
           <button
             onClick={nextMonth}
-            className="w-8 h-8 rounded flex items-center justify-center text-sm"
-            style={{ color: 'var(--muted)', background: 'var(--surface-2)' }}
+            className="chip-surface w-8 h-8 rounded flex items-center justify-center text-sm"
+            style={{ color: 'var(--muted)' }}
           >
             &rsaquo;
           </button>

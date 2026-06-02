@@ -35,8 +35,8 @@ export function PlayerIdentityHeader({
       <div className="flex items-center gap-2 mb-1">
         {playerNumber ? (
           <span
-            className="text-xs font-mono-code px-2 py-0.5 rounded"
-            style={{ background: "var(--surface-2)", color: "var(--muted)" }}
+            className="chip-surface text-xs font-mono-code px-2 py-0.5 rounded"
+            style={{ color: "var(--muted)" }}
           >
             #{playerNumber}
           </span>
@@ -73,11 +73,7 @@ export function PlayerStatsCard({ stats, statsDate }: PlayerStatsCardProps) {
   if (!stats) {
     return (
       <div
-        className="rounded-lg p-4 mb-6"
-        style={{
-          background: "var(--surface)",
-          border: "1px solid var(--border)",
-        }}
+        className="card-surface rounded-lg p-4 mb-6"
       >
         <p className="text-xs" style={{ color: "var(--dim)" }}>
           기록이 없습니다
@@ -90,11 +86,7 @@ export function PlayerStatsCard({ stats, statsDate }: PlayerStatsCardProps) {
 
   return (
     <div
-      className="rounded-lg p-4 mb-6"
-      style={{
-        background: "var(--surface)",
-        border: "1px solid var(--border)",
-      }}
+      className="card-surface rounded-lg p-4 mb-6"
     >
       <p className="text-xs mb-3" style={{ color: "var(--dim)" }}>
         시즌 기록 &middot; {formatDate(statsDate)}

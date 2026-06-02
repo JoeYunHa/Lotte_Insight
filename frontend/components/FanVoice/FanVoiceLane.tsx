@@ -4,14 +4,12 @@ import { FanVoiceBubble } from "./FanVoiceBubble";
 import type { ActiveFanVoiceBubble } from "@/lib/fan-voice/fan-voice-lane-scheduler";
 
 interface FanVoiceLaneProps {
-  laneIndex: number;
   bubbles: ActiveFanVoiceBubble[];
   onReact: (messageId: string) => void;
   onReport: (messageId: string) => void;
 }
 
 export function FanVoiceLane({
-  laneIndex,
   bubbles,
   onReact,
   onReport,

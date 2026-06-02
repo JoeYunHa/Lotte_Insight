@@ -39,7 +39,7 @@ export function PageShell({ children, footer, headerActions, seasonBadge }: Page
               </span>
             </div>
             {seasonBadge ? (
-              <span className="text-xs px-1.5 py-0.5 rounded font-mono-code ml-1" style={{ background: 'var(--surface-2)', color: 'var(--muted)', border: '1px solid var(--border)' }}>
+              <span className="chip-surface text-xs px-1.5 py-0.5 rounded font-mono-code ml-1" style={{ color: 'var(--muted)' }}>
                 {seasonBadge}
               </span>
             ) : null}

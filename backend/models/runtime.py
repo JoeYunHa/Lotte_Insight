@@ -7,6 +7,90 @@ from typing import Any, Callable
 
 logger = logging.getLogger(__name__)
 
+_KOELECTRA_MAX_LEN = 128
+
+
+def infer_single(
+    artifacts: "ModelArtifacts",
+    text_a: str,
+    text_b: str,
+    labels: list[str],
+) -> dict:
+    """Run single-item sequence classification and return {label, confidence, source}."""
+    import torch
+
+    enc = artifacts.tokenizer(
+        text_a,
+        text_b,
+        truncation="only_second",
+        padding="max_length",
+        max_length=_KOELECTRA_MAX_LEN,
+        return_tensors="pt",
+    )
+    enc = {k: v.to(artifacts.device) for k, v in enc.items()}
+    with torch.no_grad():
+        logits = artifacts.model(**enc).logits[0]
+        probs = torch.softmax(logits, dim=-1).cpu().tolist()
+    best_idx = int(max(range(len(probs)), key=lambda i: probs[i]))
+    return {
+        "label": labels[best_idx],
+        "confidence": round(probs[best_idx], 4),
+        "source": "koelectra",
+    }
+
+
+def infer_batch(
+    artifacts: "ModelArtifacts",
+    text_pairs: list[tuple[str, str]],
+    labels: list[str],
+    *,
+    chunk_size: int,
+    error_log_prefix: str,
+    module_logger: logging.Logger,
+) -> list[dict]:
+    """Run batched sequence classification. Returns [{label, confidence, source}] in input order.
+
+    On chunk-level failure falls back to model_error entries for that chunk.
+    """
+    import torch
+
+    results: list[dict] = [{"label": None, "confidence": 0.0, "source": "model_error"} for _ in text_pairs]
+
+    for start in range(0, len(text_pairs), chunk_size):
+        end = start + chunk_size
+        chunk = text_pairs[start:end]
+        texts_a = [p[0] for p in chunk]
+        texts_b = [p[1] for p in chunk]
+        try:
+            enc = artifacts.tokenizer(
+                texts_a,
+                texts_b,
+                truncation="only_second",
+                padding=True,
+                max_length=_KOELECTRA_MAX_LEN,
+                return_tensors="pt",
+            )
+            enc = {k: v.to(artifacts.device) for k, v in enc.items()}
+            with torch.no_grad():
+                logits = artifacts.model(**enc).logits
+                probs_batch = torch.softmax(logits, dim=-1).cpu().tolist()
+            for i, probs in enumerate(probs_batch):
+                best_idx = int(max(range(len(probs)), key=lambda j: probs[j]))
+                results[start + i] = {
+                    "label": labels[best_idx],
+                    "confidence": round(probs[best_idx], 4),
+                    "source": "koelectra",
+                }
+        except Exception:
+            module_logger.exception(
+                "%s chunk [%d:%d]; returning model_error.",
+                error_log_prefix,
+                start,
+                end,
+            )
+
+    return results
+
 
 @dataclass
 class ModelArtifacts:

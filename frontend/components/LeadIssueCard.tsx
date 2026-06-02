@@ -16,9 +16,8 @@ export function LeadIssueCard({ label, summary, articleCount, keyPlayers, title,
 
   return (
     <div
-      className="rounded-2xl overflow-hidden animate-fade-up"
+      className="card-surface rounded-2xl overflow-hidden animate-fade-up"
       style={{
-        background: 'var(--surface)',
         border: '1px solid var(--border-strong)',
         borderLeft: `4px solid ${dot}`,
         animationDelay: '180ms',
@@ -72,11 +71,9 @@ export function LeadIssueCard({ label, summary, articleCount, keyPlayers, title,
             {keyPlayers.slice(0, 5).map(name => (
               <span
                 key={name}
-                className="text-xs px-2 py-0.5 rounded"
+                className="chip-surface text-xs px-2 py-0.5 rounded"
                 style={{
-                  background: 'var(--surface-2)',
                   color: 'var(--muted)',
-                  border: '1px solid var(--border)',
                 }}
               >
                 {name}

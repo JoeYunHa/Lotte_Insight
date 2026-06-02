@@ -58,6 +58,7 @@ class TestSaveLabelsAndPlayers:
         """When stance label is None (model_error), player_stance must not be in upsert row."""
         enriched = [{
             "is_lotte_related": True,
+            "normalized_url": "https://a.com/1",
             "item": _make_item("http://a.com/1"),
             "label_result": {"label": "MATCH_RELATED", "confidence": 0.9, "secondary_labels": []},
             "detected_player_ids": [42],
@@ -73,6 +74,7 @@ class TestSaveLabelsAndPlayers:
         """When stance label is provided, player_stance must be in upsert row."""
         enriched = [{
             "is_lotte_related": True,
+            "normalized_url": "https://a.com/2",
             "item": _make_item("http://a.com/2"),
             "label_result": {"label": "MATCH_RELATED", "confidence": 0.9, "secondary_labels": []},
             "detected_player_ids": [7],
@@ -86,6 +88,7 @@ class TestSaveLabelsAndPlayers:
         """not_applicable (model missing) also produces None label → key excluded."""
         enriched = [{
             "is_lotte_related": True,
+            "normalized_url": "https://a.com/3",
             "item": _make_item("http://a.com/3"),
             "label_result": {"label": "ETC", "confidence": 0.5, "secondary_labels": []},
             "detected_player_ids": [5],
@@ -98,6 +101,7 @@ class TestSaveLabelsAndPlayers:
         """Articles with is_lotte_related=False produce no player rows."""
         enriched = [{
             "is_lotte_related": False,
+            "normalized_url": "http://a.com/4",
             "item": _make_item("http://a.com/4"),
             "label_result": {"label": "ETC", "confidence": 0.0, "secondary_labels": []},
             "detected_player_ids": [1],
@@ -110,6 +114,7 @@ class TestSaveLabelsAndPlayers:
         """One player has a stance, another doesn't — only the valid one gets the key."""
         enriched = [{
             "is_lotte_related": True,
+            "normalized_url": "https://a.com/5",
             "item": _make_item("http://a.com/5"),
             "label_result": {"label": "MATCH_RELATED", "confidence": 0.9, "secondary_labels": []},
             "detected_player_ids": [1, 2],
@@ -138,6 +143,7 @@ class TestNormalizedUrlPersistence:
 
         enriched = [{
             "is_lotte_related": True,
+            "normalized_url": "https://a.com/1",
             "item": _make_item("http://www.a.com/1?utm=abc"),
             "label_result": {"label": "MATCH_RELATED", "confidence": 0.9, "secondary_labels": []},
             "detected_player_ids": [42],
@@ -159,6 +165,7 @@ class TestNormalizedUrlPersistence:
 
         enriched = [{
             "item": item,
+            "normalized_url": "https://example.com/article",
             "event_summary_json": "{}",
             "collection_source": "naver_api",
         }]
