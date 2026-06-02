@@ -40,8 +40,7 @@ COPY . .
 
 # 빌드 시 모델을 이미지에 포함 — API 서버와 크론 잡이 동일 이미지를 공유하므로
 # 런타임 다운로드 없이 모든 서비스에서 모델을 사용할 수 있다.
-ARG HF_TOKEN
-RUN HF_TOKEN=${HF_TOKEN} python scripts/download_models.py
+RUN python scripts/download_models.py
 
 EXPOSE 8000
 
