@@ -5,10 +5,14 @@ from api import articles, fan_voice, fan_voice_review, home, players, reports, t
 
 app = FastAPI(title="Lotte Insight API")
 
-_raw = os.environ.get("ALLOWED_ORIGINS", "https://lotte-insight-frontend.vercel.app")
+_base_origins = [
+    "https://lotte-insight-frontend.vercel.app",
+    "http://localhost:3000",
+]
+_extra = [o.strip() for o in os.environ.get("ALLOWED_ORIGINS", "").split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[o.strip() for o in _raw.split(",")],
+    allow_origins=list(dict.fromkeys(_base_origins + _extra)),
     allow_credentials=True,
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
