@@ -90,8 +90,12 @@ def _keyword_classify(text: str) -> dict:
     return {"label": "ETC", "confidence": 0.5, "secondary_labels": []}
 
 
-def _build_auxiliary_text(description_snippet: str) -> str:
-    return description_snippet[: settings.article_description_snippet_length].strip()
+def _build_auxiliary_text(description_snippet: str, game_context: str = "") -> str:
+    desc = description_snippet[: settings.article_description_snippet_length].strip()
+    ctx = str(game_context or "").strip()
+    if ctx and ctx != "해당 날짜 경기 없음":
+        return f"{desc} [경기정보] 경기: {ctx}" if desc else f"경기: {ctx}"
+    return desc
 
 
 def _predict_from_probs(probs, label_classes: list[str], label_thresholds: dict[str, float]) -> dict:
@@ -144,7 +148,10 @@ def classify_batch(articles: list[dict]) -> list[dict]:
 
     runtime = _runtime.get()
     titles = [a.get("title", "") for a in articles]
-    snippets = [_build_auxiliary_text(a.get("description_snippet", "")) for a in articles]
+    snippets = [
+        _build_auxiliary_text(a.get("description_snippet", ""), a.get("game_context", ""))
+        for a in articles
+    ]
 
     if runtime is None or runtime.model is None or runtime.tokenizer is None:
         return [_keyword_classify((t + " " + s).strip()) for t, s in zip(titles, snippets)]
@@ -184,13 +191,13 @@ def classify_batch(articles: list[dict]) -> list[dict]:
     return results
 
 
-def classify(title: str, description_snippet: str = "") -> dict:
+def classify(title: str, description_snippet: str = "", game_context: str = "") -> dict:
     """
     Returns:
         {"label": str, "confidence": float, "secondary_labels": list[str]}
     """
     runtime = _runtime.get()
-    auxiliary_text = _build_auxiliary_text(description_snippet)
+    auxiliary_text = _build_auxiliary_text(description_snippet, game_context)
     text = (title + " " + auxiliary_text).strip()
 
     if runtime is None or runtime.model is None or runtime.tokenizer is None:
