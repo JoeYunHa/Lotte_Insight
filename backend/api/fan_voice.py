@@ -65,13 +65,14 @@ def init_session(
     fan_session: str | None = Cookie(default=None),
 ):
     token, session = fan_voice_service.init_session(fan_session)
+    is_prod = settings.app_env != "development"
     response.set_cookie(
         key=_SESSION_COOKIE_NAME,
         value=token,
         max_age=_SESSION_MAX_AGE_SEC,
         httponly=True,
-        samesite="lax",
-        secure=settings.app_env != "development",
+        samesite="none" if is_prod else "lax",
+        secure=is_prod,
     )
     return {
         "session_alias": session["session_alias"],
