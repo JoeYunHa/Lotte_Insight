@@ -20,7 +20,7 @@ from transformers import (
     Seq2SeqTrainingArguments,
 )
 
-from training.collect.collect_utils import clean_snippet
+from collect.collect_utils import clean_snippet
 from settings import (
     ARTICLE_SNIPPET_LENGTH,
     DATA_DIR,

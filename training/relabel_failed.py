@@ -5,7 +5,7 @@ from __future__ import annotations
 import csv
 from pathlib import Path
 
-from training.collect.collect_utils import auto_label, write_csv
+from collect.collect_utils import auto_label, write_csv
 from settings import LABELED_TITLES_CSV, LABELED_PLAYERS_CSV
 
 

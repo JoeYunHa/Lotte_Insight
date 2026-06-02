@@ -7,7 +7,7 @@ import csv
 import re
 from pathlib import Path
 
-from training.collect.clean_labeled_players import (
+from collect.clean_labeled_players import (
     ARTIFACTS_DIR,
     build_outputs,
     load_rows,

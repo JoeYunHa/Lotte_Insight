@@ -12,7 +12,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from training.collect.collect_utils import add_structured_summaries, load_csv_rows, rewrite_csv
+from collect.collect_utils import add_structured_summaries, load_csv_rows, rewrite_csv
 from settings import LABELED_PLAYERS_CSV, LABELED_TITLES_CSV
 
 
