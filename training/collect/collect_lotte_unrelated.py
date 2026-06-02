@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import argparse
 
-from training.collect.collect_utils import (
+from collect.collect_utils import (
     auto_label,
     build_days_cutoff,
     collect_news_by_keywords,

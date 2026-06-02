@@ -3,7 +3,7 @@
 import argparse
 import sys
 
-from training.collect.collect_utils import (
+from collect.collect_utils import (
     BASEBALL_KEYWORDS,
     NON_BASEBALL_KEYWORDS,
     auto_label,

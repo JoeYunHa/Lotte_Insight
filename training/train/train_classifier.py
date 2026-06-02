@@ -46,7 +46,7 @@ class ArticleDataset(Dataset):
         auxiliary_texts: list[str],
         labels: list[list[float]],
         tokenizer,
-        max_len: int = 256,
+        max_len: int = 128,
     ):
         self.encodings = tokenizer(
             titles,
@@ -93,18 +93,18 @@ def encode_multihot(labels: list[str]) -> list[float]:
     return encoded
 
 
-def build_auxiliary_text(description_snippet: str, event_summary: str = "") -> str:
+def build_auxiliary_text(description_snippet: str, game_context: str = "") -> str:
     parts: list[str] = []
 
     description = str(description_snippet or "").strip()
     if description:
         parts.append(description)
 
-    summary = str(event_summary or "").strip()
-    if summary:
-        parts.append(f"요약: {summary}")
+    ctx = str(game_context or "").strip()
+    if ctx and ctx != "해당 날짜 경기 없음":
+        parts.append(f"경기: {ctx}")
 
-    return " [요약정보] ".join(parts)
+    return " [경기정보] ".join(parts)
 
 
 def load_data() -> tuple[list[str], list[str], list[list[float]], list[str]]:
@@ -117,8 +117,8 @@ def load_data() -> tuple[list[str], list[str], list[list[float]], list[str]]:
             continue
 
         dataframe = pd.read_csv(path, encoding="utf-8-sig")
-        if "event_summary" not in dataframe.columns:
-            dataframe["event_summary"] = ""
+        if "game_context" not in dataframe.columns:
+            dataframe["game_context"] = ""
         before = len(dataframe)
         dataframe = dataframe[dataframe["is_lotte_related"].astype(str).str.lower() == "true"].copy()
         removed = before - len(dataframe)
@@ -134,7 +134,7 @@ def load_data() -> tuple[list[str], list[str], list[list[float]], list[str]]:
     dataframe["description_snippet"] = (
         dataframe["description_snippet"].fillna("").astype(str).str[:ARTICLE_SNIPPET_LENGTH].str.strip()
     )
-    dataframe["event_summary"] = dataframe["event_summary"].fillna("").astype(str).str.strip()
+    dataframe["game_context"] = dataframe["game_context"].fillna("").astype(str).str.strip()
     dataframe["label_set"] = dataframe.apply(
         lambda row: normalize_label_set(row.get("primary_label", ""), row.get("secondary_labels", "")),
         axis=1,
@@ -143,8 +143,11 @@ def load_data() -> tuple[list[str], list[str], list[list[float]], list[str]]:
 
     titles = dataframe["title"].tolist()
     auxiliary_texts = [
-        build_auxiliary_text(description)
-        for description in dataframe["description_snippet"].tolist()
+        build_auxiliary_text(description, game_context=ctx)
+        for description, ctx in zip(
+            dataframe["description_snippet"].tolist(),
+            dataframe["game_context"].tolist(),
+        )
     ]
     multilabels = [encode_multihot(label_set) for label_set in dataframe["label_set"]]
     primary_labels = [
@@ -153,8 +156,11 @@ def load_data() -> tuple[list[str], list[str], list[list[float]], list[str]]:
     ]
 
     print(f"\nTotal usable rows: {len(titles)}")
-    with_summary = sum(1 for value in dataframe["event_summary"].tolist() if value)
-    print(f"  Rows with event_summary        {with_summary:>4}")
+    with_ctx = sum(
+        1 for v in dataframe["game_context"].tolist()
+        if v and v != "해당 날짜 경기 없음"
+    )
+    print(f"  Rows with game_context         {with_ctx:>4}")
     label_totals = np.array(multilabels, dtype=np.float32).sum(axis=0)
     for index, label in enumerate(VALID_LABELS):
         print(f"  {label:<25} {int(label_totals[index]):>4} positives")

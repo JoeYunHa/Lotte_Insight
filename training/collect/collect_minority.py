@@ -5,8 +5,8 @@ from __future__ import annotations
 import argparse
 from collections import Counter
 
-from training.collect.collect_for_labeling import build_keywords, filter_photo_captions
-from training.collect.collect_utils import (
+from collect.collect_for_labeling import build_keywords, filter_photo_captions
+from collect.collect_utils import (
     BASEBALL_KEYWORDS,
     NON_BASEBALL_KEYWORDS,
     apply_label_cap,

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 
-from training.collect.collect_utils import add_player_stances, add_structured_summaries, load_csv_rows, rewrite_csv
+from collect.collect_utils import add_player_stances, add_structured_summaries, load_csv_rows, rewrite_csv
 from settings import GAME_RESULTS_CSV, LABELED_PLAYERS_CSV, LABELED_TITLES_CSV
 
 

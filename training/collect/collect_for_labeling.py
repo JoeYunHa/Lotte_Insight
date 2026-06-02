@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 
-from training.collect.collect_utils import (
+from collect.collect_utils import (
     add_structured_summaries,
     apply_label_cap,
     auto_label,
