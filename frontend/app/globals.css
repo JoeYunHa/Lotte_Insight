@@ -75,9 +75,10 @@
   --gold-soft-strong: rgba(var(--lotte-navy-rgb), 0.18);
   --gold-border: rgba(var(--lotte-navy-rgb), 0.24);
   --gradient-page:
-    radial-gradient(circle at top left, rgba(var(--lotte-blue-rgb), 0.14), transparent 24%),
-    radial-gradient(circle at top right, rgba(var(--lotte-red-rgb), 0.08), transparent 20%),
-    linear-gradient(180deg, var(--lotte-white) 0%, rgba(var(--lotte-blue-rgb), 0.03) 100%);
+    radial-gradient(circle at 12% 18%, rgba(var(--lotte-red-rgb), 0.14), transparent 28%),
+    radial-gradient(circle at 52% 10%, rgba(var(--lotte-blue-rgb), 0.16), transparent 30%),
+    radial-gradient(circle at 88% 22%, rgba(var(--lotte-navy-rgb), 0.18), transparent 34%),
+    linear-gradient(135deg, var(--lotte-white) 0%, rgba(var(--lotte-blue-rgb), 0.05) 45%, rgba(var(--lotte-navy-rgb), 0.08) 100%);
   --gradient-surface:
     linear-gradient(180deg, rgba(var(--lotte-white-rgb), 0.98) 0%, rgba(var(--lotte-blue-rgb), 0.06) 100%);
   --gradient-surface-accent:
