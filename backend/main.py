@@ -15,7 +15,7 @@ app.add_middleware(
     allow_origins=list(dict.fromkeys(_base_origins + _extra)),
     allow_credentials=True,
     allow_methods=["GET", "POST"],
-    allow_headers=["*"],
+    allow_headers=["Content-Type", "X-Fan-Session"],
 )
 
 app.include_router(reports.router, prefix="/reports")

@@ -7,17 +7,25 @@ import type {
   FanVoiceTopicTag,
 } from './fan-voice-types'
 import { buildApiUrl, requestJson } from '../http-client'
+import { readSessionToken, writeSessionToken } from './fan-voice-storage'
 
 const FETCH_OPTIONS: RequestInit = {
   next: { revalidate: 0 },
   credentials: 'include',
 }
 
+function sessionHeaders(): Record<string, string> {
+  const token = readSessionToken()
+  return token ? { 'X-Fan-Session': token } : {}
+}
+
 export async function initFanVoiceSession(): Promise<FanVoiceSessionResponse> {
-  return requestJson<FanVoiceSessionResponse>('/fan-voice/session', {
+  const res = await requestJson<FanVoiceSessionResponse>('/fan-voice/session', {
     ...FETCH_OPTIONS,
     method: 'POST',
   }, 'POST')
+  writeSessionToken(res.session_token)
+  return res
 }
 
 export async function getFanVoiceStream(params: {
@@ -62,7 +70,7 @@ export async function postFanVoiceMessage(input: {
   return requestJson<FanVoiceMessage>('/fan-voice/messages', {
     ...FETCH_OPTIONS,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...sessionHeaders() },
     body: JSON.stringify(input),
   }, 'POST')
 }
@@ -74,7 +82,7 @@ export async function postFanVoiceReaction(input: {
   return requestJson<{ ok: true; reaction_count: number }>('/fan-voice/reactions', {
     ...FETCH_OPTIONS,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...sessionHeaders() },
     body: JSON.stringify(input),
   }, 'POST')
 }
@@ -86,7 +94,7 @@ export async function postFanVoiceReport(input: {
   return requestJson<{ ok: true; report_count: number }>('/fan-voice/reports', {
     ...FETCH_OPTIONS,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...sessionHeaders() },
     body: JSON.stringify(input),
   }, 'POST')
 }

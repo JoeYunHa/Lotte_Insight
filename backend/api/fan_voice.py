@@ -5,7 +5,7 @@ import asyncio
 import json
 import time
 
-from fastapi import APIRouter, Cookie, HTTPException, Query, Response
+from fastapi import APIRouter, Cookie, Header, HTTPException, Query, Response
 from fastapi import Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
@@ -28,6 +28,7 @@ class FanVoiceSessionResponse(BaseModel):
     session_alias: str
     slow_mode: bool
     blocked: bool
+    session_token: str
 
 
 class FanVoiceMessageCreate(BaseModel):
@@ -78,6 +79,7 @@ def init_session(
         "session_alias": session["session_alias"],
         "slow_mode": False,
         "blocked": bool(session.get("is_blocked", False)),
+        "session_token": token,
     }
 
 
@@ -176,8 +178,10 @@ async def generate_stream_sse_events(
 @router.post("/messages")
 def create_message(
     payload: FanVoiceMessageCreate,
+    x_fan_session: str | None = Header(default=None),
     fan_session: str | None = Cookie(default=None),
 ):
+    fan_session = x_fan_session or fan_session
     if not fan_session:
         raise HTTPException(status_code=401, detail="missing fan session")
     try:
@@ -200,8 +204,10 @@ def create_message(
 @router.post("/reactions")
 def create_reaction(
     payload: FanVoiceReactionCreate,
+    x_fan_session: str | None = Header(default=None),
     fan_session: str | None = Cookie(default=None),
 ):
+    fan_session = x_fan_session or fan_session
     if not fan_session:
         raise HTTPException(status_code=401, detail="missing fan session")
     try:
@@ -218,8 +224,10 @@ def create_reaction(
 @router.post("/reports")
 def create_report(
     payload: FanVoiceReportCreate,
+    x_fan_session: str | None = Header(default=None),
     fan_session: str | None = Cookie(default=None),
 ):
+    fan_session = x_fan_session or fan_session
     if not fan_session:
         raise HTTPException(status_code=401, detail="missing fan session")
     try:

@@ -40,4 +40,5 @@ export interface FanVoiceSessionResponse {
   session_alias: string
   slow_mode: boolean
   blocked: boolean
+  session_token: string
 }
