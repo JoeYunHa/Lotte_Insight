@@ -39,4 +39,5 @@ COPY . .
 
 EXPOSE 8000
 
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port $PORT"]
+# 기동 시 1회 모델 다운로드 후 서버 시작
+CMD ["sh", "-c", "python scripts/download_models.py && uvicorn main:app --host 0.0.0.0 --port $PORT"]
