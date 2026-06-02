@@ -6,6 +6,7 @@ RSS feeds are free, require no API keys, and provide good coverage of Korean spo
 """
 
 import logging
+import time
 from calendar import timegm
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -131,25 +132,49 @@ def normalize_rss_entry(
     )
 
 
+_RETRY_COUNT = 3
+_RETRY_BACKOFF_BASE = 2  # seconds; delay = base ** attempt (2, 4, 8…)
+
+
 def fetch_rss_feed(
-    feed_url: str, *, timeout: int = _REQUEST_TIMEOUT, verify_ssl: bool = True
+    feed_url: str,
+    *,
+    timeout: int = _REQUEST_TIMEOUT,
+    verify_ssl: bool = True,
+    retries: int = _RETRY_COUNT,
 ) -> list[Any]:
-    """Fetch and parse an RSS feed."""
+    """Fetch and parse an RSS feed. Retries on transient network errors."""
     headers = {
         "User-Agent": "LotteInsightBot/1.0 (RSS aggregator; non-commercial fan project)"
     }
-    response = requests.get(feed_url, headers=headers, timeout=timeout, verify=verify_ssl)
-    response.raise_for_status()
+    last_exc: Exception | None = None
+    for attempt in range(1, retries + 1):
+        try:
+            response = requests.get(feed_url, headers=headers, timeout=timeout, verify=verify_ssl)
+            response.raise_for_status()
+            feed = feedparser.parse(response.content)
+            if feed.bozo:
+                logger.warning(
+                    "RSS feed parsing warning for %s: %s",
+                    feed_url,
+                    getattr(feed, "bozo_exception", "unknown error"),
+                )
+            return feed.entries
+        except requests.RequestException as exc:
+            last_exc = exc
+            if attempt < retries:
+                delay = _RETRY_BACKOFF_BASE ** attempt
+                logger.warning(
+                    "RSS fetch attempt %d/%d failed for %s (%s); retrying in %ds",
+                    attempt,
+                    retries,
+                    feed_url,
+                    exc,
+                    delay,
+                )
+                time.sleep(delay)
 
-    feed = feedparser.parse(response.content)
-    if feed.bozo:
-        logger.warning(
-            "RSS feed parsing warning for %s: %s",
-            feed_url,
-            getattr(feed, "bozo_exception", "unknown error"),
-        )
-
-    return feed.entries
+    raise last_exc  # type: ignore[misc]
 
 
 def collect_from_rss_feeds(
