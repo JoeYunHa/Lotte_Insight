@@ -9,6 +9,7 @@ _raw = os.environ.get("ALLOWED_ORIGINS", "https://lotte-insight-frontend.vercel.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[o.strip() for o in _raw.split(",")],
+    allow_credentials=True,
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
