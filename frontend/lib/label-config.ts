@@ -10,11 +10,11 @@ export interface LabelMeta {
 
 export const LABEL_META: Record<LabelKey, LabelMeta> = {
   MATCH_RELATED: { name: 'Match', dot: getBadgeDot('red'), tone: 'red' },
-  INJURY_ROSTER: { name: 'Injury/Roster', dot: getBadgeDot('gold'), tone: 'gold' },
+  INJURY_ROSTER: { name: 'Injury/Roster', dot: getBadgeDot('navy'), tone: 'navy' },
   TRANSACTION_CONTRACT: { name: 'Transaction', dot: getBadgeDot('blue'), tone: 'blue' },
   PERFORMANCE_ANALYSIS: { name: 'Performance', dot: getBadgeDot('navy'), tone: 'navy' },
   INTERVIEW: { name: 'Interview', dot: getBadgeDot('blue'), tone: 'blue' },
-  CLUB_OPERATION: { name: 'Club', dot: getBadgeDot('gold'), tone: 'gold' },
+  CLUB_OPERATION: { name: 'Club', dot: getBadgeDot('navy'), tone: 'navy' },
   ETC: { name: 'General', dot: getBadgeDot('neutral'), tone: 'neutral' },
 }
 
@@ -25,7 +25,7 @@ export interface StanceMeta {
 }
 
 export const STANCE_META: Record<LotteStance, StanceMeta> = {
-  positive: { label: 'Positive', symbol: '+', tone: 'gold' },
+  positive: { label: 'Positive', symbol: '+', tone: 'navy' },
   negative: { label: 'Negative', symbol: '-', tone: 'red' },
   neutral: { label: 'Neutral', symbol: '=', tone: 'neutral' },
 }

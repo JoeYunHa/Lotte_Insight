@@ -66,7 +66,7 @@ export function RankingPanel({
                 className="flex items-start gap-4 rounded-[20px] px-4 py-3 transition-colors"
                 style={{
                   background: isTop
-                    ? 'linear-gradient(135deg, rgba(var(--lotte-gold-rgb), 0.11) 0%, rgba(var(--lotte-cream-rgb), 0.88) 100%)'
+                    ? 'linear-gradient(135deg, rgba(var(--lotte-navy-rgb), 0.1) 0%, rgba(var(--lotte-white-rgb), 0.92) 100%)'
                     : 'var(--surface-glass-muted)',
                   border: isTop ? '1px solid var(--gold-border)' : '1px solid var(--border)',
                 }}

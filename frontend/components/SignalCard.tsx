@@ -19,7 +19,7 @@ export function SignalCard({ title, value, detail, delay = 0, children, accent =
     accent === 'red'
       ? 'linear-gradient(180deg, rgba(var(--lotte-white-rgb), 0.98) 0%, rgba(var(--lotte-red-rgb), 0.05) 100%)'
       : accent === 'gold'
-        ? 'linear-gradient(180deg, rgba(var(--lotte-white-rgb), 0.98) 0%, rgba(var(--lotte-gold-rgb), 0.07) 100%)'
+        ? 'linear-gradient(180deg, rgba(var(--lotte-white-rgb), 0.98) 0%, rgba(var(--lotte-navy-rgb), 0.08) 100%)'
         : 'linear-gradient(180deg, rgba(var(--lotte-white-rgb), 0.98) 0%, rgba(var(--lotte-blue-rgb), 0.1) 100%)'
 
   return (

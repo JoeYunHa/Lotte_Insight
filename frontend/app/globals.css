@@ -56,8 +56,8 @@
   --red: var(--lotte-red);
   --red-dark: var(--lotte-red-dark);
   --blue: var(--lotte-blue);
-  --gold: var(--lotte-gold);
-  --win: var(--lotte-gold);
+  --gold: var(--lotte-navy);
+  --win: var(--lotte-navy);
   --loss: var(--lotte-red);
   --neutral: var(--lotte-blue-deep);
   --text-on-accent: var(--lotte-cream);
@@ -71,9 +71,9 @@
   --navy-soft: rgba(var(--lotte-navy-rgb), 0.1);
   --navy-soft-strong: rgba(var(--lotte-navy-rgb), 0.18);
   --navy-border: rgba(var(--lotte-navy-rgb), 0.24);
-  --gold-soft: rgba(var(--lotte-gold-rgb), 0.14);
-  --gold-soft-strong: rgba(var(--lotte-gold-rgb), 0.2);
-  --gold-border: rgba(var(--lotte-gold-rgb), 0.3);
+  --gold-soft: rgba(var(--lotte-navy-rgb), 0.1);
+  --gold-soft-strong: rgba(var(--lotte-navy-rgb), 0.18);
+  --gold-border: rgba(var(--lotte-navy-rgb), 0.24);
   --gradient-page:
     radial-gradient(circle at top left, rgba(var(--lotte-blue-rgb), 0.14), transparent 24%),
     radial-gradient(circle at top right, rgba(var(--lotte-red-rgb), 0.08), transparent 20%),
