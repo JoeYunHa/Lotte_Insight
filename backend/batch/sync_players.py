@@ -8,14 +8,9 @@ departed players have status="inactive".
 
 import logging
 
-try:
-    from core.bootstrap import load_supabase
-    from batch.kbo_crawler import fetch_roster
-    from services.player_catalog import invalidate_cache, list_players
-except ModuleNotFoundError:
-    from backend.core.bootstrap import load_supabase
-    from backend.batch.kbo_crawler import fetch_roster
-    from backend.services.player_catalog import invalidate_cache, list_players
+from core.bootstrap import load_supabase
+from batch.kbo_crawler import fetch_roster
+from services.player_catalog import invalidate_cache, list_players
 
 logger = logging.getLogger(__name__)
 
