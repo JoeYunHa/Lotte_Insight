@@ -13,15 +13,21 @@ interface SignalCardProps {
 }
 
 export function SignalCard({ title, value, detail, delay = 0, children, accent = 'neutral', eyebrow }: SignalCardProps) {
-  const accentColor = accent === 'red' ? 'var(--red)' : accent === 'gold' ? 'var(--gold)' : undefined
+  const accentColor = accent === 'red' ? 'var(--red)' : accent === 'gold' ? 'var(--gold)' : 'var(--blue)'
   const valueColor = accent === 'red' ? 'var(--red)' : accent === 'gold' ? 'var(--gold)' : 'var(--text)'
-  const topBorder = accentColor ? `2px solid ${accentColor}` : '1px solid var(--border)'
+  const panelBackground =
+    accent === 'red'
+      ? 'linear-gradient(180deg, rgba(var(--lotte-white-rgb), 0.98) 0%, rgba(var(--lotte-red-rgb), 0.05) 100%)'
+      : accent === 'gold'
+        ? 'linear-gradient(180deg, rgba(var(--lotte-white-rgb), 0.98) 0%, rgba(var(--lotte-gold-rgb), 0.07) 100%)'
+        : 'linear-gradient(180deg, rgba(var(--lotte-white-rgb), 0.98) 0%, rgba(var(--lotte-blue-rgb), 0.1) 100%)'
 
   return (
     <div
       className="card-surface rounded-lg p-4 animate-fade-up"
       style={{
-        borderTop: topBorder,
+        borderTop: `2px solid ${accentColor}`,
+        background: panelBackground,
         animationDelay: `${delay}ms`,
       }}
     >

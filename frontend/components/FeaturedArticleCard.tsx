@@ -18,6 +18,7 @@ export function FeaturedArticleCard({
         style={{
           background: 'var(--gradient-surface)',
           border: '1px solid var(--border)',
+          boxShadow: 'var(--shadow-card)',
         }}
       >
         <p className="text-xs font-mono-code uppercase tracking-[0.24em]" style={{ color: 'var(--gold)' }}>
@@ -38,12 +39,12 @@ export function FeaturedArticleCard({
       className="rounded-[28px] p-6 md:p-7"
       style={{
         background: 'var(--gradient-surface-accent)',
-        border: '1px solid var(--border)',
+        border: '1px solid var(--blue-border)',
         boxShadow: 'var(--shadow-hero)',
       }}
     >
       <div className="flex flex-wrap items-center gap-2">
-        <p className="text-xs font-mono-code uppercase tracking-[0.24em]" style={{ color: 'var(--gold)' }}>
+        <p className="text-xs font-mono-code uppercase tracking-[0.24em]" style={{ color: 'var(--blue)' }}>
           {eyebrow}
         </p>
         {article.primary_label ? <LabelBadge label={article.primary_label} /> : null}
@@ -75,9 +76,9 @@ export function FeaturedArticleCard({
           rel="noopener noreferrer"
           className="group/link inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-all"
           style={{
-            background: 'var(--surface-glass-muted)',
+            background: 'rgba(var(--lotte-blue-rgb), 0.1)',
             color: 'var(--text)',
-            border: '1px solid var(--red-border)',
+            border: '1px solid var(--blue-border)',
           }}
         >
           원문 기사 보기

@@ -14,9 +14,16 @@ export function HomeHeroDesk({ date, headline, subcopy, kicker, metaStat, status
     <div
       className="relative pt-10 pb-10 overflow-hidden"
       style={{
-        background: 'radial-gradient(ellipse at 15% 60%, rgba(var(--lotte-red-rgb), 0.06) 0%, transparent 55%)',
+        background:
+          'radial-gradient(ellipse at 12% 18%, rgba(var(--lotte-blue-rgb), 0.2) 0%, transparent 36%), radial-gradient(ellipse at 86% 72%, rgba(var(--lotte-red-rgb), 0.08) 0%, transparent 34%)',
       }}
     >
+      <div
+        className="absolute inset-x-0 top-0 h-[1px]"
+        aria-hidden="true"
+        style={{ background: 'linear-gradient(90deg, transparent, var(--blue), transparent)' }}
+      />
+
       {/* Decorative season watermark */}
       <div
         className="pointer-events-none absolute select-none"
@@ -27,7 +34,7 @@ export function HomeHeroDesk({ date, headline, subcopy, kicker, metaStat, status
           fontSize: 'clamp(130px, 20vw, 210px)',
           fontFamily: 'var(--font-giants-inline), var(--font-giants), serif',
           color: 'transparent',
-          WebkitTextStroke: '1px rgba(var(--lotte-red-rgb), 0.09)',
+          WebkitTextStroke: '1px rgba(var(--lotte-blue-rgb), 0.22)',
           lineHeight: 1,
           letterSpacing: '-0.04em',
           userSelect: 'none',
@@ -48,8 +55,8 @@ export function HomeHeroDesk({ date, headline, subcopy, kicker, metaStat, status
           <div
             className="inline-flex items-center gap-2 rounded-full px-2.5 py-1"
             style={{
-              background: 'var(--red-overlay)',
-              border: '1px solid var(--red-soft-strong)',
+              background: 'rgba(var(--lotte-blue-rgb), 0.1)',
+              border: '1px solid var(--blue-border)',
             }}
           >
             <span
@@ -58,7 +65,7 @@ export function HomeHeroDesk({ date, headline, subcopy, kicker, metaStat, status
             />
             <p
               className="text-xs font-mono-code tracking-widest uppercase"
-              style={{ color: 'var(--red)' }}
+              style={{ color: 'var(--text)' }}
             >
               {kicker}
             </p>
@@ -78,7 +85,7 @@ export function HomeHeroDesk({ date, headline, subcopy, kicker, metaStat, status
       {/* Animated red rule */}
       <div
         className="h-[2px] w-10 mb-5 animate-expand-width"
-        style={{ background: 'var(--red)', animationDelay: '150ms' }}
+        style={{ background: 'var(--gradient-navy-band)', animationDelay: '150ms' }}
       />
 
       {/* Subcopy + metaStat */}
@@ -96,7 +103,7 @@ export function HomeHeroDesk({ date, headline, subcopy, kicker, metaStat, status
           <div className="shrink-0 text-right">
             <p
               className="text-3xl font-bold font-mono-code leading-none"
-              style={{ color: 'var(--gold)' }}
+              style={{ color: 'var(--text)' }}
             >
               {metaStat.value}
             </p>

@@ -17,9 +17,9 @@ interface PageShellProps {
 export function PageShell({ children, footer, headerActions, seasonBadge }: PageShellProps) {
   return (
     <div className="min-h-dvh" style={{ background: 'var(--bg)' }}>
-      <div className="h-[4px] w-full" style={{ background: 'var(--red)' }} />
+      <div className="h-[4px] w-full" style={{ background: 'var(--gradient-navy-band)' }} />
 
-      <header className="sticky top-0 z-50 backdrop-blur-md" style={{ background: 'var(--surface-glass-strong)', borderBottom: '1px solid var(--border)' }}>
+      <header className="sticky top-0 z-50 backdrop-blur-md" style={{ background: 'var(--surface-glass-strong)', borderBottom: '1px solid var(--border)', boxShadow: '0 8px 24px rgba(var(--lotte-navy-rgb), 0.06)' }}>
         <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Image
@@ -39,7 +39,7 @@ export function PageShell({ children, footer, headerActions, seasonBadge }: Page
               </span>
             </div>
             {seasonBadge ? (
-              <span className="chip-surface text-xs px-1.5 py-0.5 rounded font-mono-code ml-1" style={{ color: 'var(--muted)' }}>
+              <span className="chip-surface text-xs px-1.5 py-0.5 rounded font-mono-code ml-1" style={{ color: 'var(--text)' }}>
                 {seasonBadge}
               </span>
             ) : null}
@@ -52,7 +52,7 @@ export function PageShell({ children, footer, headerActions, seasonBadge }: Page
                   href={action.href}
                   className="text-xs transition-all px-3 py-1.5 rounded-full hover:-translate-y-px"
                   style={{
-                    color: 'var(--muted)',
+                    color: 'var(--text)',
                     border: '1px solid var(--border)',
                     background: 'var(--surface-glass-muted)',
                   }}
