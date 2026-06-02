@@ -39,7 +39,7 @@ def get_report(
     if player_id is not None:
         query = query.eq("player_id", player_id)
     result = query.maybe_single().execute()
-    return result.data
+    return result.data if result is not None else None
 
 
 def report_exists(
@@ -51,7 +51,8 @@ def report_exists(
     query = supabase.table(table).select("id").eq("date", report_date.isoformat())
     if player_id is not None:
         query = query.eq("player_id", player_id)
-    return bool(query.maybe_single().execute().data)
+    result = query.maybe_single().execute()
+    return bool(result.data if result is not None else None)
 
 
 import logging as _logging
