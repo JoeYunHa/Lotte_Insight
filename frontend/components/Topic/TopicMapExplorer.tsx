@@ -62,7 +62,7 @@ export function TopicMapExplorer({ data }: TopicMapExplorerProps) {
             className="rounded-[24px] overflow-hidden"
             style={{
               border: '1px solid var(--border)',
-              boxShadow: '0 2px 24px rgba(96,62,27,0.07)',
+              boxShadow: '0 2px 24px rgba(var(--lotte-navy-rgb), 0.07)',
             }}
           >
             <TopicMapCanvas

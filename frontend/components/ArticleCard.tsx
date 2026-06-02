@@ -16,7 +16,7 @@ export function ArticleCard({ article, variant = 'default', showKeyPlayers = tru
   const isCompact = variant === 'compact'
 
   return (
-    <article className="card-surface group relative rounded-2xl overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_6px_20px_rgba(96,62,27,0.09)]">
+    <article className="card-surface group relative rounded-2xl overflow-hidden transition-all duration-200 hover:-translate-y-0.5" style={{ boxShadow: 'var(--shadow-card)' }}>
       <div className="absolute top-0 left-0 h-full w-[3px] group-hover:w-[4px] transition-all duration-200" style={{ background: labelDot }} />
       <div className={isCompact ? 'pl-4 pr-4 pt-3 pb-3' : 'pl-4 pr-4 pt-3.5 pb-3.5'}>
         <div className="flex items-center gap-1.5 mb-2 flex-wrap">

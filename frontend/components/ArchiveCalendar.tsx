@@ -10,13 +10,14 @@ interface Props {
   initialDate: string
 }
 
-const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+const DAYS = ['일', '월', '화', '수', '목', '금', '토']
+const MONTHS = ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월']
+const RESULT_LABEL: Record<'W' | 'L' | 'D', string> = { W: '승', L: '패', D: '무' }
 
 const RESULT_STYLE: Record<'W' | 'L' | 'D', { bg: string; text: string }> = {
-  W: { bg: 'rgba(52,211,153,0.15)', text: '#34d399' },
-  L: { bg: 'rgba(248,113,113,0.15)', text: '#f87171' },
-  D: { bg: 'rgba(148,163,184,0.15)', text: '#94a3b8' },
+  W: { bg: 'var(--gold-soft)', text: 'var(--gold)' },
+  L: { bg: 'var(--red-soft)', text: 'var(--red)' },
+  D: { bg: 'var(--blue-soft)', text: 'var(--neutral)' },
 }
 
 export function ArchiveCalendar({ reports, initialDate }: Props) {
@@ -74,7 +75,7 @@ export function ArchiveCalendar({ reports, initialDate }: Props) {
             &lsaquo;
           </button>
           <span className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
-            {viewYear} {MONTHS[viewMonth]}
+            {viewYear}년 {MONTHS[viewMonth]}
           </span>
           <button
             onClick={nextMonth}
@@ -87,7 +88,7 @@ export function ArchiveCalendar({ reports, initialDate }: Props) {
 
         <div className="grid grid-cols-7 mb-1">
           {DAYS.map((day, i) => (
-            <div key={day} className="text-center text-xs py-1 font-medium" style={{ color: i === 0 ? '#f87171' : i === 6 ? '#60a5fa' : 'var(--dim)' }}>
+            <div key={day} className="text-center text-xs py-1 font-medium" style={{ color: i === 0 ? 'var(--red)' : i === 6 ? 'var(--blue)' : 'var(--dim)' }}>
               {day}
             </div>
           ))}
@@ -110,7 +111,7 @@ export function ArchiveCalendar({ reports, initialDate }: Props) {
                 className="relative aspect-square flex flex-col items-center justify-center rounded text-xs transition-all"
                 style={{
                   background: isSelected ? 'var(--red)' : 'transparent',
-                  color: isSelected ? '#fff' : dow === 0 ? '#f87171' : dow === 6 ? '#60a5fa' : report ? 'var(--text)' : 'var(--dim)',
+                  color: isSelected ? 'var(--text-on-accent)' : dow === 0 ? 'var(--red)' : dow === 6 ? 'var(--blue)' : report ? 'var(--text)' : 'var(--dim)',
                   cursor: report ? 'pointer' : 'default',
                   fontWeight: dateStr === initialDate ? '700' : '400',
                 }}
@@ -128,7 +129,7 @@ export function ArchiveCalendar({ reports, initialDate }: Props) {
           {(['W', 'L', 'D'] as const).map((result) => (
             <div key={result} className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--muted)' }}>
               <span className="w-2 h-2 rounded-full" style={{ background: RESULT_STYLE[result].text }} />
-              {result}
+              {RESULT_LABEL[result]}
             </div>
           ))}
           <div className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--muted)' }}>
@@ -165,7 +166,7 @@ export function ArchiveCalendar({ reports, initialDate }: Props) {
 
 function ArchiveReportCard({ report, isSelected }: { report: TeamDailyReport; isSelected: boolean }) {
   const date = new Date(report.date + 'T00:00:00')
-  const label = `${MONTHS[date.getMonth()]} ${date.getDate()} (${DAYS[date.getDay()]})`
+  const label = `${date.getMonth() + 1}월 ${date.getDate()}일 (${DAYS[date.getDay()]})`
   const result = inferGameResult(report)
 
   return (
@@ -183,7 +184,7 @@ function ArchiveReportCard({ report, isSelected }: { report: TeamDailyReport; is
           </span>
           {result ? (
             <span className="text-xs font-mono-code font-bold px-2 py-0.5 rounded" style={{ background: RESULT_STYLE[result].bg, color: RESULT_STYLE[result].text }}>
-              {result}
+              {RESULT_LABEL[result]}
             </span>
           ) : null}
         </div>

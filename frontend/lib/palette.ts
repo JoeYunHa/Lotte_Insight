@@ -1,0 +1,45 @@
+import type { CSSProperties } from 'react'
+
+export type PaletteTone = 'red' | 'blue' | 'navy' | 'gold' | 'neutral'
+
+export const palette = {
+  red: 'var(--red)',
+  redDark: 'var(--red-dark)',
+  blue: 'var(--blue)',
+  blueDeep: 'var(--neutral)',
+  navy: 'var(--text)',
+  gold: 'var(--gold)',
+  cream: 'var(--surface)',
+  creamDeep: 'var(--surface-2)',
+  muted: 'var(--muted)',
+  dim: 'var(--dim)',
+  border: 'var(--border)',
+  textOnAccent: 'var(--text-on-accent)',
+} as const
+
+const toneStyles: Record<PaletteTone, CSSProperties> = {
+  red: { background: 'var(--red-soft)', color: 'var(--red)', border: '1px solid var(--red-border)' },
+  blue: { background: 'var(--blue-soft)', color: 'var(--blue)', border: '1px solid var(--blue-border)' },
+  navy: { background: 'var(--navy-soft)', color: 'var(--text)', border: '1px solid var(--navy-border)' },
+  gold: { background: 'var(--gold-soft)', color: 'var(--gold)', border: '1px solid var(--gold-border)' },
+  neutral: { background: 'var(--blue-soft)', color: 'var(--neutral)', border: '1px solid var(--blue-border)' },
+}
+
+export function getBadgeStyle(tone: PaletteTone): CSSProperties {
+  return toneStyles[tone]
+}
+
+export function getBadgeDot(tone: PaletteTone): string {
+  return tone === 'neutral' ? palette.blueDeep : palette[tone]
+}
+
+export const clusterPalette = [
+  palette.red,
+  palette.blue,
+  palette.gold,
+  palette.navy,
+  'var(--lotte-red-light)',
+  'var(--lotte-blue-deep)',
+  palette.redDark,
+  'var(--lotte-gold-light)',
+]

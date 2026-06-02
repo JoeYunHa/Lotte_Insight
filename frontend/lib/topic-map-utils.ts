@@ -1,22 +1,12 @@
 import { getLabelMeta } from './label-config'
+import { clusterPalette, palette } from './palette'
 import type { LabelFilter, TopicArticlePoint, TopicCluster, ViewMode } from './types'
 
 export const VIEWBOX_W = 600
 export const VIEWBOX_H = 460
 export const PADDING = 36
 
-export const CLUSTER_PALETTE = [
-  '#E1062C',
-  '#D97706',
-  '#7C3AED',
-  '#0D9488',
-  '#6366F1',
-  '#EC4899',
-  '#059669',
-  '#0891B2',
-  '#F59E0B',
-  '#DC2626',
-]
+export const CLUSTER_PALETTE = clusterPalette
 
 export type NormalizedPoint = TopicArticlePoint & { svgX: number; svgY: number }
 
@@ -55,14 +45,14 @@ export function getPointColor(
   clusterById: Record<string, TopicCluster>,
   clusterColorMap: Record<string, string>,
 ): string {
-  if (p.is_outlier) return '#94a3b8'
+  if (p.is_outlier) return palette.blueDeep
   if (viewMode === 'label') {
     const rawLabel =
       p.article?.primary_label ?? (p.cluster_id ? clusterById[p.cluster_id]?.label_hint : undefined)
-    return getLabelMeta(rawLabel)?.dot ?? '#94a3b8'
+    return getLabelMeta(rawLabel)?.dot ?? palette.blueDeep
   }
-  if (viewMode === 'outlier') return 'rgba(148,163,184,0.35)'
-  return p.cluster_id ? (clusterColorMap[p.cluster_id] ?? '#94a3b8') : '#94a3b8'
+  if (viewMode === 'outlier') return 'var(--blue-soft-strong)'
+  return p.cluster_id ? (clusterColorMap[p.cluster_id] ?? palette.blueDeep) : palette.blueDeep
 }
 
 export function getPointOpacity(p: NormalizedPoint, selectedClusterId: string | null): number {

@@ -17,24 +17,24 @@ export const PLAYER_STATUS_BADGE: Record<
   { bg: string; text: string; border: string }
 > = {
   active: {
-    bg: "rgba(52,211,153,0.12)",
-    text: "#34d399",
-    border: "rgba(52,211,153,0.25)",
+    bg: "var(--gold-soft)",
+    text: "var(--gold)",
+    border: "var(--gold-border)",
   },
   "1군": {
-    bg: "rgba(52,211,153,0.12)",
-    text: "#34d399",
-    border: "rgba(52,211,153,0.25)",
+    bg: "var(--gold-soft)",
+    text: "var(--gold)",
+    border: "var(--gold-border)",
   },
   "2군": {
-    bg: "rgba(148,163,184,0.12)",
-    text: "#94a3b8",
-    border: "rgba(148,163,184,0.25)",
+    bg: "var(--blue-soft)",
+    text: "var(--neutral)",
+    border: "var(--blue-border)",
   },
   말소: {
-    bg: "rgba(248,113,113,0.12)",
-    text: "#f87171",
-    border: "rgba(248,113,113,0.25)",
+    bg: "var(--red-soft)",
+    text: "var(--red)",
+    border: "var(--red-border)",
   },
 };
 

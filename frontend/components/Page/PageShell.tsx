@@ -19,7 +19,7 @@ export function PageShell({ children, footer, headerActions, seasonBadge }: Page
     <div className="min-h-dvh" style={{ background: 'var(--bg)' }}>
       <div className="h-[4px] w-full" style={{ background: 'var(--red)' }} />
 
-      <header className="sticky top-0 z-50 backdrop-blur-md" style={{ background: 'rgba(251, 246, 239, 0.9)', borderBottom: '1px solid var(--border)' }}>
+      <header className="sticky top-0 z-50 backdrop-blur-md" style={{ background: 'var(--surface-glass-strong)', borderBottom: '1px solid var(--border)' }}>
         <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Image
@@ -54,7 +54,7 @@ export function PageShell({ children, footer, headerActions, seasonBadge }: Page
                   style={{
                     color: 'var(--muted)',
                     border: '1px solid var(--border)',
-                    background: 'rgba(255,255,255,0.72)',
+                    background: 'var(--surface-glass-muted)',
                   }}
                 >
                   {action.label}

@@ -32,8 +32,7 @@ export function FanVoiceHighlights({ messages }: FanVoiceHighlightsProps) {
       className="mb-2 rounded-xl overflow-hidden"
       style={{
         border: "1px solid var(--border)",
-        background:
-          "linear-gradient(180deg, rgba(255,255,255,0.92) 0%, rgba(241,232,218,0.78) 100%)",
+        background: "var(--gradient-surface)",
       }}
     >
       {/* Header */}
@@ -41,7 +40,7 @@ export function FanVoiceHighlights({ messages }: FanVoiceHighlightsProps) {
         className="px-3 py-1.5 flex items-center gap-2"
         style={{
           borderBottom: "1px solid var(--border)",
-          background: "rgba(255,255,255,0.5)",
+          background: "var(--surface-overlay)",
         }}
       >
         <span
@@ -52,7 +51,7 @@ export function FanVoiceHighlights({ messages }: FanVoiceHighlightsProps) {
           className="text-[10px] font-bold uppercase tracking-[0.18em]"
           style={{ color: "var(--dim)" }}
         >
-          Top Voices
+          인기 팬보이스
         </p>
       </div>
 

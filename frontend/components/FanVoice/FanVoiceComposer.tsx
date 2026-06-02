@@ -18,12 +18,12 @@ interface FanVoiceComposerProps {
 type EmotionOption = { value: FanVoiceEmotion | ""; label: string };
 
 const EMOTIONS: EmotionOption[] = [
-  { value: "", label: "No Emotion" },
-  { value: "CHEER", label: "Cheer" },
-  { value: "EXPECT", label: "Expect" },
-  { value: "FRUSTRATED", label: "Frustrated" },
-  { value: "MOVED", label: "Moved" },
-  { value: "ANGRY", label: "Angry" },
+  { value: "", label: "감정 없음" },
+  { value: "CHEER", label: "응원 📣" },
+  { value: "EXPECT", label: "기대 ⭐" },
+  { value: "FRUSTRATED", label: "답답 😤" },
+  { value: "MOVED", label: "감동 🥺" },
+  { value: "ANGRY", label: "화남 🔥" },
 ];
 
 export function FanVoiceComposer({
@@ -59,7 +59,7 @@ export function FanVoiceComposer({
       onSubmitted?.();
     } catch (error) {
       console.error("[fan-voice] post message failed", error);
-      setError("Failed to post message");
+      setError("메시지 전송에 실패했습니다");
     } finally {
       setSubmitting(false);
     }
@@ -70,7 +70,7 @@ export function FanVoiceComposer({
       className="flex flex-wrap items-center gap-2 rounded-2xl border p-2"
       style={{
         borderColor: "var(--border)",
-        background: "rgba(255,255,255,0.82)",
+        background: "var(--surface-glass-soft)",
       }}
     >
       <select
@@ -91,7 +91,7 @@ export function FanVoiceComposer({
         value={message}
         maxLength={60}
         onChange={(e) => setMessage(e.target.value)}
-        placeholder="Share your fan voice..."
+        placeholder="팬 의견을 남겨주세요..."
         className="min-w-[180px] flex-1 rounded-md border px-3 py-1.5 text-sm"
         style={{
           borderColor: "var(--border)",
@@ -105,9 +105,9 @@ export function FanVoiceComposer({
         onClick={submit}
         disabled={!canSubmit}
         className="rounded-md px-3 py-1.5 text-xs font-semibold transition disabled:opacity-50"
-        style={{ background: "var(--red)", color: "#fff" }}
+        style={{ background: "var(--red)", color: "var(--text-on-accent)" }}
       >
-        Post
+        보내기
       </button>
       {error ? (
         <p className="basis-full text-xs" style={{ color: "var(--loss)" }}>

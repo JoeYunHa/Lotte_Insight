@@ -14,7 +14,7 @@ export function HomeHeroDesk({ date, headline, subcopy, kicker, metaStat, status
     <div
       className="relative pt-10 pb-10 overflow-hidden"
       style={{
-        background: 'radial-gradient(ellipse at 15% 60%, rgba(225,6,44,0.06) 0%, transparent 55%)',
+        background: 'radial-gradient(ellipse at 15% 60%, rgba(var(--lotte-red-rgb), 0.06) 0%, transparent 55%)',
       }}
     >
       {/* Decorative season watermark */}
@@ -27,7 +27,7 @@ export function HomeHeroDesk({ date, headline, subcopy, kicker, metaStat, status
           fontSize: 'clamp(130px, 20vw, 210px)',
           fontFamily: 'var(--font-giants-inline), var(--font-giants), serif',
           color: 'transparent',
-          WebkitTextStroke: '1px rgba(208, 15, 49, 0.09)',
+          WebkitTextStroke: '1px rgba(var(--lotte-red-rgb), 0.09)',
           lineHeight: 1,
           letterSpacing: '-0.04em',
           userSelect: 'none',
@@ -48,8 +48,8 @@ export function HomeHeroDesk({ date, headline, subcopy, kicker, metaStat, status
           <div
             className="inline-flex items-center gap-2 rounded-full px-2.5 py-1"
             style={{
-              background: 'rgba(225, 6, 44, 0.07)',
-              border: '1px solid rgba(225, 6, 44, 0.16)',
+              background: 'var(--red-overlay)',
+              border: '1px solid var(--red-soft-strong)',
             }}
           >
             <span

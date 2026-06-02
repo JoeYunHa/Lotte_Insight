@@ -66,7 +66,7 @@ export function TopicMapCanvas({
       className="w-full overflow-hidden"
       style={{
         background:
-          'radial-gradient(ellipse at 20% 30%, rgba(241,232,218,0.55) 0%, rgba(251,246,239,0.8) 60%)',
+          'radial-gradient(ellipse at 20% 30%, rgba(var(--lotte-cream-deep-rgb), 0.55) 0%, rgba(var(--lotte-cream-rgb), 0.8) 60%)',
         borderRadius: '16px',
         border: '1px solid var(--border)',
       }}
@@ -78,7 +78,7 @@ export function TopicMapCanvas({
       >
         <defs>
           <pattern id="dot-grid" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
-            <circle cx="10" cy="10" r="0.7" fill="rgba(96,62,27,0.09)" />
+            <circle cx="10" cy="10" r="0.7" fill="rgba(var(--lotte-navy-rgb), 0.09)" />
           </pattern>
         </defs>
         <rect width={VIEWBOX_W} height={VIEWBOX_H} fill="url(#dot-grid)" rx="16" />

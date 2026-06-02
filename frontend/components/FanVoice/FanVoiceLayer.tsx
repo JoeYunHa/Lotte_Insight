@@ -178,7 +178,7 @@ export function FanVoiceLayer({ contextType, contextId }: FanVoiceLayerProps) {
           className="text-xs font-semibold uppercase tracking-[0.16em]"
           style={{ color: "var(--muted)" }}
         >
-          Fan Voice {slowMode ? "(Slow Mode)" : ""}
+          팬 보이스 {slowMode ? "(느린 모드)" : ""}
         </p>
         <FanVoiceToggle cleanMode={cleanMode} onToggle={toggleCleanMode} />
       </div>

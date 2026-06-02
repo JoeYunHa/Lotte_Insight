@@ -1,46 +1,89 @@
 @import "tailwindcss";
 
 @theme {
-  /* Official Lotte Giants color palette */
-  --color-lotte-red: #D00F31;        /* Energetic Red  — PANTONE 199C / R208 G15 B49  */
+  --color-lotte-red: #d00f31;
   --color-lotte-red-dark: #a50c27;
   --color-lotte-red-light: #e8153a;
-  --color-lotte-blue: #6CACE4;       /* Heritage Blue  — PANTONE 284C / R108 G172 B228 */
-  --color-lotte-navy: #041E42;       /* Classic Navy   — PANTONE 289C / R4 G30 B66    */
-
-  --color-navy-950: #000c1a;
-  --color-navy-900: #011226;
-  --color-navy-800: #021832;
-  --color-navy-700: #041E42;
-  --color-navy-600: #0c3060;
-  --color-navy-500: #163c7a;
-
-  --color-gold-500: #c7a35a;
-  --color-gold-400: #d4b866;
-
-  --color-cream-50: #fdf8f2;
-  --color-cream-100: #f5efe6;
-  --color-cream-200: #e8e4dc;
-  --color-cream-300: #d0c8bb;
+  --color-lotte-blue: #6cace4;
+  --color-lotte-blue-deep: #4d8fc6;
+  --color-lotte-navy: #041e42;
+  --color-lotte-navy-soft: #163c7a;
+  --color-lotte-gold: #c7a35a;
+  --color-lotte-gold-light: #d4b866;
+  --color-lotte-cream: #fdf8f2;
+  --color-lotte-cream-deep: #f5efe6;
+  --color-lotte-cream-shadow: #e8e4dc;
 }
 
 :root {
-  --bg: #f7f1e7;
-  --surface: #fffdf9;
-  --surface-2: #f1e8da;
-  --surface-3: #e7dbc9;
-  --border: #d8c6ab;
-  --border-strong: #bea27b;
-  --text: #041E42;        /* Classic Navy */
-  --muted: #4a5e7a;
-  --dim: #7d8da1;
-  --red: #D00F31;         /* Energetic Red */
-  --red-dark: #a50c27;
-  --blue: #6CACE4;        /* Heritage Blue */
-  --gold: #c7a35a;
-  --win: #d8b15b;
-  --loss: #D00F31;
-  --neutral: #99a3b3;
+  --lotte-red: var(--color-lotte-red);
+  --lotte-red-dark: var(--color-lotte-red-dark);
+  --lotte-red-light: var(--color-lotte-red-light);
+  --lotte-red-rgb: 208 15 49;
+  --lotte-blue: var(--color-lotte-blue);
+  --lotte-blue-deep: var(--color-lotte-blue-deep);
+  --lotte-blue-rgb: 108 172 228;
+  --lotte-navy: var(--color-lotte-navy);
+  --lotte-navy-soft: var(--color-lotte-navy-soft);
+  --lotte-navy-rgb: 4 30 66;
+  --lotte-gold: var(--color-lotte-gold);
+  --lotte-gold-light: var(--color-lotte-gold-light);
+  --lotte-gold-rgb: 199 163 90;
+  --lotte-cream: var(--color-lotte-cream);
+  --lotte-cream-deep: var(--color-lotte-cream-deep);
+  --lotte-cream-shadow: var(--color-lotte-cream-shadow);
+  --lotte-cream-rgb: 253 248 242;
+  --lotte-cream-deep-rgb: 245 239 230;
+
+  --bg: var(--lotte-cream);
+  --surface: var(--lotte-cream);
+  --surface-2: var(--lotte-cream-deep);
+  --surface-3: var(--lotte-cream-shadow);
+  --surface-glass: rgba(var(--lotte-cream-rgb), 0.98);
+  --surface-glass-strong: rgba(var(--lotte-cream-rgb), 0.92);
+  --surface-glass-soft: rgba(var(--lotte-cream-rgb), 0.82);
+  --surface-glass-muted: rgba(var(--lotte-cream-rgb), 0.72);
+  --surface-overlay: rgba(var(--lotte-cream-rgb), 0.5);
+  --surface-overlay-strong: rgba(var(--lotte-cream-rgb), 0.95);
+  --border: rgba(var(--lotte-gold-rgb), 0.38);
+  --border-strong: rgba(var(--lotte-gold-rgb), 0.62);
+  --text: var(--lotte-navy);
+  --muted: rgba(var(--lotte-navy-rgb), 0.74);
+  --dim: rgba(var(--lotte-navy-rgb), 0.52);
+  --red: var(--lotte-red);
+  --red-dark: var(--lotte-red-dark);
+  --blue: var(--lotte-blue);
+  --gold: var(--lotte-gold);
+  --win: var(--lotte-gold);
+  --loss: var(--lotte-red);
+  --neutral: var(--lotte-blue-deep);
+  --text-on-accent: var(--lotte-cream);
+  --red-soft: rgba(var(--lotte-red-rgb), 0.1);
+  --red-soft-strong: rgba(var(--lotte-red-rgb), 0.16);
+  --red-border: rgba(var(--lotte-red-rgb), 0.28);
+  --red-overlay: rgba(var(--lotte-red-rgb), 0.07);
+  --blue-soft: rgba(var(--lotte-blue-rgb), 0.16);
+  --blue-soft-strong: rgba(var(--lotte-blue-rgb), 0.24);
+  --blue-border: rgba(var(--lotte-blue-rgb), 0.32);
+  --navy-soft: rgba(var(--lotte-navy-rgb), 0.1);
+  --navy-soft-strong: rgba(var(--lotte-navy-rgb), 0.18);
+  --navy-border: rgba(var(--lotte-navy-rgb), 0.24);
+  --gold-soft: rgba(var(--lotte-gold-rgb), 0.14);
+  --gold-soft-strong: rgba(var(--lotte-gold-rgb), 0.2);
+  --gold-border: rgba(var(--lotte-gold-rgb), 0.3);
+  --gradient-page:
+    radial-gradient(circle at top left, rgba(var(--lotte-red-rgb), 0.1), transparent 22%),
+    radial-gradient(circle at top right, rgba(var(--lotte-blue-rgb), 0.1), transparent 20%),
+    linear-gradient(180deg, var(--lotte-cream) 0%, var(--lotte-cream-deep) 100%);
+  --gradient-surface:
+    linear-gradient(180deg, rgba(var(--lotte-cream-rgb), 0.96) 0%, rgba(var(--lotte-cream-deep-rgb), 0.98) 100%);
+  --gradient-surface-accent:
+    radial-gradient(circle at top left, rgba(var(--lotte-red-rgb), 0.12), transparent 30%),
+    linear-gradient(180deg, rgba(var(--lotte-cream-rgb), 0.96) 0%, rgba(var(--lotte-cream-deep-rgb), 0.98) 100%);
+  --shadow-soft: inset 0 1px 0 rgba(var(--lotte-cream-rgb), 0.72), 0 2px 16px rgba(var(--lotte-navy-rgb), 0.08);
+  --shadow-panel: 0 8px 32px rgba(var(--lotte-navy-rgb), 0.1);
+  --shadow-card: 0 6px 20px rgba(var(--lotte-navy-rgb), 0.09);
+  --shadow-hero: 0 20px 50px rgba(var(--lotte-navy-rgb), 0.1);
   --radius-sm: 10px;
   --radius-md: 14px;
   --radius-lg: 20px;
@@ -95,10 +138,7 @@ html {
 }
 
 body {
-  background:
-    radial-gradient(circle at top left, rgba(208, 15, 49, 0.10), transparent 22%),
-    radial-gradient(circle at top right, rgba(108, 172, 228, 0.10), transparent 20%),
-    linear-gradient(180deg, #fbf6ef 0%, #f2e8db 100%);
+  background: var(--gradient-page);
   color: var(--text);
   font-family: var(--font-giants), var(--font-sans-kr), 'Noto Sans KR', sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -121,21 +161,18 @@ body {
   font-family: var(--font-mono), 'Space Mono', 'Courier New', monospace;
 }
 
-/* Scrollbar */
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: var(--bg); }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
 
-/* Focus rings */
 :focus-visible {
   outline: 2px solid var(--red);
   outline-offset: 2px;
 }
 
-/* Selection */
 ::selection {
-  background: rgba(208, 15, 49, 0.25);
+  background: rgba(var(--lotte-red-rgb), 0.25);
   color: var(--text);
 }
 
@@ -163,7 +200,7 @@ body {
 }
 
 .panel-elevated {
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 2px 16px rgba(96, 62, 27, 0.05);
+  box-shadow: var(--shadow-soft);
 }
 
 .fan-voice-overlay {
@@ -171,8 +208,8 @@ body {
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 18px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.74), rgba(241, 232, 218, 0.68));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 2px 16px rgba(96, 62, 27, 0.05);
+  background: linear-gradient(180deg, rgba(var(--lotte-cream-rgb), 0.74), rgba(var(--lotte-cream-deep-rgb), 0.68));
+  box-shadow: var(--shadow-soft);
 }
 
 .fan-voice-lane {
@@ -192,7 +229,7 @@ body {
   padding: 7px 12px;
   border: 1px solid var(--border);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.92);
+  background: var(--surface-glass-strong);
   color: var(--text);
   font-size: 12px;
   line-height: 1.35;
@@ -211,8 +248,8 @@ body {
 .fan-voice-bubble:hover {
   animation-play-state: paused;
   border-color: var(--border-strong);
-  background: rgba(255, 255, 255, 0.98);
-  box-shadow: 0 4px 18px rgba(96, 62, 27, 0.12);
+  background: var(--surface-glass);
+  box-shadow: 0 4px 18px rgba(var(--lotte-navy-rgb), 0.12);
   z-index: 10;
 }
 
@@ -237,7 +274,7 @@ body {
   font-size: 10px;
   line-height: 1.2;
   color: var(--muted);
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--surface-glass-strong);
 }
 
 .fan-voice-action-btn:hover {
@@ -246,9 +283,9 @@ body {
 }
 
 .fan-voice-actions .fan-voice-action-btn:first-child:hover {
-  border-color: rgba(208, 15, 49, 0.3);
+  border-color: var(--red-border);
   color: var(--red);
-  background: rgba(208, 15, 49, 0.06);
+  background: rgba(var(--lotte-red-rgb), 0.06);
 }
 
 @media (prefers-reduced-motion: reduce) {

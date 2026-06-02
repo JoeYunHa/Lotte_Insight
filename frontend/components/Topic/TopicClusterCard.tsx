@@ -1,4 +1,4 @@
-import { getLabelMeta } from '@/lib/label-config'
+import { getLabelMeta, getToneBadgeStyle } from '@/lib/label-config'
 import type { TopicCluster } from '@/lib/types'
 
 interface TopicClusterCardProps {
@@ -14,9 +14,9 @@ export function TopicClusterCard({ cluster, color, isSelected, onClick }: TopicC
       onClick={onClick}
       className="w-full text-left rounded-2xl p-4 transition-all duration-200"
       style={{
-        background: isSelected ? 'rgba(255,255,255,0.95)' : 'var(--surface)',
+        background: isSelected ? 'var(--surface-overlay-strong)' : 'var(--surface)',
         border: isSelected ? `1.5px solid ${color}` : '1px solid var(--border)',
-        boxShadow: isSelected ? `0 4px 20px ${color}22` : 'none',
+        boxShadow: isSelected ? `0 4px 20px color-mix(in srgb, ${color} 24%, transparent)` : 'none',
       }}
     >
       <div className="flex items-start gap-3">
@@ -30,7 +30,7 @@ export function TopicClusterCard({ cluster, color, isSelected, onClick }: TopicC
               {cluster.article_count}개 기사
             </span>
             {(() => { const meta = getLabelMeta(cluster.label_hint); return meta ? (
-              <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${meta.badge}`}>
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={getToneBadgeStyle(meta.tone)}>
                 {meta.name}
               </span>
             ) : null })()}

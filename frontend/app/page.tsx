@@ -104,7 +104,7 @@ export default async function HomePage() {
     meta: `${article.source_name} / ${formatRelativeTime(article.published_at)}`,
     value: article.primary_label
       ? LABEL_META[article.primary_label].name
-      : "Desk",
+      : "기타",
   }));
 
   return (
@@ -213,7 +213,7 @@ export default async function HomePage() {
           <div
             className="rounded-[24px] p-6"
             style={{
-              background: "rgba(255,255,255,0.72)",
+              background: "var(--surface-glass-muted)",
               border: "1px solid var(--border)",
             }}
           >

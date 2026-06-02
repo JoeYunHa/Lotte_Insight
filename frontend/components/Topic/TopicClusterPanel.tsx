@@ -40,9 +40,9 @@ export function TopicClusterPanel({
         <div
           className="rounded-[24px] p-5"
           style={{
-            background: 'linear-gradient(180deg, rgba(255,255,255,0.97) 0%, rgba(241,232,218,0.9) 100%)',
+            background: 'var(--gradient-surface)',
             border: `1.5px solid ${clusterColorMap[selectedCluster.id] ?? 'var(--border)'}`,
-            boxShadow: `0 8px 32px ${clusterColorMap[selectedCluster.id] ?? 'transparent'}1a`,
+            boxShadow: 'var(--shadow-panel)',
           }}
         >
           <p
@@ -63,7 +63,7 @@ export function TopicClusterPanel({
                 <span
                   key={name}
                   className="text-[11px] px-2 py-0.5 rounded-full font-medium"
-                  style={{ background: 'rgba(255,255,255,0.7)', color: 'var(--text)', border: '1px solid var(--border)' }}
+                  style={{ background: 'var(--surface-glass-muted)', color: 'var(--text)', border: '1px solid var(--border)' }}
                 >
                   {name}
                 </span>
@@ -99,7 +99,7 @@ export function TopicClusterPanel({
               <TopicClusterCard
                 key={cluster.id}
                 cluster={cluster}
-                color={clusterColorMap[cluster.id] ?? '#94a3b8'}
+                color={clusterColorMap[cluster.id] ?? 'var(--neutral)'}
                 isSelected={selectedClusterId === cluster.id}
                 onClick={() => onSelectCluster(cluster.id)}
               />

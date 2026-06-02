@@ -90,7 +90,7 @@ export function SentimentBar({ positive, neutral, negative, analyzed, total }: S
       {/* Coverage sub-line */}
       <div className="flex items-center gap-1.5 mt-1">
         <span className="text-[10px] font-mono-code" style={{ color: 'var(--dim)' }}>
-          {analyzed} of {total} analyzed
+          {total}건 중 {analyzed}건 분석됨
         </span>
         {isPartial ? (
           <span
@@ -100,7 +100,7 @@ export function SentimentBar({ positive, neutral, negative, analyzed, total }: S
               lineHeight: '16px',
             }}
           >
-            partial
+            일부
           </span>
         ) : null}
       </div>

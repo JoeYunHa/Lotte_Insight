@@ -27,7 +27,7 @@ export function ArticleFeed({ articles }: Props) {
       <div
         className="sticky top-14 z-40 -mx-4 px-4 pt-3 pb-1"
         style={{
-          background: 'rgba(251, 246, 239, 0.94)',
+          background: 'var(--surface-glass-strong)',
           backdropFilter: 'blur(8px)',
           borderBottom: '1px solid var(--border)',
         }}
@@ -37,7 +37,7 @@ export function ArticleFeed({ articles }: Props) {
         </p>
 
         <div className="relative">
-          <div className="absolute right-0 top-0 bottom-0 w-8 pointer-events-none z-10" style={{ background: 'linear-gradient(to right, transparent, rgba(251,246,239,0.96))' }} />
+          <div className="absolute right-0 top-0 bottom-0 w-8 pointer-events-none z-10" style={{ background: 'linear-gradient(to right, transparent, var(--surface-glass))' }} />
           <div className="flex gap-2 overflow-x-auto pb-1">
             {tabs.map((tab) => {
               const isActive = activeFilter === tab.key
@@ -49,8 +49,8 @@ export function ArticleFeed({ articles }: Props) {
                   style={{
                     color: isActive ? 'var(--text)' : 'var(--dim)',
                     fontWeight: isActive ? 700 : 500,
-                    border: isActive ? '1px solid rgba(225,6,44,0.28)' : '1px solid var(--border)',
-                    background: isActive ? 'rgba(225,6,44,0.1)' : 'rgba(255,255,255,0.62)',
+                    border: isActive ? '1px solid var(--red-border)' : '1px solid var(--border)',
+                    background: isActive ? 'var(--red-soft)' : 'var(--surface-glass-muted)',
                   }}
                 >
                   {tab.name}

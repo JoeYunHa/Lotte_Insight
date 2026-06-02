@@ -1,4 +1,4 @@
-import { getLabelMeta } from '@/lib/label-config'
+import { getLabelMeta, getToneBadgeStyle } from '@/lib/label-config'
 import { formatRelativeTime } from '@/lib/time'
 import type { TopicArticlePoint } from '@/lib/types'
 
@@ -37,7 +37,7 @@ export function TopicArticleList({ points }: TopicArticleListProps) {
                 {formatRelativeTime(article.published_at)}
               </span>
               {(() => { const meta = getLabelMeta(article.primary_label); return meta ? (
-                <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${meta.badge}`}>
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={getToneBadgeStyle(meta.tone)}>
                   {meta.name}
                 </span>
               ) : null })()}

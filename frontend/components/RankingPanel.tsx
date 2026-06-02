@@ -34,8 +34,8 @@ export function RankingPanel({
     <section
       className="rounded-[24px] p-5 md:p-6"
       style={{
-        background: 'linear-gradient(180deg, rgba(255,255,255,0.94) 0%, rgba(241,232,218,0.98) 100%)',
-        border: `1px solid ${accentColor === 'var(--border-strong)' ? 'var(--border)' : 'rgba(225,6,44,0.14)'}`,
+        background: 'var(--gradient-surface)',
+        border: `1px solid ${accentColor === 'var(--border-strong)' ? 'var(--border)' : 'var(--red-soft-strong)'}`,
       }}
     >
       <p className="text-[11px] font-mono-code uppercase tracking-[0.22em]" style={{ color: accentColor }}>
@@ -48,7 +48,7 @@ export function RankingPanel({
       {rows.length === 0 ? (
         <div
           className="mt-5 rounded-[20px] p-4"
-          style={{ background: 'rgba(255,255,255,0.65)', border: '1px dashed var(--border)' }}
+          style={{ background: 'var(--surface-glass-muted)', border: '1px dashed var(--border)' }}
         >
           <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
             {emptyTitle}
@@ -66,15 +66,15 @@ export function RankingPanel({
                 className="flex items-start gap-4 rounded-[20px] px-4 py-3 transition-colors"
                 style={{
                   background: isTop
-                    ? 'linear-gradient(135deg, rgba(199,163,90,0.11) 0%, rgba(255,255,255,0.88) 100%)'
-                    : 'rgba(255,255,255,0.58)',
-                  border: isTop ? '1px solid rgba(199,163,90,0.28)' : '1px solid var(--border)',
+                    ? 'linear-gradient(135deg, rgba(var(--lotte-gold-rgb), 0.11) 0%, rgba(var(--lotte-cream-rgb), 0.88) 100%)'
+                    : 'var(--surface-glass-muted)',
+                  border: isTop ? '1px solid var(--gold-border)' : '1px solid var(--border)',
                 }}
               >
                 <div
                   className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-mono-code font-bold"
                   style={{
-                    background: isTop ? 'rgba(199,163,90,0.18)' : 'var(--surface-2)',
+                    background: isTop ? 'var(--gold-soft-strong)' : 'var(--surface-2)',
                     color: isTop ? 'var(--gold)' : 'var(--muted)',
                   }}
                 >

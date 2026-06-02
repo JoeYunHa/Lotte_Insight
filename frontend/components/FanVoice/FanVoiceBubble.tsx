@@ -44,7 +44,7 @@ export function FanVoiceBubble({
           type="button"
           className="fan-voice-action-btn"
           onClick={() => onReact(bubble.message.id)}
-          title="React"
+          title="좋아요"
         >
           ♥{count > 0 ? ` ${count}` : ""}
         </button>
@@ -52,7 +52,7 @@ export function FanVoiceBubble({
           type="button"
           className="fan-voice-action-btn"
           onClick={() => onReport(bubble.message.id)}
-          title="Report"
+          title="신고"
         >
           ⚑
         </button>

@@ -51,11 +51,11 @@ export function TopicMapToolbar({
                 color: isActive ? "var(--text)" : "var(--dim)",
                 fontWeight: isActive ? 700 : 500,
                 border: isActive
-                  ? "1px solid rgba(225,6,44,0.28)"
+                  ? "1px solid var(--red-border)"
                   : "1px solid var(--border)",
                 background: isActive
-                  ? "rgba(225,6,44,0.1)"
-                  : "rgba(255,255,255,0.62)",
+                  ? "var(--red-soft)"
+                  : "var(--surface-glass-muted)",
               }}
             >
               {name}
@@ -75,7 +75,7 @@ export function TopicMapToolbar({
                 className="rounded-full px-3 py-1 text-[11px] font-medium transition-all"
                 style={{
                   background: isActive ? "var(--text)" : "var(--surface-2)",
-                  color: isActive ? "var(--bg)" : "var(--muted)",
+                  color: isActive ? "var(--text-on-accent)" : "var(--muted)",
                   border: "1px solid var(--border)",
                 }}
               >

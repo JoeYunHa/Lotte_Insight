@@ -13,12 +13,12 @@ export function FanVoiceToggle({ cleanMode, onToggle }: FanVoiceToggleProps) {
       className="rounded-full border px-3 py-1 text-xs font-medium transition"
       style={{
         borderColor: 'var(--border)',
-        background: cleanMode ? 'var(--surface-2)' : 'rgba(255,255,255,0.75)',
+        background: cleanMode ? 'var(--surface-2)' : 'var(--surface-glass-muted)',
         color: 'var(--muted)',
       }}
       aria-pressed={cleanMode}
     >
-      {cleanMode ? 'Fan Voice Off' : 'Fan Voice On'}
+      {cleanMode ? '팬 보이스 끄기' : '팬 보이스 켜기'}
     </button>
   )
 }

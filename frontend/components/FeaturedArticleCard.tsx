@@ -16,8 +16,7 @@ export function FeaturedArticleCard({
       <section
         className="rounded-[28px] p-6 md:p-7"
         style={{
-          background:
-            'linear-gradient(180deg, rgba(255,255,255,0.94) 0%, rgba(241,232,218,0.98) 100%)',
+          background: 'var(--gradient-surface)',
           border: '1px solid var(--border)',
         }}
       >
@@ -36,11 +35,11 @@ export function FeaturedArticleCard({
 
   return (
     <section
-      className="rounded-[28px] p-6 md:p-7 shadow-[0_20px_50px_rgba(96,62,27,0.10)]"
+      className="rounded-[28px] p-6 md:p-7"
       style={{
-        background:
-          'radial-gradient(circle at top left, rgba(225,6,44,0.12), transparent 30%), linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(241,232,218,0.98) 100%)',
+        background: 'var(--gradient-surface-accent)',
         border: '1px solid var(--border)',
+        boxShadow: 'var(--shadow-hero)',
       }}
     >
       <div className="flex flex-wrap items-center gap-2">
@@ -76,9 +75,9 @@ export function FeaturedArticleCard({
           rel="noopener noreferrer"
           className="group/link inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-all"
           style={{
-            background: 'rgba(255,255,255,0.7)',
+            background: 'var(--surface-glass-muted)',
             color: 'var(--text)',
-            border: '1px solid rgba(225,6,44,0.26)',
+            border: '1px solid var(--red-border)',
           }}
         >
           원문 기사 보기

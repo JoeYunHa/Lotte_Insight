@@ -27,7 +27,7 @@ export function LeadIssueCard({ label, summary, articleCount, keyPlayers, title,
       <div
         className="px-5 py-3 flex items-center gap-2"
         style={{
-          background: 'rgba(255,255,255,0.025)',
+          background: 'rgba(var(--lotte-cream-rgb), 0.25)',
           borderBottom: '1px solid var(--border)',
         }}
       >
@@ -35,7 +35,7 @@ export function LeadIssueCard({ label, summary, articleCount, keyPlayers, title,
           className="text-[10px] font-mono-code uppercase tracking-widest font-bold shrink-0"
           style={{ color: 'var(--dim)' }}
         >
-          LEAD ISSUE
+          주요 이슈
         </span>
         <span className="text-[10px]" style={{ color: 'var(--border-strong)' }}>·</span>
         <LabelBadge label={label} />

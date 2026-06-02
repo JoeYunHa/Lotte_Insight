@@ -39,11 +39,11 @@ export default async function TopicsPage() {
         <div
           className="rounded-[28px] p-10 text-center"
           style={{
-            background: "rgba(248,113,113,0.07)",
-            border: "1px solid rgba(248,113,113,0.25)",
+            background: "var(--red-overlay)",
+            border: "1px solid var(--red-border)",
           }}
         >
-          <p className="text-sm font-medium mb-2" style={{ color: "#f87171" }}>
+          <p className="text-sm font-medium mb-2" style={{ color: "var(--red)" }}>
             백엔드 연결 실패
           </p>
           <p
