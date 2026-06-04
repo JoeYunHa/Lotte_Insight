@@ -18,12 +18,12 @@ export function HotPlayerCard({ playerMention, rank, delay = 0, summary, highlig
       className="block rounded-lg p-4 transition-all duration-200 group animate-fade-up"
       style={{
         background: 'var(--surface)',
-        border: highlight ? '1px solid var(--gold)' : '1px solid var(--border)',
+        border: highlight ? '1px solid var(--blue-border)' : '1px solid var(--border)',
         animationDelay: `${delay}ms`,
       }}
     >
       <div className="flex items-start gap-3">
-        <span className="text-[10px] font-mono-code font-bold mt-1 w-4 shrink-0" style={{ color: highlight ? 'var(--gold)' : 'var(--dim)' }}>
+        <span className="text-[10px] font-mono-code font-bold mt-1 w-4 shrink-0" style={{ color: highlight ? 'var(--blue)' : 'var(--dim)' }}>
           {String(rank).padStart(2, '0')}
         </span>
 
@@ -42,7 +42,7 @@ export function HotPlayerCard({ playerMention, rank, delay = 0, summary, highlig
         </div>
 
         <div className="shrink-0 text-right">
-          <p className="text-2xl font-bold font-mono-code leading-none" style={{ color: 'var(--gold)' }}>
+          <p className="text-2xl font-bold font-mono-code leading-none" style={{ color: highlight ? 'var(--red)' : 'var(--text)' }}>
             {mention_count}
           </p>
           <p className="text-[10px] font-mono-code uppercase tracking-widest mt-0.5" style={{ color: 'var(--dim)' }}>

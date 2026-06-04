@@ -41,7 +41,7 @@ export function LeadIssueCard({ label, summary, articleCount, keyPlayers, title,
         <LabelBadge label={label} />
         <span
           className="ml-auto text-sm font-bold font-mono-code shrink-0"
-          style={{ color: 'var(--gold)' }}
+          style={{ color: 'var(--text)' }}
         >
           {articleCount}건
         </span>

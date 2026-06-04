@@ -15,7 +15,7 @@ const MONTHS = ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', 
 const RESULT_LABEL: Record<'W' | 'L' | 'D', string> = { W: '승', L: '패', D: '무' }
 
 const RESULT_STYLE: Record<'W' | 'L' | 'D', { bg: string; text: string }> = {
-  W: { bg: 'var(--gold-soft)', text: 'var(--gold)' },
+  W: { bg: 'var(--navy-soft)', text: 'var(--text)' },
   L: { bg: 'var(--red-soft)', text: 'var(--red)' },
   D: { bg: 'var(--blue-soft)', text: 'var(--neutral)' },
 }

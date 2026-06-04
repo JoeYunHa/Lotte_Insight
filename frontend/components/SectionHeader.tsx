@@ -1,4 +1,4 @@
-type SectionAccent = 'red' | 'gold' | 'neutral'
+type SectionAccent = 'red' | 'blue' | 'navy'
 
 interface SectionHeaderProps {
   label: string
@@ -6,31 +6,36 @@ interface SectionHeaderProps {
   dense?: boolean
 }
 
-export function SectionHeader({ label, accent = 'neutral', dense = false }: SectionHeaderProps) {
+export function SectionHeader({ label, accent = 'blue', dense = false }: SectionHeaderProps) {
   const labelColor =
     accent === 'red' ? 'var(--red)' :
-    accent === 'gold' ? 'var(--gold)' :
-    'var(--dim)'
+    accent === 'navy' ? 'var(--text)' :
+    'var(--blue)'
 
   const lineColor =
-    accent === 'red' ? 'var(--red)' :
-    accent === 'gold' ? 'var(--gold)' :
-    'var(--border)'
-
-  const lineClass = accent === 'red' ? 'h-[2px]' : 'h-px'
+    accent === 'red'
+      ? 'linear-gradient(90deg, var(--red), rgba(var(--lotte-red-rgb), 0.08))'
+      : accent === 'navy'
+        ? 'linear-gradient(90deg, var(--text), rgba(var(--lotte-navy-rgb), 0.08))'
+        : 'linear-gradient(90deg, var(--blue), rgba(var(--lotte-blue-rgb), 0.08))'
 
   return (
     <div className={`flex items-center gap-3 ${dense ? 'mb-3' : 'mb-5'}`}>
-      {accent === 'gold' ? (
+      <span
+        className={`shrink-0 rounded-sm ${accent === 'red' ? 'h-4 w-1' : 'h-3.5 w-3.5'}`}
+        style={{
+          background:
+            accent === 'red'
+              ? 'var(--red)'
+              : accent === 'navy'
+                ? 'var(--gradient-navy-band)'
+                : 'linear-gradient(180deg, rgba(var(--lotte-blue-rgb), 0.92), rgba(var(--lotte-navy-rgb), 0.9))',
+        }}
+      />
+      {accent === 'navy' ? (
         <span
-          className="w-1.5 h-1.5 rounded-full shrink-0"
-          style={{ background: 'var(--gold)' }}
-        />
-      ) : null}
-      {accent === 'red' ? (
-        <span
-          className="w-0.5 h-3.5 rounded-sm shrink-0"
-          style={{ background: 'var(--red)' }}
+          className="h-px w-8 shrink-0"
+          style={{ background: 'rgba(var(--lotte-red-rgb), 0.55)' }}
         />
       ) : null}
       <span
@@ -39,7 +44,7 @@ export function SectionHeader({ label, accent = 'neutral', dense = false }: Sect
       >
         {label}
       </span>
-      <div className={`flex-1 ${lineClass}`} style={{ background: lineColor }} />
+      <div className="flex-1 h-px" style={{ background: lineColor }} />
     </div>
   )
 }

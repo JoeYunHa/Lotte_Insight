@@ -15,7 +15,7 @@ export function HomeHeroDesk({ date, headline, subcopy, kicker, metaStat, status
       className="relative pt-10 pb-10 overflow-hidden"
       style={{
         background:
-          'radial-gradient(ellipse at 12% 18%, rgba(var(--lotte-blue-rgb), 0.2) 0%, transparent 36%), radial-gradient(ellipse at 86% 72%, rgba(var(--lotte-red-rgb), 0.08) 0%, transparent 34%)',
+          'radial-gradient(ellipse at 12% 18%, rgba(var(--lotte-blue-rgb), 0.24) 0%, transparent 36%), radial-gradient(ellipse at 86% 72%, rgba(var(--lotte-red-rgb), 0.12) 0%, transparent 34%), linear-gradient(135deg, rgba(var(--lotte-cream-rgb), 0.7) 0%, transparent 100%)',
       }}
     >
       <div
@@ -34,7 +34,7 @@ export function HomeHeroDesk({ date, headline, subcopy, kicker, metaStat, status
           fontSize: 'clamp(130px, 20vw, 210px)',
           fontFamily: 'var(--font-giants-inline), var(--font-giants), serif',
           color: 'transparent',
-          WebkitTextStroke: '1px rgba(var(--lotte-blue-rgb), 0.22)',
+          WebkitTextStroke: '1px rgba(var(--lotte-navy-rgb), 0.18)',
           lineHeight: 1,
           letterSpacing: '-0.04em',
           userSelect: 'none',
@@ -55,7 +55,7 @@ export function HomeHeroDesk({ date, headline, subcopy, kicker, metaStat, status
           <div
             className="inline-flex items-center gap-2 rounded-full px-2.5 py-1"
             style={{
-              background: 'rgba(var(--lotte-blue-rgb), 0.1)',
+              background: 'rgba(var(--lotte-blue-rgb), 0.14)',
               border: '1px solid var(--blue-border)',
             }}
           >

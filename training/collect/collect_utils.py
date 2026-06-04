@@ -189,6 +189,31 @@ NON_BASEBALL_KEYWORDS = (
 INJURY_KEYWORDS = ("부상", "재활", "말소", "복귀", "엔트리", "등록", "결장", "수술")
 TRANSACTION_KEYWORDS = ("영입", "방출", "트레이드", "계약", "fa", "입단", "이적", "재계약")
 
+# 수집 데이터에서 항상 배제할 비-야구 콘텐츠 키워드
+# 제목에 하나라도 포함되면 수집·저장 대상에서 제외
+CHEERLEADER_KEYWORDS: tuple[str, ...] = ("치어리더", "치어걸")
+
+# 중의어 없는 야구 전용 키워드 — 수집 필터에서 맥락 확인용
+# ('감독', '코치', '경기', '부상', '승리' 등 일반 명사는 의도적으로 제외)
+STRICT_BASEBALL_KEYWORDS: tuple[str, ...] = (
+    "야구", "프로야구", "kbo",
+    "투수", "타자", "포수", "불펜", "등판",
+    "홈런", "안타", "타점", "세이브", "이닝", "타율",
+    "ops", "era", "whip",
+)
+FULL_KBO_TEAM_NAMES: tuple[str, ...] = (
+    "kia 타이거즈", "삼성 라이온즈", "lg 트윈스", "두산 베어스",
+    "롯데 자이언츠", "ssg 랜더스", "nc 다이노스", "키움 히어로즈",
+    "한화 이글스", "kt 위즈",
+    "자이언츠", "라이온즈", "트윈스", "베어스", "랜더스",
+    "다이노스", "히어로즈", "이글스", "타이거즈",
+)
+LOTTE_BIZ_KEYWORDS: tuple[str, ...] = (
+    "롯데백", "롯데마트", "롯데칠성", "롯데호텔", "롯데쇼핑", "롯데온",
+    "롯데캐슬", "롯데免", "롯데아울렛", "롯데렌탈", "롯데월드", "롯데리아",
+    "롯데그룹", "롯데케미칼", "롯데카드", "롯데건설",
+)
+
 
 # Removed a previously corrupted keyword block.
 
@@ -1161,6 +1186,10 @@ __all__ = [
     "CSV_HEADERS",
     "DATA_DIR",
     "NON_BASEBALL_KEYWORDS",
+    "CHEERLEADER_KEYWORDS",
+    "STRICT_BASEBALL_KEYWORDS",
+    "FULL_KBO_TEAM_NAMES",
+    "LOTTE_BIZ_KEYWORDS",
     "apply_label_cap",
     "auto_label",
     "build_days_cutoff",

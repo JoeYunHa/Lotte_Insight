@@ -21,7 +21,7 @@ export function FeaturedArticleCard({
           boxShadow: 'var(--shadow-card)',
         }}
       >
-        <p className="text-xs font-mono-code uppercase tracking-[0.24em]" style={{ color: 'var(--gold)' }}>
+        <p className="text-xs font-mono-code uppercase tracking-[0.24em]" style={{ color: 'var(--blue)' }}>
           {eyebrow}
         </p>
         <h2 className="mt-4 text-2xl font-serif-kr font-bold" style={{ color: 'var(--text)' }}>
@@ -76,9 +76,9 @@ export function FeaturedArticleCard({
           rel="noopener noreferrer"
           className="group/link inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-all"
           style={{
-            background: 'rgba(var(--lotte-blue-rgb), 0.1)',
-            color: 'var(--text)',
-            border: '1px solid var(--blue-border)',
+            background: 'var(--surface-navy)',
+            color: 'var(--text-on-accent)',
+            border: '1px solid rgba(var(--lotte-blue-rgb), 0.3)',
           }}
         >
           원문 기사 보기

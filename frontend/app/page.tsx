@@ -155,7 +155,7 @@ export default async function HomePage() {
             eyebrow="스탠스"
             value={sentiment.analyzed > 0 ? `${sentiment.analyzed}` : "0"}
             detail="스탠스 데이터 보유 기사"
-            accent="gold"
+            accent="navy"
           >
             {sentiment.analyzed > 0 ? (
               <SentimentBar
@@ -178,13 +178,13 @@ export default async function HomePage() {
       </section>
 
       <section className="mb-10">
-        <SectionHeader label="빠른 순위" accent="gold" />
+        <SectionHeader label="빠른 순위" accent="navy" />
         <div className="grid gap-4 xl:grid-cols-2">
           <RankingPanel
             eyebrow="선수 순위"
             title="최다 언급 선수"
             rows={playerRankingRows}
-            accent="gold"
+            accent="navy"
             emptyTitle="선수 순위가 비어있습니다"
             emptyBody="오늘의 기사-선수 연결이 완료되면 선수 언급 순위가 표시됩니다."
           />

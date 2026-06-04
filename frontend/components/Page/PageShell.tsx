@@ -16,10 +16,10 @@ interface PageShellProps {
 
 export function PageShell({ children, footer, headerActions, seasonBadge }: PageShellProps) {
   return (
-    <div className="min-h-dvh" style={{ background: 'var(--bg)' }}>
+    <div className="min-h-dvh" style={{ background: 'transparent' }}>
       <div className="h-[4px] w-full" style={{ background: 'var(--gradient-navy-band)' }} />
 
-      <header className="sticky top-0 z-50 backdrop-blur-md" style={{ background: 'var(--surface-glass-strong)', borderBottom: '1px solid var(--border)', boxShadow: '0 8px 24px rgba(var(--lotte-navy-rgb), 0.06)' }}>
+      <header className="sticky top-0 z-50 backdrop-blur-md" style={{ background: 'var(--surface-navy-soft)', borderBottom: '1px solid rgba(var(--lotte-blue-rgb), 0.26)', boxShadow: '0 14px 36px rgba(var(--lotte-navy-rgb), 0.18)' }}>
         <div className="max-w-5xl mx-auto px-4 py-2 min-h-14 flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-3">
             <Image
@@ -31,15 +31,15 @@ export function PageShell({ children, footer, headerActions, seasonBadge }: Page
               priority
             />
             <div className="flex min-w-0 flex-col">
-              <span className="font-bold text-sm tracking-wide leading-none" style={{ color: 'var(--text)' }}>
+              <span className="font-bold text-sm tracking-wide leading-none" style={{ color: 'var(--text-on-accent)' }}>
                 Lotte Insight
               </span>
-              <span className="text-[10px] font-mono-code leading-none mt-0.5" style={{ color: 'var(--muted)' }}>
+              <span className="text-[10px] font-mono-code leading-none mt-0.5" style={{ color: 'rgba(var(--lotte-cream-rgb), 0.68)' }}>
                 LOTTE GIANTS MATCHDAY DESK
               </span>
             </div>
             {seasonBadge ? (
-              <span className="chip-surface text-xs px-1.5 py-0.5 rounded font-mono-code ml-1" style={{ color: 'var(--text)' }}>
+              <span className="text-xs px-2 py-0.5 rounded-full font-mono-code ml-1" style={{ color: 'var(--text-on-accent)', border: '1px solid rgba(var(--lotte-blue-rgb), 0.34)', background: 'rgba(var(--lotte-white-rgb), 0.08)' }}>
                 {seasonBadge}
               </span>
             ) : null}
@@ -52,9 +52,9 @@ export function PageShell({ children, footer, headerActions, seasonBadge }: Page
                   href={action.href}
                   className="text-xs transition-all px-3 py-1.5 rounded-full hover:-translate-y-px"
                   style={{
-                    color: 'var(--text)',
-                    border: '1px solid var(--border)',
-                    background: 'var(--surface-glass-muted)',
+                    color: 'var(--text-on-accent)',
+                    border: '1px solid rgba(var(--lotte-blue-rgb), 0.24)',
+                    background: 'rgba(var(--lotte-white-rgb), 0.06)',
                   }}
                 >
                   {action.label}

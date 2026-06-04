@@ -47,7 +47,7 @@ export function TopicClusterPanel({
         >
           <p
             className="text-[10px] font-mono-code uppercase tracking-[0.18em] mb-3"
-            style={{ color: clusterColorMap[selectedCluster.id] ?? 'var(--gold)' }}
+            style={{ color: clusterColorMap[selectedCluster.id] ?? 'var(--blue)' }}
           >
             선택된 클러스터
           </p>

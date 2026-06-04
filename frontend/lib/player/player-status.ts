@@ -6,8 +6,8 @@ export const PLAYER_STATUS_META: Record<
   PlayerStatus,
   { label: string; color: string }
 > = {
-  active: { label: "Active", color: "var(--gold)" },
-  "1군": { label: "Active", color: "var(--gold)" },
+  active: { label: "Active", color: "var(--blue)" },
+  "1군": { label: "Active", color: "var(--blue)" },
   "2군": { label: "Reserve", color: "var(--dim)" },
   말소: { label: "Inactive", color: "var(--dim)" },
 };
@@ -17,14 +17,14 @@ export const PLAYER_STATUS_BADGE: Record<
   { bg: string; text: string; border: string }
 > = {
   active: {
-    bg: "var(--gold-soft)",
-    text: "var(--gold)",
-    border: "var(--gold-border)",
+    bg: "var(--blue-soft)",
+    text: "var(--blue)",
+    border: "var(--blue-border)",
   },
   "1군": {
-    bg: "var(--gold-soft)",
-    text: "var(--gold)",
-    border: "var(--gold-border)",
+    bg: "var(--blue-soft)",
+    text: "var(--blue)",
+    border: "var(--blue-border)",
   },
   "2군": {
     bg: "var(--blue-soft)",

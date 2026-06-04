@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 
-type SignalAccent = 'red' | 'gold' | 'neutral'
+type SignalAccent = 'red' | 'blue' | 'navy'
 
 interface SignalCardProps {
   title: string
@@ -12,21 +12,30 @@ interface SignalCardProps {
   eyebrow?: string
 }
 
-export function SignalCard({ title, value, detail, delay = 0, children, accent = 'neutral', eyebrow }: SignalCardProps) {
-  const accentColor = accent === 'red' ? 'var(--red)' : accent === 'gold' ? 'var(--gold)' : 'var(--blue)'
-  const valueColor = accent === 'red' ? 'var(--red)' : accent === 'gold' ? 'var(--gold)' : 'var(--text)'
+export function SignalCard({ title, value, detail, delay = 0, children, accent = 'blue', eyebrow }: SignalCardProps) {
+  const accentColor =
+    accent === 'red' ? 'var(--red)' :
+    accent === 'navy' ? 'var(--text)' :
+    'var(--blue)'
+  const valueColor = accent === 'blue' ? 'var(--text)' : accentColor
+  const borderColor =
+    accent === 'red' ? 'var(--red-border)' :
+    accent === 'navy' ? 'var(--navy-border)' :
+    'var(--blue-border)'
   const panelBackground =
     accent === 'red'
-      ? 'linear-gradient(180deg, rgba(var(--lotte-white-rgb), 0.98) 0%, rgba(var(--lotte-red-rgb), 0.05) 100%)'
-      : accent === 'gold'
-        ? 'linear-gradient(180deg, rgba(var(--lotte-white-rgb), 0.98) 0%, rgba(var(--lotte-navy-rgb), 0.08) 100%)'
-        : 'linear-gradient(180deg, rgba(var(--lotte-white-rgb), 0.98) 0%, rgba(var(--lotte-blue-rgb), 0.1) 100%)'
+      ? 'linear-gradient(180deg, rgba(var(--lotte-red-rgb), 0.14) 0%, rgba(var(--lotte-cream-rgb), 0.94) 28%, rgba(var(--lotte-white-rgb), 0.86) 100%)'
+      : accent === 'navy'
+        ? 'linear-gradient(180deg, rgba(var(--lotte-navy-rgb), 0.92) 0%, rgba(var(--lotte-navy-rgb), 0.86) 22%, rgba(var(--lotte-cream-rgb), 0.96) 22%, rgba(var(--lotte-white-rgb), 0.88) 100%)'
+        : 'linear-gradient(180deg, rgba(var(--lotte-blue-rgb), 0.2) 0%, rgba(var(--lotte-cream-rgb), 0.94) 28%, rgba(var(--lotte-white-rgb), 0.88) 100%)'
+  const mutedColor = accent === 'navy' ? 'rgba(var(--lotte-cream-rgb), 0.78)' : 'var(--muted)'
 
   return (
     <div
       className="card-surface rounded-lg p-4 animate-fade-up"
       style={{
-        borderTop: `2px solid ${accentColor}`,
+        border: `1px solid ${borderColor}`,
+        borderTop: `3px solid ${accentColor}`,
         background: panelBackground,
         animationDelay: `${delay}ms`,
       }}
@@ -34,14 +43,14 @@ export function SignalCard({ title, value, detail, delay = 0, children, accent =
       {eyebrow ? (
         <p
           className="text-[9px] font-mono-code uppercase tracking-widest mb-1"
-          style={{ color: accentColor ?? 'var(--dim)' }}
+          style={{ color: accent === 'navy' ? 'rgba(var(--lotte-cream-rgb), 0.72)' : accentColor }}
         >
           {eyebrow}
         </p>
       ) : null}
       <p
         className="text-[10px] font-mono-code uppercase tracking-widest mb-2"
-        style={{ color: 'var(--dim)' }}
+        style={{ color: accent === 'navy' ? 'rgba(var(--lotte-cream-rgb), 0.72)' : 'var(--dim)' }}
       >
         {title}
       </p>
@@ -54,7 +63,7 @@ export function SignalCard({ title, value, detail, delay = 0, children, accent =
         </p>
       ) : null}
       {detail ? (
-        <p className="text-xs mt-1.5" style={{ color: 'var(--muted)' }}>
+        <p className="text-xs mt-1.5" style={{ color: mutedColor }}>
           {detail}
         </p>
       ) : null}
@@ -102,7 +111,7 @@ export function SentimentBar({ positive, neutral, negative, analyzed, total }: S
           <span
             className="chip-surface text-[9px] font-mono-code px-1 rounded"
             style={{
-              color: 'var(--gold)',
+              color: 'var(--blue)',
               lineHeight: '16px',
             }}
           >

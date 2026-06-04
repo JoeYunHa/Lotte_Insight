@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react'
 
-export type PaletteTone = 'red' | 'blue' | 'navy' | 'gold' | 'neutral'
+export type PaletteTone = 'red' | 'blue' | 'navy' | 'cream' | 'neutral'
 
 export const palette = {
   red: 'var(--red)',
@@ -8,7 +8,6 @@ export const palette = {
   blue: 'var(--blue)',
   blueDeep: 'var(--neutral)',
   navy: 'var(--text)',
-  gold: 'var(--text)',
   cream: 'var(--surface)',
   creamDeep: 'var(--surface-2)',
   muted: 'var(--muted)',
@@ -21,7 +20,7 @@ const toneStyles: Record<PaletteTone, CSSProperties> = {
   red: { background: 'var(--red-soft)', color: 'var(--red)', border: '1px solid var(--red-border)' },
   blue: { background: 'var(--blue-soft)', color: 'var(--blue)', border: '1px solid var(--blue-border)' },
   navy: { background: 'var(--navy-soft)', color: 'var(--text)', border: '1px solid var(--navy-border)' },
-  gold: { background: 'var(--gold-soft)', color: 'var(--text)', border: '1px solid var(--gold-border)' },
+  cream: { background: 'var(--cream-soft)', color: 'var(--text)', border: '1px solid var(--cream-border)' },
   neutral: { background: 'var(--blue-soft)', color: 'var(--neutral)', border: '1px solid var(--blue-border)' },
 }
 

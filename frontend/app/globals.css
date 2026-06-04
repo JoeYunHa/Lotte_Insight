@@ -8,8 +8,6 @@
   --color-lotte-blue-deep: #4d8fc6;
   --color-lotte-navy: #041e42;
   --color-lotte-navy-soft: #163c7a;
-  --color-lotte-gold: #c7a35a;
-  --color-lotte-gold-light: #d4b866;
   --color-lotte-white: #ffffff;
   --color-lotte-cream: #fdf8f2;
   --color-lotte-cream-deep: #f5efe6;
@@ -27,9 +25,6 @@
   --lotte-navy: var(--color-lotte-navy);
   --lotte-navy-soft: var(--color-lotte-navy-soft);
   --lotte-navy-rgb: 4 30 66;
-  --lotte-gold: var(--color-lotte-gold);
-  --lotte-gold-light: var(--color-lotte-gold-light);
-  --lotte-gold-rgb: 199 163 90;
   --lotte-white: var(--color-lotte-white);
   --lotte-white-rgb: 255 255 255;
   --lotte-cream: var(--color-lotte-cream);
@@ -38,25 +33,28 @@
   --lotte-cream-rgb: 253 248 242;
   --lotte-cream-deep-rgb: 245 239 230;
 
-  --bg: var(--lotte-white);
-  --surface: var(--lotte-white);
-  --surface-2: rgba(var(--lotte-blue-rgb), 0.08);
-  --surface-3: rgba(var(--lotte-navy-rgb), 0.08);
-  --surface-glass: rgba(var(--lotte-white-rgb), 0.98);
-  --surface-glass-strong: rgba(var(--lotte-white-rgb), 0.94);
-  --surface-glass-soft: rgba(var(--lotte-white-rgb), 0.88);
-  --surface-glass-muted: rgba(var(--lotte-white-rgb), 0.76);
-  --surface-overlay: rgba(var(--lotte-white-rgb), 0.58);
-  --surface-overlay-strong: rgba(var(--lotte-white-rgb), 0.96);
-  --border: rgba(var(--lotte-blue-rgb), 0.28);
-  --border-strong: rgba(var(--lotte-navy-rgb), 0.28);
+  --bg: var(--lotte-cream);
+  --surface: rgba(var(--lotte-white-rgb), 0.84);
+  --surface-2: rgba(var(--lotte-blue-rgb), 0.12);
+  --surface-3: rgba(var(--lotte-navy-rgb), 0.12);
+  --surface-cream: rgba(var(--lotte-cream-rgb), 0.96);
+  --surface-cream-strong: rgba(var(--lotte-cream-deep-rgb), 0.98);
+  --surface-navy: rgba(var(--lotte-navy-rgb), 0.94);
+  --surface-navy-soft: rgba(var(--lotte-navy-rgb), 0.82);
+  --surface-glass: rgba(var(--lotte-cream-rgb), 0.92);
+  --surface-glass-strong: rgba(var(--lotte-cream-rgb), 0.9);
+  --surface-glass-soft: rgba(var(--lotte-white-rgb), 0.82);
+  --surface-glass-muted: rgba(var(--lotte-white-rgb), 0.72);
+  --surface-overlay: rgba(var(--lotte-cream-rgb), 0.62);
+  --surface-overlay-strong: rgba(var(--lotte-cream-rgb), 0.94);
+  --border: rgba(var(--lotte-navy-rgb), 0.16);
+  --border-strong: rgba(var(--lotte-navy-rgb), 0.32);
   --text: var(--lotte-navy);
   --muted: rgba(var(--lotte-navy-rgb), 0.74);
   --dim: rgba(var(--lotte-navy-rgb), 0.52);
   --red: var(--lotte-red);
   --red-dark: var(--lotte-red-dark);
   --blue: var(--lotte-blue);
-  --gold: var(--lotte-navy);
   --win: var(--lotte-navy);
   --loss: var(--lotte-red);
   --neutral: var(--lotte-blue-deep);
@@ -71,26 +69,26 @@
   --navy-soft: rgba(var(--lotte-navy-rgb), 0.1);
   --navy-soft-strong: rgba(var(--lotte-navy-rgb), 0.18);
   --navy-border: rgba(var(--lotte-navy-rgb), 0.24);
-  --gold-soft: rgba(var(--lotte-navy-rgb), 0.1);
-  --gold-soft-strong: rgba(var(--lotte-navy-rgb), 0.18);
-  --gold-border: rgba(var(--lotte-navy-rgb), 0.24);
+  --cream-soft: rgba(var(--lotte-cream-rgb), 0.84);
+  --cream-soft-strong: rgba(var(--lotte-cream-deep-rgb), 0.96);
+  --cream-border: rgba(var(--lotte-navy-rgb), 0.14);
   --gradient-page:
-    radial-gradient(circle at 10% 16%, rgba(var(--lotte-red-rgb), 0.28) 0%, rgba(var(--lotte-red-rgb), 0.16) 18%, transparent 38%),
-    radial-gradient(circle at 52% 8%, rgba(var(--lotte-blue-rgb), 0.32) 0%, rgba(var(--lotte-blue-rgb), 0.18) 20%, transparent 42%),
-    radial-gradient(circle at 90% 20%, rgba(var(--lotte-navy-rgb), 0.34) 0%, rgba(var(--lotte-navy-rgb), 0.18) 22%, transparent 46%),
-    linear-gradient(135deg, rgba(var(--lotte-white-rgb), 1) 0%, rgba(var(--lotte-blue-rgb), 0.1) 48%, rgba(var(--lotte-navy-rgb), 0.16) 100%);
+    radial-gradient(circle at 12% 16%, rgba(var(--lotte-red-rgb), 0.18) 0%, rgba(var(--lotte-red-rgb), 0.08) 20%, transparent 40%),
+    radial-gradient(circle at 54% 8%, rgba(var(--lotte-blue-rgb), 0.24) 0%, rgba(var(--lotte-blue-rgb), 0.14) 22%, transparent 44%),
+    radial-gradient(circle at 88% 18%, rgba(var(--lotte-navy-rgb), 0.22) 0%, rgba(var(--lotte-navy-rgb), 0.1) 24%, transparent 46%),
+    linear-gradient(180deg, rgba(var(--lotte-cream-rgb), 1) 0%, rgba(var(--lotte-white-rgb), 0.92) 42%, rgba(var(--lotte-blue-rgb), 0.08) 100%);
   --gradient-surface:
-    linear-gradient(180deg, rgba(var(--lotte-white-rgb), 0.98) 0%, rgba(var(--lotte-blue-rgb), 0.06) 100%);
+    linear-gradient(180deg, rgba(var(--lotte-cream-rgb), 0.96) 0%, rgba(var(--lotte-white-rgb), 0.88) 42%, rgba(var(--lotte-blue-rgb), 0.1) 100%);
   --gradient-surface-accent:
     radial-gradient(circle at top left, rgba(var(--lotte-blue-rgb), 0.22), transparent 34%),
-    radial-gradient(circle at top right, rgba(var(--lotte-red-rgb), 0.1), transparent 24%),
-    linear-gradient(180deg, rgba(var(--lotte-white-rgb), 1) 0%, rgba(var(--lotte-blue-rgb), 0.07) 100%);
+    radial-gradient(circle at top right, rgba(var(--lotte-red-rgb), 0.14), transparent 24%),
+    linear-gradient(180deg, rgba(var(--lotte-cream-rgb), 0.98) 0%, rgba(var(--lotte-white-rgb), 0.9) 56%, rgba(var(--lotte-blue-rgb), 0.08) 100%);
   --gradient-navy-band:
-    linear-gradient(135deg, rgba(var(--lotte-navy-rgb), 0.96) 0%, rgba(var(--lotte-blue-rgb), 0.92) 100%);
-  --shadow-soft: inset 0 1px 0 rgba(var(--lotte-white-rgb), 0.88), 0 6px 24px rgba(var(--lotte-navy-rgb), 0.08);
-  --shadow-panel: 0 12px 40px rgba(var(--lotte-navy-rgb), 0.12);
-  --shadow-card: 0 10px 28px rgba(var(--lotte-navy-rgb), 0.1);
-  --shadow-hero: 0 24px 60px rgba(var(--lotte-navy-rgb), 0.14);
+    linear-gradient(90deg, rgba(var(--lotte-navy-rgb), 0.98) 0%, rgba(var(--lotte-blue-rgb), 0.9) 72%, rgba(var(--lotte-red-rgb), 0.9) 100%);
+  --shadow-soft: inset 0 1px 0 rgba(var(--lotte-white-rgb), 0.7), 0 10px 24px rgba(var(--lotte-navy-rgb), 0.06);
+  --shadow-panel: 0 18px 44px rgba(var(--lotte-navy-rgb), 0.12);
+  --shadow-card: 0 16px 34px rgba(var(--lotte-navy-rgb), 0.08);
+  --shadow-hero: 0 28px 64px rgba(var(--lotte-navy-rgb), 0.12);
   --radius-sm: 10px;
   --radius-md: 14px;
   --radius-lg: 20px;
@@ -150,6 +148,7 @@ body {
   font-family: var(--font-giants), var(--font-sans-kr), 'Noto Sans KR', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
 }
 
 @utility font-giants {
@@ -197,13 +196,14 @@ body {
 }
 
 .card-surface {
-  background: var(--surface);
+  background: var(--surface-cream);
   border: 1px solid var(--border);
+  box-shadow: var(--shadow-soft);
 }
 
 .chip-surface {
-  background: linear-gradient(180deg, rgba(var(--lotte-blue-rgb), 0.08), rgba(var(--lotte-blue-rgb), 0.12));
-  border: 1px solid var(--border);
+  background: linear-gradient(180deg, rgba(var(--lotte-white-rgb), 0.7), rgba(var(--lotte-blue-rgb), 0.14));
+  border: 1px solid rgba(var(--lotte-blue-rgb), 0.24);
 }
 
 .panel-elevated {

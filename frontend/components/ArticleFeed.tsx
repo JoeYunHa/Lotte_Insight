@@ -55,7 +55,7 @@ export function ArticleFeed({ articles }: Props) {
                 >
                   {tab.name}
                   {tab.count > 0 ? (
-                    <span className="font-mono-code" style={{ color: isActive ? 'var(--gold)' : 'var(--dim)', fontSize: '10px' }}>
+                    <span className="font-mono-code" style={{ color: isActive ? 'var(--red)' : 'var(--dim)', fontSize: '10px' }}>
                       {tab.count}
                     </span>
                   ) : null}

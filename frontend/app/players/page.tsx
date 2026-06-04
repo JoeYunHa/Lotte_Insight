@@ -34,7 +34,7 @@ function PlayerCard({ player }: { player: Player }) {
       <div className="flex items-center gap-3">
         <span
           className="text-lg font-bold font-mono-code leading-none w-8 shrink-0 text-center"
-          style={{ color: isActive ? "var(--gold)" : "var(--dim)" }}
+          style={{ color: isActive ? "var(--blue)" : "var(--dim)" }}
         >
           {player.number ?? "--"}
         </span>

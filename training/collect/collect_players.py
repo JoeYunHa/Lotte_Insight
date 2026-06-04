@@ -13,10 +13,15 @@ import sys
 from collect.collect_lotte_unrelated import (
     LOTTE_OPPONENT_KEYWORDS,
     _LOTTE_MAIN_SUBJECT_IN_TITLE,
+    _title_starts_with_lotte_giants,
 )
 from collect.collect_utils import (
     BASEBALL_KEYWORDS,
+    CHEERLEADER_KEYWORDS,
+    FULL_KBO_TEAM_NAMES,
+    LOTTE_BIZ_KEYWORDS,
     NON_BASEBALL_KEYWORDS,
+    STRICT_BASEBALL_KEYWORDS,
     auto_label,
     build_days_cutoff,
     collect_news_by_keywords,
@@ -24,6 +29,21 @@ from collect.collect_utils import (
     print_stats,
     write_csv,
 )
+
+
+def _has_strict_baseball_signal(title: str, snippet: str) -> bool:
+    """중의어 없는 야구 키워드 또는 KBO 팀 정식·별명이 있으면 True."""
+    text = (title + " " + snippet).lower()
+    return (
+        any(kw in text for kw in STRICT_BASEBALL_KEYWORDS)
+        or any(tm in text for tm in FULL_KBO_TEAM_NAMES)
+    )
+
+
+def _has_lotte_biz_signal(title: str, snippet: str) -> bool:
+    """롯데 그룹사 키워드(야구 무관) 언급이 있으면 True."""
+    text = title + " " + snippet
+    return any(b in text for b in LOTTE_BIZ_KEYWORDS)
 from settings import LABELED_PLAYERS_CSV, NAVER_DISPLAY_LIMIT, REPO_ROOT, TEAM_ALIASES, TEAM_NAME_KO
 
 if str(REPO_ROOT) not in sys.path:
@@ -75,12 +95,16 @@ def _assign_query_player(rows: list[dict]) -> list[dict]:
 
 
 def _filter_photo_captions(rows: list[dict]) -> list[dict]:
-    """Exclude photo/photo-caption rows — they carry no labelable text."""
+    """Exclude photo/caption/cheerleader rows — they carry no labelable training signal."""
     before = len(rows)
-    filtered = [row for row in rows if not row.get("title", "").startswith(_PHOTO_PREFIXES)]
+    filtered = [
+        row for row in rows
+        if not row.get("title", "").startswith(_PHOTO_PREFIXES)
+        and not any(kw in row.get("title", "") for kw in CHEERLEADER_KEYWORDS)
+    ]
     removed = before - len(filtered)
     if removed:
-        print(f"      [포토/사진 제외] {removed}건 제거 -> {len(filtered)}건")
+        print(f"      [포토/사진/치어리더 제외] {removed}건 제거 -> {len(filtered)}건")
     return filtered
 
 
@@ -131,23 +155,38 @@ def _filter_hard_negative_rows(rows: list[dict]) -> tuple[list[dict], int]:
     """타팀 주체이면서 롯데가 언급된 hard negative 추출 (players CSV 전용).
 
     조건:
-      - 포토/사진 기사 제외
-      - 제목에 롯데 주체 지시어 없음 (타팀이 기사의 주인공)
-      - title 또는 description_snippet 어딘가에 "롯데"/"자이언츠" 언급 있음
+      - 포토/사진/치어리더 기사 제외
+      - 제목에 롯데 관련 지시어 없음 (타팀이 기사의 주인공)
+      - 제목이 "롯데 [비-그룹사]"로 시작하지 않음 ("롯데 김태형" 등 오분류 방지)
+      - title 또는 snippet 어딘가에 "롯데"/"자이언츠" 언급 있음
+      - 중의어 없는 야구 키워드 OR KBO 팀 정식명 OR 롯데 그룹사 키워드가
+        있어야 함 — 금융·IT 기사가 "삼성전자", "롯데마트" snippet으로 슬립스루되는
+        것을 막기 위해 엄격한 스포츠 맥락 또는 롯데 브랜드 구분 학습 근거 필요
     """
     kept: list[dict] = []
     removed = 0
     for row in rows:
         title = row.get("title", "")
-        full_text = f"{title} {row.get('description_snippet', '')}"
+        snippet = row.get("description_snippet", "")
+        full_text = f"{title} {snippet}"
 
         if title.startswith(_PHOTO_PREFIXES):
+            removed += 1
+            continue
+        if any(kw in title for kw in CHEERLEADER_KEYWORDS):
             removed += 1
             continue
         if any(kw in title for kw in _LOTTE_MAIN_SUBJECT_IN_TITLE):
             removed += 1
             continue
+        if _title_starts_with_lotte_giants(title):
+            removed += 1
+            continue
         if not any(kw in full_text for kw in ("롯데", "자이언츠", "사직")):
+            removed += 1
+            continue
+        # 야구 맥락 또는 롯데 그룹사 언급이 없으면 유의미한 False 샘플이 아님
+        if not _has_strict_baseball_signal(title, snippet) and not _has_lotte_biz_signal(title, snippet):
             removed += 1
             continue
         kept.append(row)
