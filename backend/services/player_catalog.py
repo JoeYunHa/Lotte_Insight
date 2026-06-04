@@ -9,16 +9,19 @@ logger = logging.getLogger(__name__)
 # Process-local in-memory cache. Each Railway worker process holds its own copy;
 # invalidate_cache() only affects the calling process. If multi-process deployment
 # requires cross-process invalidation, migrate this cache to Redis.
+# Note: _nicknames_cache has no TTL — valid_until-expired nicknames stay in cache until
+# the process restarts. Acceptable for Railway single-process cron jobs; revisit if
+# long-lived processes need periodic invalidation.
 _players_cache: list[dict] | None = None
 _alias_index_cache: "PlayerAliasIndex | None" = None
-_nicknames_cache: "dict[int, list[str]] | None" = None
+_nicknames_cache: "dict[str, list[str]] | None" = None
 _cache_lock = threading.Lock()
 
 
 @dataclass(frozen=True)
 class PlayerAliasIndex:
-    aliases_by_player_id: dict[int, tuple[str, ...]]
-    player_ids_by_alias: dict[str, tuple[int, ...]]
+    aliases_by_player_id: dict[str, tuple[str, ...]]
+    player_ids_by_alias: dict[str, tuple[str, ...]]
     aliases_desc: tuple[str, ...]
 
     def all_names(self) -> list[str]:
@@ -27,15 +30,15 @@ class PlayerAliasIndex:
             names.extend(aliases)
         return names
 
-    def name_to_id_map(self) -> dict[str, int]:
-        name_map: dict[str, int] = {}
+    def name_to_id_map(self) -> dict[str, str]:
+        name_map: dict[str, str] = {}
         for player_id, aliases in self.aliases_by_player_id.items():
             for alias in aliases:
                 name_map[alias] = player_id
         return name_map
 
-    def match_player_ids(self, text: str) -> list[int]:
-        found: set[int] = set()
+    def match_player_ids(self, text: str) -> list[str]:
+        found: set[str] = set()
         for alias in self.aliases_desc:
             if alias in text:
                 found.update(self.player_ids_by_alias.get(alias, ()))
@@ -47,7 +50,7 @@ def _fetch_players() -> list[dict]:
     return result.data
 
 
-def _fetch_player_nicknames() -> dict[int, list[str]]:
+def _fetch_player_nicknames() -> dict[str, list[str]]:
     global _nicknames_cache
     if _nicknames_cache is not None:
         return _nicknames_cache
@@ -55,16 +58,24 @@ def _fetch_player_nicknames() -> dict[int, list[str]]:
         if _nicknames_cache is not None:
             return _nicknames_cache
         try:
-            result = supabase.table("player_nicknames").select("player_id, nickname").execute()
+            from datetime import datetime, timezone
+            now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            result = (
+                supabase.table("player_nicknames")
+                .select("player_id, nickname")
+                .gte("confidence", 0.5)
+                .or_(f"valid_until.is.null,valid_until.gte.{now_iso}")
+                .execute()
+            )
         except Exception as exc:
             logger.warning("Failed to fetch player_nicknames: %s", exc, exc_info=True)
             return {}
-        nicknames: dict[int, list[str]] = {}
+        nicknames: dict[str, list[str]] = {}
         for row in result.data or []:
             player_id = row.get("player_id")
             nickname = row.get("nickname")
             if player_id and nickname:
-                nicknames.setdefault(player_id, []).append(nickname)
+                nicknames.setdefault(str(player_id), []).append(nickname)
         _nicknames_cache = nicknames
     return _nicknames_cache
 
@@ -85,7 +96,7 @@ def _attach_nicknames(players: list[dict]) -> list[dict]:
     enriched: list[dict] = []
     for player in players:
         cloned = dict(player)
-        cloned["nicknames"] = nicknames_by_player_id.get(player.get("id"), [])
+        cloned["nicknames"] = nicknames_by_player_id.get(str(player.get("id") or ""), [])
         enriched.append(cloned)
     return enriched
 
@@ -93,10 +104,10 @@ def _attach_nicknames(players: list[dict]) -> list[dict]:
 def _build_alias_index_from_players(players: list[dict]) -> PlayerAliasIndex:
     players = _attach_nicknames(players)
     aliases_by_player_id = {
-        player["id"]: _player_aliases(player)
+        str(player["id"]): _player_aliases(player)
         for player in players
     }
-    player_ids_by_alias: dict[str, list[int]] = {}
+    player_ids_by_alias: dict[str, list[str]] = {}
     for player_id, aliases in aliases_by_player_id.items():
         for alias in aliases:
             player_ids_by_alias.setdefault(alias, []).append(player_id)
@@ -132,9 +143,9 @@ def build_player_alias_index(*, use_cache: bool = True) -> PlayerAliasIndex:
 _ACTIVE_STATUSES = {"active", "1군"}
 
 
-def get_active_player_ids(*, use_cache: bool = True) -> frozenset[int]:
+def get_active_player_ids(*, use_cache: bool = True) -> frozenset[str]:
     return frozenset(
-        p["id"]
+        str(p["id"])
         for p in list_players(use_cache=use_cache)
         if p.get("status") in _ACTIVE_STATUSES
     )
@@ -160,7 +171,7 @@ def list_player_canonical_names(*, use_cache: bool = True, active_only: bool = F
     return [p["name"] for p in players if p.get("name")]
 
 
-def player_name_to_id_map(*, use_cache: bool = True) -> dict[str, int]:
+def player_name_to_id_map(*, use_cache: bool = True) -> dict[str, str]:
     return build_player_alias_index(use_cache=use_cache).name_to_id_map()
 
 

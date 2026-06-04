@@ -1,7 +1,7 @@
 """
 Daily topic map computation: embed articles → cluster → project to 2D.
 
-Embedding: KoELECTRA mean pooling (reuses the is_lotte_related model dir).
+Embedding: KLUE-RoBERTa-large mean pooling (reuses the is_lotte_related model dir).
 Clustering: agglomerative clustering on cosine distance.
 Projection: UMAP (falls back to PCA if umap-learn is not installed).
 
@@ -35,19 +35,18 @@ _MIN_CLUSTER_SIZE = 2        # clusters smaller than this become outliers
 _UMAP_RANDOM_STATE = 42      # fixed for reproducible 2D coordinates
 _EMBED_BATCH_SIZE = 32
 _EMBED_MAX_LENGTH = 256
-_EMBEDDING_MODEL_KEY = "koelectra_mean_pool_v1"
+_EMBEDDING_MODEL_KEY = "roberta_mean_pool_v1"
 _PROJECTION_MODEL_UMAP = "umap_v1"
 _PROJECTION_MODEL_PCA = "pca_v1"
 _MAX_AGGLOMERATIVE_ARTICLES = 400
 
 
 # ---------------------------------------------------------------------------
-# Embedder — KoELECTRA mean pooling
+# Embedder — KLUE-RoBERTa-large mean pooling
 #
 # Reuses the is_lotte_related model dir (LOTTE_RELATED_MODEL_DIR /
-# lotte_related_koelectra).
-# AutoModel loads the base ELECTRA encoder; the classification head weights
-# in the checkpoint are silently ignored (not part of AutoModel's structure).
+# lotte_related_koelectra). AutoModel loads the base encoder; the
+# classification head weights are silently ignored (not part of AutoModel).
 # ---------------------------------------------------------------------------
 
 def _load_embedder(model_dir: Path) -> ModelArtifacts:
@@ -58,7 +57,7 @@ def _load_embedder(model_dir: Path) -> ModelArtifacts:
     tokenizer = AutoTokenizer.from_pretrained(str(model_dir))
     model = AutoModel.from_pretrained(str(model_dir), ignore_mismatched_sizes=True).to(device)
     model.eval()
-    logger.info("Loaded KoELECTRA embedder from %s (device=%s)", model_dir, device)
+    logger.info("Loaded RoBERTa embedder from %s (device=%s)", model_dir, device)
     return ModelArtifacts(model=model, tokenizer=tokenizer, device=device)
 
 
@@ -250,20 +249,18 @@ def _project_2d(embeddings: np.ndarray) -> tuple[np.ndarray, str]:
 # ---------------------------------------------------------------------------
 
 def _derive_cluster_summary(cluster_articles: list[dict], label_counts: Counter) -> dict:
-    def summary_len(a: dict) -> int:
-        blob = parse_event_summary_json(a.get("event_summary"))
-        return len(blob.get("event_summary") or "")
+    parsed = [parse_event_summary_json(a.get("event_summary")) for a in cluster_articles]
 
-    representative = max(cluster_articles, key=summary_len)
+    rep_idx = max(range(len(cluster_articles)), key=lambda i: len(parsed[i].get("event_summary") or ""))
+    representative = cluster_articles[rep_idx]
+    rep_blob = parsed[rep_idx]
 
     all_players: list[str] = []
-    for a in cluster_articles:
-        blob = parse_event_summary_json(a.get("event_summary"))
+    for blob in parsed:
         all_players.extend(blob.get("key_players") or [])
     top_players = [p for p, _ in Counter(all_players).most_common(5)]
 
     dominant_label = label_counts.most_common(1)[0][0] if label_counts else None
-    rep_blob = parse_event_summary_json(representative.get("event_summary"))
     summary_text = (rep_blob.get("event_summary") or representative.get("title") or "").strip()
 
     return {
@@ -347,7 +344,9 @@ def run_topic_clustering(target_date: date | None = None) -> None:
     date_str = target_date.isoformat()
     start_at, end_at = utc_day_bounds(target_date)
 
-    # 1. Fetch articles with labels
+    # 1. Fetch articles with labels.
+    # All articles stored in DB have already passed the is_lotte_related gate during
+    # news collection, so no secondary filtering on event_summary JSON is needed.
     resp = (
         supabase.table("articles")
         .select("id, title, event_summary, article_labels(label, confidence)")
@@ -357,18 +356,15 @@ def run_topic_clustering(target_date: date | None = None) -> None:
     )
     raw_articles = resp.data or []
 
-    # Keep only is_lotte_related=True (parsed from event_summary JSON)
     articles: list[dict] = []
     for a in raw_articles:
-        blob = parse_event_summary_json(a.get("event_summary"))
-        if blob.get("is_lotte_related") is True:
-            labels = a.get("article_labels") or []
-            best = max(labels, key=lambda x: x.get("confidence") or 0.0) if labels else {}
-            a["primary_label"] = best.get("label")
-            articles.append(a)
+        labels = a.get("article_labels") or []
+        best = max(labels, key=lambda x: x.get("confidence") or 0.0) if labels else {}
+        a["primary_label"] = best.get("label")
+        articles.append(a)
 
     n = len(articles)
-    logger.info("Topic clustering: %d is_lotte_related articles on %s", n, date_str)
+    logger.info("Topic clustering: %d articles on %s", n, date_str)
 
     if n < _MIN_ARTICLES:
         logger.info("Too few articles (%d < %d); skipping topic map.", n, _MIN_ARTICLES)

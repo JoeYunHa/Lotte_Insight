@@ -90,7 +90,7 @@ export function HomeHeroDesk({ date, headline, subcopy, kicker, metaStat, status
 
       {/* Subcopy + metaStat */}
       <div
-        className="flex items-end justify-between gap-6 animate-fade-up"
+        className="flex flex-col items-start gap-4 animate-fade-up sm:flex-row sm:items-end sm:justify-between sm:gap-6"
         style={{ animationDelay: '80ms' }}
       >
         <p
@@ -100,7 +100,7 @@ export function HomeHeroDesk({ date, headline, subcopy, kicker, metaStat, status
           {subcopy}
         </p>
         {metaStat ? (
-          <div className="shrink-0 text-right">
+          <div className="text-left sm:shrink-0 sm:text-right">
             <p
               className="text-3xl font-bold font-mono-code leading-none"
               style={{ color: 'var(--text)' }}

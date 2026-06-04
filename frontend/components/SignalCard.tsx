@@ -87,14 +87,14 @@ export function SentimentBar({ positive, neutral, negative, analyzed, total }: S
       </div>
 
       {/* Legend */}
-      <div className="flex gap-2.5 mt-1.5">
+      <div className="mt-1.5 flex flex-wrap gap-x-2.5 gap-y-1">
         <span className="text-[10px] font-mono-code" style={{ color: 'var(--win)' }}>긍정 {pos}%</span>
         <span className="text-[10px] font-mono-code" style={{ color: 'var(--neutral)' }}>중립 {neu}%</span>
         <span className="text-[10px] font-mono-code" style={{ color: 'var(--loss)' }}>부정 {neg}%</span>
       </div>
 
       {/* Coverage sub-line */}
-      <div className="flex items-center gap-1.5 mt-1">
+      <div className="mt-1 flex flex-wrap items-center gap-1.5">
         <span className="text-[10px] font-mono-code" style={{ color: 'var(--dim)' }}>
           {total}건 중 {analyzed}건 분석됨
         </span>

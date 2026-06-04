@@ -119,7 +119,9 @@ def load_data(data_dir: Path | None = None) -> tuple[list[str], list[str], list[
         print(f"  WARNING: dropping {len(conflicting)} titles with conflicting stance labels")
         df = df[~df["title"].isin(conflicting)].reset_index(drop=True)
 
-    df = df.drop_duplicates(subset=["title"]).reset_index(drop=True)
+    # Dedup on (title, source_name) so same title from different sources is kept.
+    dedup_cols = ["title", "source_name"] if "source_name" in df.columns else ["title"]
+    df = df.drop_duplicates(subset=dedup_cols).reset_index(drop=True)
 
     labels = df["team_stance"].map(LABEL2ID).tolist()
     print(f"\nTotal: {len(labels)} rows")

@@ -43,9 +43,9 @@ def _build_event_summary_json(
         "is_lotte_related": is_lotte_related,
         "is_lotte_related_confidence": lr_result["confidence"],
         "is_lotte_related_source": lr_result["source"],
-        "lotte_stance": stance["label"] if is_lotte_related else None,
-        "lotte_stance_confidence": stance["confidence"] if is_lotte_related else None,
-        "lotte_stance_source": stance["source"] if is_lotte_related else "not_applicable",
+        "team_stance": stance["label"] if is_lotte_related else None,
+        "team_stance_confidence": stance["confidence"] if is_lotte_related else None,
+        "team_stance_source": stance["source"] if is_lotte_related else "not_applicable",
         "event_summary": gpt.get("event_summary", "") if is_lotte_related else "",
         "key_players": gpt.get("key_players", []) if is_lotte_related else [],
         "summary_source": gpt.get("source", "not_applicable") if is_lotte_related else "not_applicable",
@@ -126,7 +126,7 @@ def _filter_recent_items(
 def _is_current_roster_item(
     item: NormalizedNewsItem,
     alias_index: PlayerAliasIndex,
-    active_ids: frozenset[int],
+    active_ids: frozenset[str],
 ) -> bool:
     """Return True unless the title matches only inactive players.
 
@@ -143,12 +143,12 @@ def _is_current_roster_item(
 def _filter_current_roster_items(
     items: list[tuple[NormalizedNewsItem, str, str]],
     alias_index: PlayerAliasIndex,
-    active_ids: frozenset[int],
+    active_ids: frozenset[str],
 ) -> list[tuple[NormalizedNewsItem, str, str]]:
     return [t for t in items if _is_current_roster_item(t[0], alias_index, active_ids)]
 
 
-def _run_inference(items: list[NormalizedNewsItem]) -> list[dict]:
+def _run_inference(items: list[NormalizedNewsItem], alias_index: PlayerAliasIndex) -> list[dict]:
     total = len(items)
     logger.info("Inference started: %d items", total)
 
@@ -184,16 +184,15 @@ def _run_inference(items: list[NormalizedNewsItem]) -> list[dict]:
         gpt_results[idx] = gpt_result
     logger.info("GPT summarization done: %d items", len(gpt_indices))
 
-    alias_index = build_player_alias_index()
-    id_to_name: dict[int, str] = {
+    id_to_name: dict[str, str] = {
         pid: aliases[0]
         for pid, aliases in alias_index.aliases_by_player_id.items()
         if aliases
     }
 
-    ps_meta: list[tuple[int, int]] = []
+    ps_meta: list[tuple[int, str]] = []
     ps_inputs: list[dict] = []
-    detected_players: list[list[int]] = [[] for _ in items]
+    detected_players: list[list[str]] = [[] for _ in items]
 
     for i in lotte_indices:
         item = items[i]
@@ -210,7 +209,7 @@ def _run_inference(items: list[NormalizedNewsItem]) -> list[dict]:
             )
 
     ps_raw = classify_player_stance_batch(ps_inputs) if ps_inputs else []
-    player_stances: list[dict[int, dict]] = [{} for _ in items]
+    player_stances: list[dict[str, dict]] = [{} for _ in items]
     for (i, pid), stance_result in zip(ps_meta, ps_raw):
         player_stances[i][pid] = stance_result
     logger.info("Player stance classification done: %d player-article pairs", len(ps_inputs))
@@ -313,7 +312,7 @@ def _save_labels_and_players(enriched: list[dict], id_map: dict[str, int]) -> No
         ps_map = e.get("player_stances", {})
         for player_id in e.get("detected_player_ids", []):
             stance = ps_map.get(player_id, {})
-            row: dict = {"article_id": article_id, "player_id": player_id}
+            row: dict = {"article_id": article_id, "player_id": int(player_id)}
             label = stance.get("label")
             if label is not None:
                 row["player_stance"] = label
@@ -427,7 +426,7 @@ def run() -> int:
     enriched: list[dict] = []
     if new_items_with_source:
         new_items = [item for item, _, _ in new_items_with_source]
-        enriched = _run_inference(new_items)
+        enriched = _run_inference(new_items, full_alias_index)
         for enriched_item, (_, source, normalized_link) in zip(enriched, new_items_with_source, strict=True):
             enriched_item["collection_source"] = source
             enriched_item["normalized_url"] = normalized_link

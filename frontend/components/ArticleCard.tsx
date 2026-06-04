@@ -22,7 +22,7 @@ export function ArticleCard({ article, variant = 'default', showKeyPlayers = tru
         <div className="flex items-center gap-1.5 mb-2 flex-wrap">
           {article.primary_label ? <LabelBadge label={article.primary_label} /> : null}
           {article.lotte_stance ? <StanceBadge stance={article.lotte_stance} /> : null}
-          <span className="text-[10px] font-mono-code ml-auto whitespace-nowrap shrink-0" style={{ color: 'var(--dim)' }}>
+          <span className="basis-full min-w-0 text-[10px] font-mono-code sm:ml-auto sm:basis-auto sm:text-right sm:whitespace-nowrap" style={{ color: 'var(--dim)' }}>
             {article.source_name} · {formatRelativeTime(article.published_at)}
           </span>
         </div>

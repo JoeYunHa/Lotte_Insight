@@ -20,8 +20,8 @@ export function PageShell({ children, footer, headerActions, seasonBadge }: Page
       <div className="h-[4px] w-full" style={{ background: 'var(--gradient-navy-band)' }} />
 
       <header className="sticky top-0 z-50 backdrop-blur-md" style={{ background: 'var(--surface-glass-strong)', borderBottom: '1px solid var(--border)', boxShadow: '0 8px 24px rgba(var(--lotte-navy-rgb), 0.06)' }}>
-        <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="max-w-5xl mx-auto px-4 py-2 min-h-14 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
             <Image
               src="/images/lotte_emblem.jpg"
               alt="롯데 자이언츠"
@@ -30,7 +30,7 @@ export function PageShell({ children, footer, headerActions, seasonBadge }: Page
               className="shrink-0 object-contain"
               priority
             />
-            <div className="flex flex-col">
+            <div className="flex min-w-0 flex-col">
               <span className="font-bold text-sm tracking-wide leading-none" style={{ color: 'var(--text)' }}>
                 Lotte Insight
               </span>
@@ -45,7 +45,7 @@ export function PageShell({ children, footer, headerActions, seasonBadge }: Page
             ) : null}
           </div>
           {headerActions && headerActions.length > 0 ? (
-            <nav className="flex items-center gap-2">
+            <nav className="flex flex-wrap items-center justify-end gap-2">
               {headerActions.map((action) => (
                 <Link
                   key={action.href}

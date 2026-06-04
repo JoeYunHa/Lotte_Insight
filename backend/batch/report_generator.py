@@ -5,6 +5,7 @@ Generate daily team and player reports.
 import functools
 import logging
 import threading
+from collections import defaultdict
 from datetime import date, datetime, timedelta
 
 from openai import OpenAI, RateLimitError
@@ -108,7 +109,6 @@ def _format_player_stance_summary(stance_counts: dict[str, dict[str, int]]) -> s
 
 def _build_team_event_texts(articles: list[dict]) -> list[str]:
     """라벨별 최대 2건씩 균형 있게 뽑아 GPT 입력용 텍스트 목록을 만든다."""
-    from collections import defaultdict
     buckets: dict[str, list[str]] = defaultdict(list)
     unlabeled: list[str] = []
 

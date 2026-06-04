@@ -15,7 +15,7 @@ def _reshape_article(raw: dict) -> dict:
 
     parsed = parse_event_summary_json(article.get("event_summary"))
     article["event_summary"] = parsed.get("event_summary") or None
-    article["lotte_stance"] = parsed.get("lotte_stance") or None
+    article["team_stance"] = parsed.get("team_stance") or parsed.get("lotte_stance") or None
     article["key_players"] = parsed.get("key_players") or []
 
     return article

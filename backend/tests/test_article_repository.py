@@ -50,13 +50,13 @@ class TestReshapeArticle:
 
         payload = {
             "event_summary": "롯데 승리",
-            "lotte_stance": "positive",
+            "team_stance": "positive",
             "key_players": ["전준우"],
         }
         raw = _make_raw(event_summary=json.dumps(payload, ensure_ascii=False))
         result = _reshape_article(raw)
         assert result["event_summary"] == "롯데 승리"
-        assert result["lotte_stance"] == "positive"
+        assert result["team_stance"] == "positive"
         assert result["key_players"] == ["전준우"]
 
     def test_invalid_event_summary_json(self):
@@ -65,7 +65,7 @@ class TestReshapeArticle:
         raw = _make_raw(event_summary="not-json")
         result = _reshape_article(raw)
         assert result["event_summary"] is None
-        assert result["lotte_stance"] is None
+        assert result["team_stance"] is None
         assert result["key_players"] == []
 
 

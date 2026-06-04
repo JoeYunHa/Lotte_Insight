@@ -13,7 +13,7 @@ def _make_article(
     article_id: int = 1,
 ) -> dict:
     summary = (
-        json.dumps({"lotte_stance": stance, "event_summary": "요약", "key_players": []},
+        json.dumps({"team_stance": stance, "event_summary": "요약", "key_players": []},
                    ensure_ascii=False)
         if stance else None
     )
@@ -96,11 +96,11 @@ class TestGetLeadStory:
             _make_article("MATCH_RELATED", article_id=2),
         ]
         articles[0]["event_summary"] = json.dumps(
-            {"lotte_stance": "positive", "event_summary": "긴 요약입니다 매우 길어요", "key_players": ["전준우"]},
+            {"team_stance": "positive", "event_summary": "긴 요약입니다 매우 길어요", "key_players": ["전준우"]},
             ensure_ascii=False,
         )
         articles[1]["event_summary"] = json.dumps(
-            {"lotte_stance": "positive", "event_summary": "짧음", "key_players": []},
+            {"team_stance": "positive", "event_summary": "짧음", "key_players": []},
             ensure_ascii=False,
         )
         summary, players = home_service._get_lead_story(articles, "MATCH_RELATED")
@@ -117,7 +117,7 @@ class TestGetLeadStory:
         for i in range(3):
             a = _make_article("MATCH_RELATED", article_id=i)
             a["event_summary"] = json.dumps(
-                {"lotte_stance": "positive", "event_summary": "요약", "key_players": ["전준우"]},
+                {"team_stance": "positive", "event_summary": "요약", "key_players": ["전준우"]},
                 ensure_ascii=False,
             )
             articles.append(a)

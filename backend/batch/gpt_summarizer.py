@@ -8,6 +8,7 @@ import logging
 import re
 import threading
 import time
+from collections.abc import Callable
 
 import openai
 
@@ -37,6 +38,8 @@ _SYSTEM_PROMPT = (
 _MAX_WORKERS = 1
 _INTER_REQUEST_DELAY = 0.5
 _TITLE_MAX = 80
+# GPT receives up to 300 chars; model gates (KoELECTRA) use the shorter
+# article_description_snippet_length (default 120) set during item normalization.
 _SNIPPET_MAX = 300
 _GPT_SUMMARY_TTL = 7 * 86400  # 7 days — article content is immutable after collection
 _GPT_LABEL_TTL = 7 * 86400
@@ -230,7 +233,12 @@ def _call_gpt_label(title: str, description_snippet: str) -> dict:
         return dict(_LABEL_ERROR)
 
 
-def gpt_summarize_batch(articles: list[dict]) -> list[dict]:
+def _run_gpt_batch(
+    articles: list[dict],
+    call_fn: "Callable[[str, str], dict]",
+    error_payload: dict,
+    batch_name: str,
+) -> list[dict]:
     if not articles:
         return []
 
@@ -238,49 +246,24 @@ def gpt_summarize_batch(articles: list[dict]) -> list[dict]:
 
     def _worker(article: dict) -> dict:
         if daily_limit_hit.is_set():
-            return dict(_ERROR)
+            return dict(error_payload)
         time.sleep(_INTER_REQUEST_DELAY)
-        return _call_gpt(article["title"], article.get("description_snippet", ""))
+        return call_fn(article["title"], article.get("description_snippet", ""))
 
     def _on_error(idx: int, exc: Exception) -> dict:
         if isinstance(exc, _DailyLimitExceeded):
             daily_limit_hit.set()
-            logger.warning("Skipping remaining articles: OpenAI RPD limit exhausted")
+            logger.warning("Skipping remaining %s requests: OpenAI RPD limit exhausted", batch_name)
         else:
-            logger.error("Unexpected error in gpt_summarize_batch[%d]: %s", idx, exc)
-        return dict(_ERROR)
+            logger.error("Unexpected error in %s[%d]: %s", batch_name, idx, exc)
+        return dict(error_payload)
 
-    return run_indexed_parallel(
-        articles,
-        _worker,
-        max_workers=_MAX_WORKERS,
-        on_error=_on_error,
-    )
+    return run_indexed_parallel(articles, _worker, max_workers=_MAX_WORKERS, on_error=_on_error)
+
+
+def gpt_summarize_batch(articles: list[dict]) -> list[dict]:
+    return _run_gpt_batch(articles, _call_gpt, _ERROR, "gpt_summarize_batch")
 
 
 def gpt_classify_labels_batch(articles: list[dict]) -> list[dict]:
-    if not articles:
-        return []
-
-    daily_limit_hit = threading.Event()
-
-    def _worker(article: dict) -> dict:
-        if daily_limit_hit.is_set():
-            return dict(_LABEL_ERROR)
-        time.sleep(_INTER_REQUEST_DELAY)
-        return _call_gpt_label(article["title"], article.get("description_snippet", ""))
-
-    def _on_error(idx: int, exc: Exception) -> dict:
-        if isinstance(exc, _DailyLimitExceeded):
-            daily_limit_hit.set()
-            logger.warning("Skipping remaining label requests: OpenAI RPD limit exhausted")
-        else:
-            logger.error("Unexpected error in gpt_classify_labels_batch[%d]: %s", idx, exc)
-        return dict(_LABEL_ERROR)
-
-    return run_indexed_parallel(
-        articles,
-        _worker,
-        max_workers=_MAX_WORKERS,
-        on_error=_on_error,
-    )
+    return _run_gpt_batch(articles, _call_gpt_label, _LABEL_ERROR, "gpt_classify_labels_batch")

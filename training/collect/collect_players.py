@@ -1,8 +1,19 @@
-"""Collect player-focused news data for labeling."""
+"""Collect player-focused news data for labeling.
+
+모드:
+  기본: 롯데 선수별 뉴스 수집 → labeled_players.csv (is_lotte_related=true)
+  --hard-negative: 타팀 선수/경기 기사 중 롯데 언급 케이스 수집
+                   → labeled_players.csv (is_lotte_related=false)
+                   제목 기준으로만 롯데 주체 여부 판단 (스니펫 "롯데 자이언츠" 허용)
+"""
 
 import argparse
 import sys
 
+from collect.collect_lotte_unrelated import (
+    LOTTE_OPPONENT_KEYWORDS,
+    _LOTTE_MAIN_SUBJECT_IN_TITLE,
+)
 from collect.collect_utils import (
     BASEBALL_KEYWORDS,
     NON_BASEBALL_KEYWORDS,
@@ -19,6 +30,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 _PHOTO_PREFIXES = ("[사진]", "[포토]")
+_DEFAULT_HARD_NEGATIVE_TARGET = 200
 
 
 def _get_roster(player_filter: str | None) -> list[str]:
@@ -115,6 +127,70 @@ def _validate_before_write(rows: list[dict]) -> list[dict]:
     return valid
 
 
+def _filter_hard_negative_rows(rows: list[dict]) -> tuple[list[dict], int]:
+    """타팀 주체이면서 롯데가 언급된 hard negative 추출 (players CSV 전용).
+
+    조건:
+      - 포토/사진 기사 제외
+      - 제목에 롯데 주체 지시어 없음 (타팀이 기사의 주인공)
+      - title 또는 description_snippet 어딘가에 "롯데"/"자이언츠" 언급 있음
+    """
+    kept: list[dict] = []
+    removed = 0
+    for row in rows:
+        title = row.get("title", "")
+        full_text = f"{title} {row.get('description_snippet', '')}"
+
+        if title.startswith(_PHOTO_PREFIXES):
+            removed += 1
+            continue
+        if any(kw in title for kw in _LOTTE_MAIN_SUBJECT_IN_TITLE):
+            removed += 1
+            continue
+        if not any(kw in full_text for kw in ("롯데", "자이언츠", "사직")):
+            removed += 1
+            continue
+        kept.append(row)
+    return kept, removed
+
+
+def _force_false_player_label(rows: list[dict]) -> list[dict]:
+    """hard negative 행의 is_lotte_related를 false로 강제."""
+    for row in rows:
+        row["is_lotte_related"] = "false"
+        row["query_player"] = ""
+        if not row.get("primary_label"):
+            row["primary_label"] = "ETC"
+        row["confidence_score"] = "1.0"
+        row["confidence_note"] = "hard_negative_player_context"
+    return rows
+
+
+def collect_hard_negatives(
+    days_cutoff: str | None,
+    per_keyword: int,
+    target: int,
+    existing_titles: set[str],
+) -> list[dict]:
+    """LOTTE_OPPONENT_KEYWORDS로 타팀 vs 롯데 기사를 수집한 뒤 hard negative 필터 적용."""
+    print(f"  키워드 수: {len(LOTTE_OPPONENT_KEYWORDS)}  per-keyword: {per_keyword}  target: {target}")
+    rows = collect_news_by_keywords(
+        LOTTE_OPPONENT_KEYWORDS,
+        days_cutoff=days_cutoff,
+        target_count=target * 4,
+        per_keyword_limit=per_keyword,
+        existing_titles=existing_titles,
+    )
+    print(f"  수집 완료: {len(rows)}건")
+
+    rows, removed = _filter_hard_negative_rows(rows)
+    print(f"  hard negative 필터 (제목 기준) 제거: {removed}건  남은 행: {len(rows)}건")
+
+    rows = rows[:target]
+    print(f"  target {target}건으로 자름: {len(rows)}건")
+    return rows
+
+
 def _filter_lotte_related(rows: list[dict], labeled: bool) -> list[dict]:
     before = len(rows)
     if labeled:
@@ -146,12 +222,56 @@ def main():
         default=NAVER_DISPLAY_LIMIT,
         help=f"선수당 최대 수집 건수 (기본={NAVER_DISPLAY_LIMIT}, 최대 1000, 100 초과 시 페이지네이션)",
     )
+    parser.add_argument(
+        "--hard-negative",
+        action="store_true",
+        help=(
+            "타팀 선수/경기 기사 중 롯데가 언급된 hard negative 수집. "
+            "is_lotte_related=false로 labeled_players.csv에 저장. "
+            f"(기본 target: {_DEFAULT_HARD_NEGATIVE_TARGET}건)"
+        ),
+    )
+    parser.add_argument(
+        "--target",
+        type=int,
+        default=_DEFAULT_HARD_NEGATIVE_TARGET,
+        help=f"--hard-negative 모드에서 수집할 목표 건수 (기본: {_DEFAULT_HARD_NEGATIVE_TARGET})",
+    )
     args = parser.parse_args()
 
     cutoff = build_days_cutoff(args.days)
-
     per_keyword = max(1, min(args.per_keyword, 1000))
 
+    # ── hard negative 모드 ────────────────────────────────────────────────────
+    if args.hard_negative:
+        from collect.collect_utils import load_existing_titles
+
+        print("=== hard negative 수집 모드 (labeled_players.csv) ===")
+        print(f"    타깃: {args.target}건  per-keyword: {per_keyword}\n")
+
+        existing_titles = load_existing_titles(LABELED_PLAYERS_CSV)
+        print(f"[1/3] 기존 CSV 제목 수: {len(existing_titles)}")
+
+        print("\n[2/3] 타팀 vs 롯데 기사 수집 및 필터링")
+        rows = collect_hard_negatives(
+            days_cutoff=cutoff,
+            per_keyword=per_keyword,
+            target=args.target,
+            existing_titles=existing_titles,
+        )
+
+        if not rows:
+            print("수집된 기사 없음 — 종료")
+            return
+
+        rows = _force_false_player_label(rows)
+
+        print(f"\n[3/3] CSV 저장: {LABELED_PLAYERS_CSV}")
+        saved = write_csv(rows, LABELED_PLAYERS_CSV, append=True)
+        print(f"      {saved}건 저장 완료 (is_lotte_related=false)")
+        return
+
+    # ── 기본 모드: 롯데 선수 수집 ─────────────────────────────────────────────
     print("[1/6] KBO 로스터 수집 (Playwright) ...")
     roster = _get_roster(args.player)
     print(f"      선수 {len(roster)}명: {', '.join(roster)}")

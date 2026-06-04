@@ -247,11 +247,10 @@ class TestPhase5Gates:
             patch.object(news_collector, "gpt_summarize_batch", return_value=[
                 {"event_summary": "요약은 player_stance에 쓰지 않는다.", "key_players": ["박세웅"], "source": "test"}
             ]),
-            patch.object(news_collector, "build_player_alias_index", return_value=alias_index),
             patch.object(news_collector, "classify_player_stance_batch", side_effect=fake_player_stance),
             patch.object(news_collector, "settings", SimpleNamespace(gpt_summary_labels=["MATCH_RELATED"])),
         ):
-            news_collector._run_inference([item])
+            news_collector._run_inference([item], alias_index)
 
         assert captured_inputs == [{
             "title": "박세웅 7이닝 무실점",

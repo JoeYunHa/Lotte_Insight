@@ -50,7 +50,7 @@ def _compute_sentiment(articles: list[dict]) -> dict:
         parsed = article.get("_parsed_event_summary") or parse_event_summary_json(
             article.get("event_summary")
         )
-        stance = parsed.get("lotte_stance", "")
+        stance = parsed.get("team_stance") or parsed.get("lotte_stance") or ""
         if stance == "positive":
             positive += 1
         elif stance == "negative":

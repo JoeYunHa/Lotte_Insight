@@ -12,8 +12,12 @@ ROOT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = ROOT_DIR.parent
 BACKEND_DIR = REPO_ROOT / "backend"
 DATA_DIR = ROOT_DIR / "data"
+# Deprecated — classifier_koelectra and summarizer replaced by GPT in Phase 5.
+# Referenced only by train_classifier.py and train_summarizer.py which are
+# slated for removal after Phase 5-E. Do not use in new code.
 MODEL_DIR = ROOT_DIR / "models" / "classifier_koelectra"
 SUMMARIZER_MODEL_DIR = ROOT_DIR / "models" / "summarizer_kobart_v2"
+
 LOTTE_RELATED_MODEL_DIR = ROOT_DIR / "models" / "lotte_related_koelectra"
 
 LABELED_TITLES_CSV = DATA_DIR / "labeled_titles.csv"
@@ -174,7 +178,7 @@ DEFAULT_VALIDATION_SPLIT = 0.15
 DEFAULT_MIN_MACRO_F1 = 0.70
 DEFAULT_CLASSIFIER_MAX_LENGTH = 256
 
-DEFAULT_LOTTE_RELATED_PRETRAINED = "monologg/koelectra-small-v3-discriminator"
+DEFAULT_LOTTE_RELATED_PRETRAINED = "klue/roberta-large"
 DEFAULT_LOTTE_RELATED_EPOCHS = 5
 DEFAULT_LOTTE_RELATED_LR = 5e-5
 DEFAULT_LOTTE_RELATED_BATCH_SIZE = 16

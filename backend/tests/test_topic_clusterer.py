@@ -354,7 +354,7 @@ class TestReplaceTopicMap:
                         "cluster_rank": 1,
                         "x": 0.1,
                         "y": 0.2,
-                        "embedding_model": "koelectra_mean_pool_v1",
+                        "embedding_model": "roberta_mean_pool_v1",
                         "projection_model": "umap_v1",
                         "is_outlier": False,
                     }
