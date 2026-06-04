@@ -269,6 +269,17 @@ def _save_labels_and_players(enriched: list[dict], id_map: dict[str, int]) -> No
         logger.info("Upserted %d player-article rows", len(player_rows))
 
 
+def _query_existing_urls(urls: list[str]) -> set[str]:
+    """Return the subset of URLs already present in the articles table."""
+    existing: set[str] = set()
+    for i in range(0, len(urls), _ID_MAP_CHUNK_SIZE):
+        chunk = urls[i : i + _ID_MAP_CHUNK_SIZE]
+        result = supabase.table("articles").select("source_url").in_("source_url", chunk).execute()
+        for row in result.data or []:
+            existing.add(row["source_url"])
+    return existing
+
+
 def run() -> int:
     from batch import game_collector
     from core.time_utils import today_kst
@@ -337,12 +348,24 @@ def run() -> int:
         len(all_normalized) - len(unique_items_with_source),
     )
 
-    unique_items = [item for item, _, _ in unique_items_with_source]
-    enriched = _run_inference(unique_items)
+    # Skip articles already in DB to avoid redundant GPT calls.
+    all_unique_urls = [normalized_url for _, _, normalized_url in unique_items_with_source]
+    existing_urls = _query_existing_urls(all_unique_urls)
+    new_items_with_source = [t for t in unique_items_with_source if t[2] not in existing_urls]
+    logger.info(
+        "DB filter: %d unique -> %d new (skipping %d existing)",
+        len(unique_items_with_source),
+        len(new_items_with_source),
+        len(existing_urls),
+    )
 
-    for enriched_item, (_, source, normalized_link) in zip(enriched, unique_items_with_source, strict=True):
-        enriched_item["collection_source"] = source
-        enriched_item["normalized_url"] = normalized_link
+    enriched: list[dict] = []
+    if new_items_with_source:
+        new_items = [item for item, _, _ in new_items_with_source]
+        enriched = _run_inference(new_items)
+        for enriched_item, (_, source, normalized_link) in zip(enriched, new_items_with_source, strict=True):
+            enriched_item["collection_source"] = source
+            enriched_item["normalized_url"] = normalized_link
 
     _, id_map = _upsert_articles(enriched)
     if len(id_map) < len(enriched):

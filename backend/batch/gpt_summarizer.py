@@ -6,11 +6,15 @@ import functools
 import json
 import logging
 import re
+import threading
+import time
 
 import openai
 
 from batch.parallel_utils import run_indexed_parallel
+from core import cache
 from core.config import settings
+from services.cache_keys import CacheKeyBuilder
 
 logger = logging.getLogger(__name__)
 
@@ -28,14 +32,23 @@ _SYSTEM_PROMPT = (
     "- 반드시 유효한 JSON 객체만 출력."
 )
 
-_MAX_WORKERS = 4
+# Sequential execution to stay within RPM limits; inter-request delay gives ~120 req/min max.
+_MAX_WORKERS = 1
+_INTER_REQUEST_DELAY = 0.5
 _TITLE_MAX = 80
 _SNIPPET_MAX = 200
+_GPT_SUMMARY_TTL = 7 * 86400  # 7 days — article content is immutable after collection
+
+
+class _DailyLimitExceeded(Exception):
+    """Raised when OpenAI RPD (requests per day) limit is exhausted."""
 
 
 @functools.lru_cache(maxsize=1)
 def _get_client() -> openai.OpenAI:
-    return openai.OpenAI(api_key=settings.openai_api_key)
+    # max_retries=0: SDK auto-retry disabled. RPD exhaustion makes retries futile;
+    # RPM throttling is handled by _INTER_REQUEST_DELAY + caller-level abort.
+    return openai.OpenAI(api_key=settings.openai_api_key, max_retries=0)
 
 
 def _build_user_message(title: str, description_snippet: str) -> str:
@@ -73,6 +86,12 @@ def _parse_response(text: str) -> dict:
 
 
 def _call_gpt(title: str, description_snippet: str) -> dict:
+    cache_key = CacheKeyBuilder.gpt_summary(title=title, snippet=description_snippet)
+    cached = cache.get_json(cache_key)
+    if cached is not None:
+        logger.debug("GPT summary cache hit for '%s'", title[:40])
+        return cached
+
     try:
         response = _get_client().chat.completions.create(
             model=settings.openai_model,
@@ -84,11 +103,20 @@ def _call_gpt(title: str, description_snippet: str) -> dict:
             temperature=0.0,
         )
         text = response.choices[0].message.content or ""
-        return _parse_response(text)
+        result = _parse_response(text)
+        if result.get("source") != "gpt_error":
+            cache.set_json(cache_key, result, _GPT_SUMMARY_TTL)
+        return result
+    except openai.RateLimitError as exc:
+        # RPD (daily) exhaustion: retrying within the same day is futile — abort the batch.
+        if "requests per day" in str(exc) or "RPD" in str(exc):
+            logger.error("OpenAI daily request limit (RPD) exhausted, aborting batch: %s", exc)
+            raise _DailyLimitExceeded() from exc
+        logger.error("GPT summarization failed for '%s': %s", title[:40], exc)
+        return dict(_ERROR)
     except (
         openai.APIError,
         openai.APIConnectionError,
-        openai.RateLimitError,
         TimeoutError,
         ValueError,
         IndexError,
@@ -102,11 +130,20 @@ def gpt_summarize_batch(articles: list[dict]) -> list[dict]:
     if not articles:
         return []
 
+    daily_limit_hit = threading.Event()
+
     def _worker(article: dict) -> dict:
+        if daily_limit_hit.is_set():
+            return dict(_ERROR)
+        time.sleep(_INTER_REQUEST_DELAY)
         return _call_gpt(article["title"], article.get("description_snippet", ""))
 
     def _on_error(idx: int, exc: Exception) -> dict:
-        logger.error("Unexpected error in gpt_summarize_batch[%d]: %s", idx, exc)
+        if isinstance(exc, _DailyLimitExceeded):
+            daily_limit_hit.set()
+            logger.warning("Skipping remaining articles: OpenAI RPD limit exhausted")
+        else:
+            logger.error("Unexpected error in gpt_summarize_batch[%d]: %s", idx, exc)
         return dict(_ERROR)
 
     return run_indexed_parallel(

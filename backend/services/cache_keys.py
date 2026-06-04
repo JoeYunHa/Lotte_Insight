@@ -135,6 +135,21 @@ class CacheKeyBuilder:
         return f"player:{player_id}:stats:{date_str}"
 
     @staticmethod
+    def gpt_summary(*, title: str, snippet: str) -> str:
+        """
+        Content-based cache key for GPT article summarization results.
+
+        Format: gpt:summary:{sha256[:12]}
+        TTL: 7 days — article content never changes after publication.
+        Hash is derived from the exact input sent to GPT so identical content
+        from different URLs hits the same cache entry.
+        """
+        import hashlib
+        content = f"{title[:80]}|{snippet[:200]}"
+        digest = hashlib.sha256(content.encode()).hexdigest()[:12]
+        return f"gpt:summary:{digest}"
+
+    @staticmethod
     def rate_limit_context_writes(context_type: str, context_id: str) -> str:
         """Format: fanvoice:writes:{context_type}:{context_id}"""
         return f"fanvoice:writes:{context_type}:{context_id}"

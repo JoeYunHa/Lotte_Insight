@@ -4,9 +4,10 @@ Generate daily team and player reports.
 
 import functools
 import logging
+import threading
 from datetime import date, datetime, timedelta
 
-from openai import OpenAI
+from openai import OpenAI, RateLimitError
 
 from batch.parallel_utils import run_indexed_parallel
 from core.config import settings
@@ -45,9 +46,14 @@ _TEAM_EVENT_TEXT_LIMIT = 8
 _PLAYER_REPORT_WORKERS = 4
 
 
+class _DailyLimitExceeded(Exception):
+    """Raised when OpenAI RPD (requests per day) limit is exhausted."""
+
+
 @functools.lru_cache(maxsize=1)
 def _get_openai() -> OpenAI:
-    return OpenAI(api_key=settings.openai_api_key)
+    # max_retries=0: RPD exhaustion makes retries futile; avoid 8.64s×2 waits per player.
+    return OpenAI(api_key=settings.openai_api_key, max_retries=0)
 
 
 def _extract_event_summary(raw_summary: str | None) -> str:
@@ -147,6 +153,12 @@ def _generate_team_insight(user_prompt: str) -> str | None:
             temperature=0.4,
         )
         return response.choices[0].message.content.strip()
+    except RateLimitError as exc:
+        if "requests per day" in str(exc) or "RPD" in str(exc):
+            logger.error("OpenAI RPD exhausted during team report generation: %s", exc)
+            raise _DailyLimitExceeded() from exc
+        logger.error("Failed to generate team insight via GPT: %s", exc)
+        return None
     except Exception as exc:  # noqa: BLE001 - GPT fallback handled
         logger.error("Failed to generate team insight via GPT: %s", exc)
         return None
@@ -255,6 +267,12 @@ def _build_player_report(player_id: int, player_name: str, today: date) -> dict 
             temperature=settings.player_report_temperature,
         )
         insight = response.choices[0].message.content.strip()
+    except RateLimitError as exc:
+        if "requests per day" in str(exc) or "RPD" in str(exc):
+            logger.error("OpenAI RPD exhausted during player report for %s: %s", player_name, exc)
+            raise _DailyLimitExceeded() from exc
+        logger.error("Failed to generate player report for %s: %s", player_name, exc)
+        return None
     except Exception as exc:  # noqa: BLE001 - GPT call boundary
         logger.error("Failed to generate player report for %s: %s", player_name, exc)
         return None
@@ -271,18 +289,29 @@ def run() -> dict:
     today = datetime.now(KST).date()
     logger.info("Report generation started: %s", today)
 
-    team_report = _build_team_report(today)
+    try:
+        team_report = _build_team_report(today)
+    except _DailyLimitExceeded:
+        logger.error("OpenAI RPD exhausted during team report — skipping all reports for %s", today)
+        return {"team": 0, "players": 0}
     if team_report:
         report_repository.save_report("team_daily_report", team_report, on_conflict="date")
 
     players = report_repository.list_active_players()
+    daily_limit_hit = threading.Event()
 
     def _worker(player: dict) -> dict | None:
+        if daily_limit_hit.is_set():
+            return None
         return _build_player_report(player["id"], player["name"], today)
 
     def _on_player_error(idx: int, exc: Exception) -> dict | None:
         player = players[idx]
-        logger.error("Player report failed for %s: %s", player["name"], exc)
+        if isinstance(exc, _DailyLimitExceeded):
+            daily_limit_hit.set()
+            logger.warning("Skipping remaining player reports: OpenAI RPD exhausted")
+        else:
+            logger.error("Player report failed for %s: %s", player["name"], exc)
         return None
 
     player_reports = run_indexed_parallel(
