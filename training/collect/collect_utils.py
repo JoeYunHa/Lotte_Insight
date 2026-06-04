@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+import html
 import re
 import sys
 import time
@@ -210,7 +211,7 @@ MLB_GIANTS_CONTEXT_KEYWORDS = (
 
 
 def clean_html(text: str) -> str:
-    return re.sub(r"<[^>]+>", "", text).strip()
+    return html.unescape(re.sub(r"<[^>]+>", "", text)).strip()
 
 
 _AGENCY_PREFIX_RE = re.compile(
