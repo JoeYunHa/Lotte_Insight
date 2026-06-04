@@ -25,6 +25,7 @@ def _build_settings():
         team_name_ko: str = "롯데"
         article_keyword_limit: int = 60
         article_description_snippet_length: int = 120
+        article_recent_days: int = 14
         report_recent_days: int = 7
         player_report_article_limit: int = 10
         player_stats_history_limit: int = 30

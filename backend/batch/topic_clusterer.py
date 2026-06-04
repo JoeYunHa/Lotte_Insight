@@ -1,7 +1,7 @@
 """
 Daily topic map computation: embed articles → cluster → project to 2D.
 
-Embedding: KoELECTRA mean pooling (reuses the existing classifier model dir).
+Embedding: KoELECTRA mean pooling (reuses the is_lotte_related model dir).
 Clustering: agglomerative clustering on cosine distance.
 Projection: UMAP (falls back to PCA if umap-learn is not installed).
 
@@ -34,7 +34,7 @@ _SIMILARITY_THRESHOLD = 0.75  # cosine similarity; articles above this merge int
 _MIN_CLUSTER_SIZE = 2        # clusters smaller than this become outliers
 _UMAP_RANDOM_STATE = 42      # fixed for reproducible 2D coordinates
 _EMBED_BATCH_SIZE = 32
-_EMBED_MAX_LENGTH = 128
+_EMBED_MAX_LENGTH = 256
 _EMBEDDING_MODEL_KEY = "koelectra_mean_pool_v1"
 _PROJECTION_MODEL_UMAP = "umap_v1"
 _PROJECTION_MODEL_PCA = "pca_v1"
@@ -44,7 +44,8 @@ _MAX_AGGLOMERATIVE_ARTICLES = 400
 # ---------------------------------------------------------------------------
 # Embedder — KoELECTRA mean pooling
 #
-# Reuses the classifier model dir (CLASSIFIER_MODEL_DIR / classifier_koelectra).
+# Reuses the is_lotte_related model dir (LOTTE_RELATED_MODEL_DIR /
+# lotte_related_koelectra).
 # AutoModel loads the base ELECTRA encoder; the classification head weights
 # in the checkpoint are silently ignored (not part of AutoModel's structure).
 # ---------------------------------------------------------------------------
@@ -63,9 +64,9 @@ def _load_embedder(model_dir: Path) -> ModelArtifacts:
 
 _embedder = LazyArtifactsLoader(
     current_file=__file__,
-    env_var="CLASSIFIER_MODEL_DIR",
-    deployed_dir_name="classifier_koelectra",
-    training_dir_name="classifier_koelectra",
+    env_var="LOTTE_RELATED_MODEL_DIR",
+    deployed_dir_name="lotte_related_koelectra",
+    training_dir_name="lotte_related_koelectra",
     required_file="config.json",
     loader=_load_embedder,
     missing_log="KoELECTRA embedder not found; topic clustering skipped.",

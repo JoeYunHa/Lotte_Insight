@@ -81,11 +81,11 @@ export function RankingPanel({
                   {isTop ? '★' : String(index + 1).padStart(2, '0')}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold leading-6" style={{ color: 'var(--text)' }}>
+                  <p className="line-clamp-2 text-sm font-semibold leading-6" style={{ color: 'var(--text)' }}>
                     {row.title}
                   </p>
                   {row.meta ? (
-                    <p className="mt-1 text-xs" style={{ color: 'var(--dim)' }}>
+                    <p className="mt-1 truncate text-xs" style={{ color: 'var(--dim)' }}>
                       {row.meta}
                     </p>
                   ) : null}

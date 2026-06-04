@@ -23,18 +23,12 @@ import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
-from sklearn.metrics import classification_report, f1_score
-from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, Dataset
-from transformers import (
-    AutoModelForSequenceClassification,
-    AutoTokenizer,
-    get_linear_schedule_with_warmup,
-)
 
 from settings import (
     ARTICLE_SNIPPET_LENGTH,
     DATA_DIR,
+    DEFAULT_CLASSIFIER_MAX_LENGTH,
     DEFAULT_EVAL_BATCH_SIZE,
     DEFAULT_PLAYER_STANCE_BATCH_SIZE,
     DEFAULT_PLAYER_STANCE_EPOCHS,
@@ -61,7 +55,7 @@ class PlayerStanceDataset(Dataset):
         player_snippets: list[str],
         labels: list[int],
         tokenizer,
-        max_len: int = 128,
+        max_len: int = DEFAULT_CLASSIFIER_MAX_LENGTH,
     ):
         # seq-A: title  |  seq-B: query_player + " " + description_snippet
         self.encodings = tokenizer(
@@ -106,10 +100,10 @@ def load_data(data_dir: Path | None = None) -> tuple[list[str], list[str], list[
         df["description_snippet"].fillna("").astype(str)
         .str[:ARTICLE_SNIPPET_LENGTH].str.strip()
     )
-    df["event_summary"] = df["event_summary"].fillna("").astype(str).str.strip() if "event_summary" in df.columns else ""
-    # seq-B: player name (anchor) + description snippet + event_summary (refined context)
+    # seq-B: player name (anchor) + description snippet. event_summary is
+    # excluded because it is GPT-generated and unavailable at inference time.
     df["player_snippet"] = (
-        df["query_player"] + " " + df["description_snippet"] + " " + df["event_summary"]
+        df["query_player"] + " " + df["description_snippet"]
     ).str.strip()
 
     # Drop titles with conflicting player_stance labels (same title+player, different label)
@@ -154,9 +148,19 @@ def train(
     epochs: int = DEFAULT_PLAYER_STANCE_EPOCHS,
     lr: float = DEFAULT_PLAYER_STANCE_LR,
     batch_size: int = DEFAULT_PLAYER_STANCE_BATCH_SIZE,
+    pretrained: str = PRETRAINED,
+    max_length: int = DEFAULT_CLASSIFIER_MAX_LENGTH,
     warmup_ratio: float = DEFAULT_TRAIN_WARMUP_RATIO,
     seed: int = DEFAULT_TRAIN_SEED,
 ):
+    from sklearn.metrics import classification_report, f1_score
+    from sklearn.model_selection import train_test_split
+    from transformers import (
+        AutoModelForSequenceClassification,
+        AutoTokenizer,
+        get_linear_schedule_with_warmup,
+    )
+
     out_dir = output_dir or PLAYER_STANCE_MODEL_DIR
     torch.manual_seed(seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -172,9 +176,9 @@ def train(
     )
     print(f"\nTrain: {len(tr_t)} rows  Validation: {len(va_t)} rows")
 
-    tokenizer = AutoTokenizer.from_pretrained(PRETRAINED)
+    tokenizer = AutoTokenizer.from_pretrained(pretrained)
     model = AutoModelForSequenceClassification.from_pretrained(
-        PRETRAINED,
+        pretrained,
         num_labels=NUM_LABELS,
         id2label=ID2LABEL,
         label2id=LABEL2ID,
@@ -182,8 +186,8 @@ def train(
 
     pin = device.type == "cuda"
     num_workers = 2 if device.type == "cuda" else 0
-    train_ds = PlayerStanceDataset(tr_t, tr_ps, tr_l, tokenizer)
-    val_ds = PlayerStanceDataset(va_t, va_ps, va_l, tokenizer)
+    train_ds = PlayerStanceDataset(tr_t, tr_ps, tr_l, tokenizer, max_len=max_length)
+    val_ds = PlayerStanceDataset(va_t, va_ps, va_l, tokenizer, max_len=max_length)
     train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=pin)
     val_loader = DataLoader(val_ds, batch_size=DEFAULT_EVAL_BATCH_SIZE, num_workers=num_workers, pin_memory=pin)
 
@@ -283,6 +287,9 @@ def main():
     parser.add_argument("--epochs", type=int, default=DEFAULT_PLAYER_STANCE_EPOCHS)
     parser.add_argument("--lr", type=float, default=DEFAULT_PLAYER_STANCE_LR)
     parser.add_argument("--batch", type=int, default=DEFAULT_PLAYER_STANCE_BATCH_SIZE)
+    parser.add_argument("--pretrained", default=PRETRAINED,
+                        help="Base model name, e.g. klue/roberta-large")
+    parser.add_argument("--max-length", type=int, default=DEFAULT_CLASSIFIER_MAX_LENGTH)
     args = parser.parse_args()
 
     train(
@@ -291,6 +298,8 @@ def main():
         epochs=args.epochs,
         lr=args.lr,
         batch_size=args.batch,
+        pretrained=args.pretrained,
+        max_length=args.max_length,
     )
 
 

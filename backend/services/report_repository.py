@@ -80,7 +80,7 @@ def fetch_articles_for_day(target_date: date) -> list[dict]:
 
 
 def fetch_player_mentions(article_ids: list[int]) -> list[dict]:
-    return _fetch_article_player_rows(article_ids, "player_id, players(name)")
+    return _fetch_article_player_rows(article_ids, "player_id, player_stance, players(name)")
 
 
 def fetch_recent_player_articles(
@@ -92,7 +92,7 @@ def fetch_recent_player_articles(
     start_at, _ = utc_day_bounds(since)
     result = (
         supabase.table("article_players")
-        .select("articles!inner(title, published_at, event_summary)")
+        .select("player_stance, articles!inner(title, published_at, event_summary)")
         .eq("player_id", player_id)
         .gte("articles.published_at", start_at)
         .order("articles.published_at", desc=True)

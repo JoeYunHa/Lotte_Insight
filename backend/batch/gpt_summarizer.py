@@ -19,6 +19,7 @@ from services.cache_keys import CacheKeyBuilder
 logger = logging.getLogger(__name__)
 
 _ERROR = {"event_summary": "", "key_players": [], "source": "gpt_error"}
+_LABEL_ERROR = {"label": "ETC", "confidence": 0.0, "secondary_labels": [], "source": "gpt_error"}
 
 _SYSTEM_PROMPT = (
     "당신은 KBO 롯데 자이언츠 야구 기사 분석가입니다.\n"
@@ -36,8 +37,33 @@ _SYSTEM_PROMPT = (
 _MAX_WORKERS = 1
 _INTER_REQUEST_DELAY = 0.5
 _TITLE_MAX = 80
-_SNIPPET_MAX = 200
+_SNIPPET_MAX = 300
 _GPT_SUMMARY_TTL = 7 * 86400  # 7 days — article content is immutable after collection
+_GPT_LABEL_TTL = 7 * 86400
+
+_VALID_LABELS = {
+    "INJURY_ROSTER",
+    "TRANSACTION_CONTRACT",
+    "MATCH_RELATED",
+    "PERFORMANCE_ANALYSIS",
+    "INTERVIEW",
+    "CLUB_OPERATION",
+    "ETC",
+}
+
+_LABEL_SYSTEM_PROMPT = (
+    "You classify Korean KBO Lotte Giants news articles. Return only a valid JSON object.\n\n"
+    "Labels:\n"
+    "- MATCH_RELATED: game result, lineup, game preview/review, in-game performance.\n"
+    "- INJURY_ROSTER: injury, rehab, roster registration/call-up/send-down.\n"
+    "- TRANSACTION_CONTRACT: trade, signing, release, FA, contract, foreign-player move.\n"
+    "- PERFORMANCE_ANALYSIS: statistics, form, tactical or performance analysis.\n"
+    "- INTERVIEW: player/coach/front-office quote or interview focused article.\n"
+    "- CLUB_OPERATION: club business, front office, stadium, event, fan operation.\n"
+    "- ETC: related but none of the above.\n\n"
+    "Use the title and snippet only. Do not infer facts not present in the input.\n"
+    "Output schema: {\"label\":\"MATCH_RELATED\", \"confidence\":0.0, \"secondary_labels\":[]}"
+)
 
 
 class _DailyLimitExceeded(Exception):
@@ -57,6 +83,14 @@ def _build_user_message(title: str, description_snippet: str) -> str:
     if s:
         return f"제목: {t}\n설명: {s}"
     return f"제목: {t}"
+
+
+def _build_label_user_message(title: str, description_snippet: str) -> str:
+    t = title[:_TITLE_MAX].strip()
+    s = (description_snippet or "")[:_SNIPPET_MAX].strip()
+    if s:
+        return f"title: {t}\nsnippet: {s}"
+    return f"title: {t}"
 
 
 def _parse_response(text: str) -> dict:
@@ -83,6 +117,36 @@ def _parse_response(text: str) -> dict:
 
     logger.warning("GPT response parse failed: %s", text[:120])
     return dict(_ERROR)
+
+
+def _parse_label_response(text: str) -> dict:
+    try:
+        data = json.loads(text.strip())
+    except json.JSONDecodeError:
+        logger.warning("GPT label response parse failed: %s", text[:120])
+        return dict(_LABEL_ERROR)
+
+    label = str(data.get("label") or "ETC").strip().upper()
+    if label not in _VALID_LABELS:
+        label = "ETC"
+
+    try:
+        confidence = max(0.0, min(1.0, float(data.get("confidence", 0.0))))
+    except (TypeError, ValueError):
+        confidence = 0.0
+
+    secondary_labels: list[str] = []
+    for raw_label in data.get("secondary_labels") or []:
+        secondary = str(raw_label).strip().upper()
+        if secondary in _VALID_LABELS and secondary != label and secondary not in secondary_labels:
+            secondary_labels.append(secondary)
+
+    return {
+        "label": label,
+        "confidence": round(confidence, 4),
+        "secondary_labels": secondary_labels,
+        "source": "gpt",
+    }
 
 
 def _call_gpt(title: str, description_snippet: str) -> dict:
@@ -126,6 +190,46 @@ def _call_gpt(title: str, description_snippet: str) -> dict:
         return dict(_ERROR)
 
 
+def _call_gpt_label(title: str, description_snippet: str) -> dict:
+    cache_key = CacheKeyBuilder.gpt_label(title=title, snippet=description_snippet)
+    cached = cache.get_json(cache_key)
+    if cached is not None:
+        logger.debug("GPT label cache hit for '%s'", title[:40])
+        return cached
+
+    try:
+        response = _get_client().chat.completions.create(
+            model=settings.openai_model,
+            messages=[
+                {"role": "system", "content": _LABEL_SYSTEM_PROMPT},
+                {"role": "user", "content": _build_label_user_message(title, description_snippet)},
+            ],
+            max_tokens=120,
+            temperature=0.0,
+        )
+        text = response.choices[0].message.content or ""
+        result = _parse_label_response(text)
+        if result.get("source") != "gpt_error":
+            cache.set_json(cache_key, result, _GPT_LABEL_TTL)
+        return result
+    except openai.RateLimitError as exc:
+        if "requests per day" in str(exc) or "RPD" in str(exc):
+            logger.error("OpenAI daily request limit (RPD) exhausted, aborting label batch: %s", exc)
+            raise _DailyLimitExceeded() from exc
+        logger.error("GPT label classification failed for '%s': %s", title[:40], exc)
+        return dict(_LABEL_ERROR)
+    except (
+        openai.APIError,
+        openai.APIConnectionError,
+        TimeoutError,
+        ValueError,
+        IndexError,
+        KeyError,
+    ) as exc:
+        logger.error("GPT label classification failed for '%s': %s", title[:40], exc)
+        return dict(_LABEL_ERROR)
+
+
 def gpt_summarize_batch(articles: list[dict]) -> list[dict]:
     if not articles:
         return []
@@ -145,6 +249,34 @@ def gpt_summarize_batch(articles: list[dict]) -> list[dict]:
         else:
             logger.error("Unexpected error in gpt_summarize_batch[%d]: %s", idx, exc)
         return dict(_ERROR)
+
+    return run_indexed_parallel(
+        articles,
+        _worker,
+        max_workers=_MAX_WORKERS,
+        on_error=_on_error,
+    )
+
+
+def gpt_classify_labels_batch(articles: list[dict]) -> list[dict]:
+    if not articles:
+        return []
+
+    daily_limit_hit = threading.Event()
+
+    def _worker(article: dict) -> dict:
+        if daily_limit_hit.is_set():
+            return dict(_LABEL_ERROR)
+        time.sleep(_INTER_REQUEST_DELAY)
+        return _call_gpt_label(article["title"], article.get("description_snippet", ""))
+
+    def _on_error(idx: int, exc: Exception) -> dict:
+        if isinstance(exc, _DailyLimitExceeded):
+            daily_limit_hit.set()
+            logger.warning("Skipping remaining label requests: OpenAI RPD limit exhausted")
+        else:
+            logger.error("Unexpected error in gpt_classify_labels_batch[%d]: %s", idx, exc)
+        return dict(_LABEL_ERROR)
 
     return run_indexed_parallel(
         articles,

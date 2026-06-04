@@ -35,6 +35,7 @@ from settings import (
     ARTICLE_SNIPPET_LENGTH,
     DATA_DIR,
     DEFAULT_EVAL_BATCH_SIZE,
+    DEFAULT_CLASSIFIER_MAX_LENGTH,
     DEFAULT_LOTTE_RELATED_BATCH_SIZE,
     DEFAULT_LOTTE_RELATED_EPOCHS,
     DEFAULT_LOTTE_RELATED_LR,
@@ -61,7 +62,7 @@ class BinaryDataset(Dataset):
         snippets: list[str],
         labels: list[float],
         tokenizer,
-        max_len: int = 128,
+        max_len: int = DEFAULT_CLASSIFIER_MAX_LENGTH,
     ):
         self.encodings = tokenizer(
             titles,
@@ -192,6 +193,8 @@ def train(
     epochs: int = DEFAULT_LOTTE_RELATED_EPOCHS,
     lr: float = DEFAULT_LOTTE_RELATED_LR,
     batch_size: int = DEFAULT_LOTTE_RELATED_BATCH_SIZE,
+    pretrained: str = PRETRAINED,
+    max_length: int = DEFAULT_CLASSIFIER_MAX_LENGTH,
     warmup_ratio: float = DEFAULT_TRAIN_WARMUP_RATIO,
     seed: int = DEFAULT_TRAIN_SEED,
 ):
@@ -211,16 +214,16 @@ def train(
     )
     print(f"\nTrain: {len(tr_t)} rows  Validation: {len(va_t)} rows")
 
-    tokenizer = AutoTokenizer.from_pretrained(PRETRAINED)
+    tokenizer = AutoTokenizer.from_pretrained(pretrained)
     model = AutoModelForSequenceClassification.from_pretrained(
-        PRETRAINED,
+        pretrained,
         num_labels=1,
     ).to(device)
 
     pin = device.type == "cuda"
     num_workers = 2 if device.type == "cuda" else 0
-    train_ds = BinaryDataset(tr_t, tr_s, tr_l, tokenizer)
-    val_ds = BinaryDataset(va_t, va_s, va_l, tokenizer)
+    train_ds = BinaryDataset(tr_t, tr_s, tr_l, tokenizer, max_len=max_length)
+    val_ds = BinaryDataset(va_t, va_s, va_l, tokenizer, max_len=max_length)
     train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=pin)
     val_loader = DataLoader(val_ds, batch_size=DEFAULT_EVAL_BATCH_SIZE, num_workers=num_workers, pin_memory=pin)
 
@@ -328,6 +331,9 @@ def main():
     parser.add_argument("--epochs", type=int, default=DEFAULT_LOTTE_RELATED_EPOCHS)
     parser.add_argument("--lr", type=float, default=DEFAULT_LOTTE_RELATED_LR)
     parser.add_argument("--batch", type=int, default=DEFAULT_LOTTE_RELATED_BATCH_SIZE)
+    parser.add_argument("--pretrained", default=PRETRAINED,
+                        help="Base model name, e.g. klue/roberta-large")
+    parser.add_argument("--max-length", type=int, default=DEFAULT_CLASSIFIER_MAX_LENGTH)
     args = parser.parse_args()
 
     train(
@@ -336,6 +342,8 @@ def main():
         epochs=args.epochs,
         lr=args.lr,
         batch_size=args.batch,
+        pretrained=args.pretrained,
+        max_length=args.max_length,
     )
 
 

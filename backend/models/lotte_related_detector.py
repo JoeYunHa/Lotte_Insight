@@ -13,7 +13,7 @@ import logging
 from pathlib import Path
 
 from core.config import settings
-from models.runtime import LazyArtifactsLoader, ModelArtifacts
+from models.runtime import CLASSIFIER_MAX_LEN, LazyArtifactsLoader, ModelArtifacts
 
 logger = logging.getLogger(__name__)
 
@@ -256,7 +256,7 @@ def detect_is_lotte_related_batch(articles: list[dict]) -> list[dict]:
                 snippets,
                 truncation="only_second",
                 padding="max_length",
-                max_length=128,
+                max_length=CLASSIFIER_MAX_LEN,
                 return_tensors="pt",
             )
             encoded = {k: v.to(runtime.device) for k, v in encoded.items()}
@@ -302,7 +302,7 @@ def detect_is_lotte_related(article: dict) -> dict:
             snippet,
             truncation="only_second",
             padding="max_length",
-            max_length=128,
+            max_length=CLASSIFIER_MAX_LEN,
             return_tensors="pt",
         )
         encoded = {k: v.to(runtime.device) for k, v in encoded.items()}

@@ -179,7 +179,7 @@ export default async function HomePage() {
 
       <section className="mb-10">
         <SectionHeader label="빠른 순위" accent="gold" />
-        <div className="grid gap-4 xl:grid-cols-3">
+        <div className="grid gap-4 xl:grid-cols-2">
           <RankingPanel
             eyebrow="선수 순위"
             title="최다 언급 선수"
@@ -195,14 +195,6 @@ export default async function HomePage() {
             accent="red"
             emptyTitle="아직 헤드라인이 없습니다"
             emptyBody="수집이 완료되면 최신 기사 큐가 채워집니다."
-          />
-          <RankingPanel
-            eyebrow="독자 순위"
-            title="최다 조회 기사"
-            rows={[]}
-            accent="neutral"
-            emptyTitle="백엔드 지원 필요"
-            emptyBody="현재 API는 기사 조회수를 제공하지 않습니다. 조회수 지표 추가를 위한 백엔드 노트가 작성되었습니다."
           />
         </div>
       </section>

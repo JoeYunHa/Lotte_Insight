@@ -52,10 +52,9 @@ _runtime = LazyArtifactsLoader(
 )
 
 
-def _build_player_snippet(player_name: str, description_snippet: str, event_summary: str = "") -> str:
+def _build_player_snippet(player_name: str, description_snippet: str) -> str:
     snippet = (description_snippet or "")[: settings.article_description_snippet_length].strip()
-    summary = (event_summary or "").strip()
-    parts = [p for p in [player_name, snippet, summary] if p]
+    parts = [p for p in [player_name, snippet] if p]
     return " ".join(parts)
 
 
@@ -63,7 +62,6 @@ def classify_player_stance(
     title: str,
     description_snippet: str = "",
     player_name: str = "",
-    event_summary: str = "",
 ) -> dict:
     """
     Returns {label, confidence, source} for the given article and player.
@@ -75,7 +73,7 @@ def classify_player_stance(
 
     try:
         labels = artifacts.extras.get("labels") or _DEFAULT_LABELS
-        player_snippet = _build_player_snippet(player_name, description_snippet, event_summary)
+        player_snippet = _build_player_snippet(player_name, description_snippet)
         return infer_single(artifacts, title, player_snippet, labels)
     except Exception as exc:
         logger.error("Player stance classification failed: %s", exc)
@@ -104,7 +102,6 @@ def classify_player_stance_batch(articles: list[dict]) -> list[dict]:
             _build_player_snippet(
                 a.get("player_name", ""),
                 a.get("description_snippet", ""),
-                a.get("event_summary", ""),
             ),
         )
         for a in articles

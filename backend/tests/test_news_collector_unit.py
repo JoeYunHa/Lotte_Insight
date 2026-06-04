@@ -13,6 +13,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
+from datetime import datetime, timezone
+from types import SimpleNamespace
 
 import pytest
 
@@ -181,3 +183,78 @@ class TestNormalizedUrlPersistence:
 
         rows = mock_chain.upsert.call_args[0][0]
         assert rows[0]["source_url"] == "https://example.com/article"
+
+
+class TestPhase5Gates:
+    def test_recent_filter_keeps_recent_and_drops_stale(self):
+        from batch import news_collector
+        from services.article_utils import NormalizedNewsItem
+
+        now = datetime(2026, 6, 4, tzinfo=timezone.utc)
+
+        def item(published_at: str) -> NormalizedNewsItem:
+            return NormalizedNewsItem(
+                title="title",
+                description_snippet="snippet",
+                link="https://example.com/a",
+                source_name="example",
+                published_at=published_at,
+                published_date=published_at[:10],
+            )
+
+        rows = [
+            (item("2026-06-03T00:00:00+00:00"), "naver_api", "https://example.com/recent"),
+            (item("2026-05-01T00:00:00+00:00"), "naver_api", "https://example.com/stale"),
+        ]
+
+        with patch.object(news_collector, "settings", SimpleNamespace(article_recent_days=14)):
+            filtered = news_collector._filter_recent_items(rows, now=now)
+        assert [row[2] for row in filtered] == ["https://example.com/recent"]
+
+    def test_player_stance_input_excludes_event_summary(self):
+        from batch import news_collector
+        from services.article_utils import NormalizedNewsItem
+
+        item = NormalizedNewsItem(
+            title="박세웅 7이닝 무실점",
+            description_snippet="롯데 선발 박세웅이 호투했다.",
+            link="https://example.com/a",
+            source_name="example",
+            published_at="2026-06-04T00:00:00+00:00",
+            published_date="2026-06-04",
+        )
+
+        alias_index = MagicMock()
+        alias_index.aliases_by_player_id = {7: ("박세웅",)}
+        alias_index.match_player_ids.return_value = [7]
+
+        captured_inputs: list[dict] = []
+
+        def fake_player_stance(inputs: list[dict]) -> list[dict]:
+            captured_inputs.extend(inputs)
+            return [{"label": "positive", "confidence": 0.9, "source": "test"}]
+
+        with (
+            patch.object(news_collector, "detect_is_lotte_related_batch", return_value=[
+                {"is_lotte_related": True, "confidence": 1.0, "source": "test"}
+            ]),
+            patch.object(news_collector, "gpt_classify_labels_batch", return_value=[
+                {"label": "MATCH_RELATED", "confidence": 0.9, "secondary_labels": []}
+            ]),
+            patch.object(news_collector, "classify_stance_batch", return_value=[
+                {"label": "positive", "confidence": 0.9, "source": "test"}
+            ]),
+            patch.object(news_collector, "gpt_summarize_batch", return_value=[
+                {"event_summary": "요약은 player_stance에 쓰지 않는다.", "key_players": ["박세웅"], "source": "test"}
+            ]),
+            patch.object(news_collector, "build_player_alias_index", return_value=alias_index),
+            patch.object(news_collector, "classify_player_stance_batch", side_effect=fake_player_stance),
+            patch.object(news_collector, "settings", SimpleNamespace(gpt_summary_labels=["MATCH_RELATED"])),
+        ):
+            news_collector._run_inference([item])
+
+        assert captured_inputs == [{
+            "title": "박세웅 7이닝 무실점",
+            "description_snippet": "롯데 선발 박세웅이 호투했다.",
+            "player_name": "박세웅",
+        }]

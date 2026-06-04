@@ -79,6 +79,33 @@ def _summarize_player_mentions(mentions: list[dict]) -> dict[str, int]:
     return player_mentions
 
 
+def _summarize_player_stances(mentions: list[dict]) -> dict[str, dict[str, int]]:
+    stance_counts: dict[str, dict[str, int]] = {}
+    for row in mentions:
+        name = (row.get("players") or {}).get("name", "")
+        stance = row.get("player_stance")
+        if not name or stance not in {"positive", "neutral", "negative"}:
+            continue
+        counts = stance_counts.setdefault(name, {"positive": 0, "neutral": 0, "negative": 0})
+        counts[stance] += 1
+    return stance_counts
+
+
+def _format_player_stance_summary(stance_counts: dict[str, dict[str, int]]) -> str:
+    if not stance_counts:
+        return "없음"
+
+    def total(item: tuple[str, dict[str, int]]) -> int:
+        return sum(item[1].values())
+
+    parts: list[str] = []
+    for name, counts in sorted(stance_counts.items(), key=total, reverse=True)[:5]:
+        parts.append(
+            f"{name}(긍정 {counts['positive']}, 중립 {counts['neutral']}, 부정 {counts['negative']})"
+        )
+    return ", ".join(parts)
+
+
 def _build_team_event_texts(articles: list[dict]) -> list[str]:
     """라벨별 최대 2건씩 균형 있게 뽑아 GPT 입력용 텍스트 목록을 만든다."""
     from collections import defaultdict
@@ -124,16 +151,19 @@ def _build_team_gpt_prompt(
     article_count: int,
     label_counts: dict[str, int],
     player_mentions: dict[str, int],
+    player_stances: dict[str, dict[str, int]],
     event_texts: list[str],
 ) -> str:
     label_summary = _format_label_summary(label_counts)
     top_players = sorted(player_mentions.items(), key=lambda x: -x[1])[:5]
     player_summary = ", ".join(f"{name}({count}회)" for name, count in top_players) or "없음"
+    stance_summary = _format_player_stance_summary(player_stances)
     texts_block = "\n".join(f"- {t}" for t in event_texts) or "- (이슈 요약 없음)"
     return (
         f"기사 수: {article_count}건\n"
         f"라벨 분포: {label_summary}\n"
         f"주요 언급 선수: {player_summary}\n"
+        f"선수별 기사 톤 분포: {stance_summary}\n"
         f"주요 이슈 요약:\n{texts_block}"
     )
 
@@ -167,6 +197,7 @@ def _generate_team_insight(user_prompt: str) -> str | None:
 def _format_team_report(today: date, articles: list[dict], mentions: list[dict]) -> dict:
     label_counts = _summarize_label_counts(articles)
     player_mentions = _summarize_player_mentions(mentions)
+    player_stances = _summarize_player_stances(mentions)
     top_labels = [
         label
         for label, _ in sorted(label_counts.items(), key=lambda x: -x[1])[:3]
@@ -174,7 +205,13 @@ def _format_team_report(today: date, articles: list[dict], mentions: list[dict])
     ]
 
     event_texts = _build_team_event_texts(articles)
-    user_prompt = _build_team_gpt_prompt(len(articles), label_counts, player_mentions, event_texts)
+    user_prompt = _build_team_gpt_prompt(
+        len(articles),
+        label_counts,
+        player_mentions,
+        player_stances,
+        event_texts,
+    )
     insight = _generate_team_insight(user_prompt)
 
     if not insight:
@@ -220,7 +257,11 @@ def _collect_recent_titles(player_id: int, since: date) -> list[str]:
         if not article:
             continue
         summary = _extract_event_summary(article.get("event_summary"))
-        results.append(summary or article["title"])
+        text = summary or article["title"]
+        stance = row.get("player_stance")
+        if stance in {"positive", "neutral", "negative"}:
+            text = f"[{stance}] {text}"
+        results.append(text)
     return results
 
 

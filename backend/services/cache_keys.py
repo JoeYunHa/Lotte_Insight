@@ -11,6 +11,7 @@ All cache keys should be generated through this module to ensure:
 
 from __future__ import annotations
 
+import hashlib
 from datetime import date
 
 
@@ -144,10 +145,20 @@ class CacheKeyBuilder:
         Hash is derived from the exact input sent to GPT so identical content
         from different URLs hits the same cache entry.
         """
-        import hashlib
-        content = f"{title[:80]}|{snippet[:200]}"
+        content = f"{title[:80]}|{snippet[:300]}"
         digest = hashlib.sha256(content.encode()).hexdigest()[:12]
         return f"gpt:summary:{digest}"
+
+    @staticmethod
+    def gpt_label(*, title: str, snippet: str) -> str:
+        """
+        Content-based cache key for GPT article label classification results.
+
+        Format: gpt:label:{sha256[:12]}
+        """
+        content = f"{title[:80]}|{snippet[:300]}"
+        digest = hashlib.sha256(content.encode()).hexdigest()[:12]
+        return f"gpt:label:{digest}"
 
     @staticmethod
     def rate_limit_context_writes(context_type: str, context_id: str) -> str:

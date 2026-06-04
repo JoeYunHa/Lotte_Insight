@@ -7,7 +7,7 @@ from typing import Any, Callable
 
 logger = logging.getLogger(__name__)
 
-_KOELECTRA_MAX_LEN = 128
+CLASSIFIER_MAX_LEN = 256
 
 
 def infer_single(
@@ -24,7 +24,7 @@ def infer_single(
         text_b,
         truncation="only_second",
         padding="max_length",
-        max_length=_KOELECTRA_MAX_LEN,
+        max_length=CLASSIFIER_MAX_LEN,
         return_tensors="pt",
     )
     enc = {k: v.to(artifacts.device) for k, v in enc.items()}
@@ -67,7 +67,7 @@ def infer_batch(
                 texts_b,
                 truncation="only_second",
                 padding=True,
-                max_length=_KOELECTRA_MAX_LEN,
+                max_length=CLASSIFIER_MAX_LEN,
                 return_tensors="pt",
             )
             enc = {k: v.to(artifacts.device) for k, v in enc.items()}

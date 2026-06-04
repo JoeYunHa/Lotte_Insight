@@ -21,19 +21,13 @@ import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
-from sklearn.metrics import classification_report, f1_score
-from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, Dataset
-from transformers import (
-    AutoModelForSequenceClassification,
-    AutoTokenizer,
-    get_linear_schedule_with_warmup,
-)
 
 from settings import (
     ARTICLE_SNIPPET_LENGTH,
     DATA_DIR,
     DEFAULT_EVAL_BATCH_SIZE,
+    DEFAULT_CLASSIFIER_MAX_LENGTH,
     DEFAULT_STANCE_BATCH_SIZE,
     DEFAULT_STANCE_EPOCHS,
     DEFAULT_STANCE_LR,
@@ -60,7 +54,7 @@ class StanceDataset(Dataset):
         snippets: list[str],
         labels: list[int],
         tokenizer,
-        max_len: int = 128,
+        max_len: int = DEFAULT_CLASSIFIER_MAX_LENGTH,
     ):
         self.encodings = tokenizer(
             titles,
@@ -92,13 +86,15 @@ def load_data(data_dir: Path | None = None) -> tuple[list[str], list[str], list[
             print(f"  Skipped: {path.name} not found")
             continue
         df = pd.read_csv(path, encoding="utf-8-sig")
-        if "lotte_stance" not in df.columns or "is_lotte_related" not in df.columns:
+        stance_col = "team_stance" if "team_stance" in df.columns else "lotte_stance"
+        if stance_col not in df.columns or "is_lotte_related" not in df.columns:
             print(f"  Skipped: {path.name} missing required columns")
             continue
         before = len(df)
         df = df[df["is_lotte_related"].astype(str).str.lower().isin({"true", "1", "yes"})].copy()
-        df = df.dropna(subset=["lotte_stance"])
-        df = df[df["lotte_stance"].isin(STANCE_LABELS)]
+        df = df.dropna(subset=[stance_col])
+        df = df[df[stance_col].isin(STANCE_LABELS)].copy()
+        df["team_stance"] = df[stance_col]
         print(f"  Loaded: {path.name} ({len(df)} rows, dropped {before - len(df)})")
         frames.append(df)
 
@@ -114,7 +110,7 @@ def load_data(data_dir: Path | None = None) -> tuple[list[str], list[str], list[
 
     # Conflicting titles (same title, different lotte_stance across CSVs) indicate
     # genuine ambiguity — GPT itself disagreed. Drop them rather than picking a side.
-    df["_label_id"] = df["lotte_stance"].map(LABEL2ID)
+    df["_label_id"] = df["team_stance"].map(LABEL2ID)
     conflicting = (
         df.groupby("title")["_label_id"].nunique()
         .loc[lambda c: c > 1].index
@@ -125,7 +121,7 @@ def load_data(data_dir: Path | None = None) -> tuple[list[str], list[str], list[
 
     df = df.drop_duplicates(subset=["title"]).reset_index(drop=True)
 
-    labels = df["lotte_stance"].map(LABEL2ID).tolist()
+    labels = df["team_stance"].map(LABEL2ID).tolist()
     print(f"\nTotal: {len(labels)} rows")
     for label in STANCE_LABELS:
         count = labels.count(LABEL2ID[label])
@@ -152,9 +148,19 @@ def train(
     epochs: int = DEFAULT_STANCE_EPOCHS,
     lr: float = DEFAULT_STANCE_LR,
     batch_size: int = DEFAULT_STANCE_BATCH_SIZE,
+    pretrained: str = PRETRAINED,
+    max_length: int = DEFAULT_CLASSIFIER_MAX_LENGTH,
     warmup_ratio: float = DEFAULT_TRAIN_WARMUP_RATIO,
     seed: int = DEFAULT_TRAIN_SEED,
 ):
+    from sklearn.metrics import classification_report, f1_score
+    from sklearn.model_selection import train_test_split
+    from transformers import (
+        AutoModelForSequenceClassification,
+        AutoTokenizer,
+        get_linear_schedule_with_warmup,
+    )
+
     out_dir = output_dir or STANCE_MODEL_DIR
     torch.manual_seed(seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -170,9 +176,9 @@ def train(
     )
     print(f"\nTrain: {len(tr_t)} rows  Validation: {len(va_t)} rows")
 
-    tokenizer = AutoTokenizer.from_pretrained(PRETRAINED)
+    tokenizer = AutoTokenizer.from_pretrained(pretrained)
     model = AutoModelForSequenceClassification.from_pretrained(
-        PRETRAINED,
+        pretrained,
         num_labels=NUM_LABELS,
         id2label=ID2LABEL,
         label2id=LABEL2ID,
@@ -180,8 +186,8 @@ def train(
 
     pin = device.type == "cuda"
     num_workers = 2 if device.type == "cuda" else 0
-    train_ds = StanceDataset(tr_t, tr_s, tr_l, tokenizer)
-    val_ds = StanceDataset(va_t, va_s, va_l, tokenizer)
+    train_ds = StanceDataset(tr_t, tr_s, tr_l, tokenizer, max_len=max_length)
+    val_ds = StanceDataset(va_t, va_s, va_l, tokenizer, max_len=max_length)
     train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=pin)
     val_loader = DataLoader(val_ds, batch_size=DEFAULT_EVAL_BATCH_SIZE, num_workers=num_workers, pin_memory=pin)
 
@@ -270,7 +276,7 @@ def _save(model, tokenizer, out_dir: Path):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Train lotte_stance 3-class KoELECTRA classifier")
+    parser = argparse.ArgumentParser(description="Train team_stance 3-class classifier")
     parser.add_argument("--data-dir", type=Path, default=None,
                         help="Directory containing labeled CSVs")
     parser.add_argument("--output-dir", type=Path, default=None,
@@ -278,6 +284,9 @@ def main():
     parser.add_argument("--epochs", type=int, default=DEFAULT_STANCE_EPOCHS)
     parser.add_argument("--lr", type=float, default=DEFAULT_STANCE_LR)
     parser.add_argument("--batch", type=int, default=DEFAULT_STANCE_BATCH_SIZE)
+    parser.add_argument("--pretrained", default=PRETRAINED,
+                        help="Base model name, e.g. klue/roberta-large")
+    parser.add_argument("--max-length", type=int, default=DEFAULT_CLASSIFIER_MAX_LENGTH)
     args = parser.parse_args()
 
     train(
@@ -286,6 +295,8 @@ def main():
         epochs=args.epochs,
         lr=args.lr,
         batch_size=args.batch,
+        pretrained=args.pretrained,
+        max_length=args.max_length,
     )
 
 

@@ -4,21 +4,26 @@ Collect Lotte Giants news articles from the Naver Search API.
 
 import json
 import logging
+from datetime import datetime, timedelta, timezone
 
 import requests
 from requests import RequestException
 
-from batch.gpt_summarizer import gpt_summarize_batch
+from batch.gpt_summarizer import gpt_classify_labels_batch, gpt_summarize_batch
 from batch.parallel_utils import run_indexed_parallel
 from batch.rss_collector import collect_from_rss_feeds
 from core.config import settings
 from core.database import supabase
-from models.classifier import classify_batch
 from models.lotte_related_detector import detect_is_lotte_related_batch
 from models.player_stance_classifier import classify_player_stance_batch
 from models.stance_classifier import classify_stance_batch
 from services.article_utils import NormalizedNewsItem, normalize_naver_news_item, normalize_url
-from services.player_catalog import build_player_alias_index, list_player_canonical_names
+from services.player_catalog import (
+    PlayerAliasIndex,
+    build_player_alias_index,
+    get_active_player_ids,
+    list_player_canonical_names,
+)
 
 _FETCH_WORKERS = 8
 _ID_MAP_CHUNK_SIZE = 100
@@ -89,6 +94,60 @@ def _should_gpt_summarize(label_result: dict) -> bool:
     return any(s in summarizable for s in label_result.get("secondary_labels", []))
 
 
+def _parse_published_at(value: str) -> datetime | None:
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except (AttributeError, ValueError):
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed
+
+
+def _is_recent_item(item: NormalizedNewsItem, *, now: datetime | None = None) -> bool:
+    published_at = _parse_published_at(item.published_at)
+    if published_at is None:
+        return False
+    current = now or datetime.now(timezone.utc)
+    if current.tzinfo is None:
+        current = current.replace(tzinfo=timezone.utc)
+    cutoff = current - timedelta(days=settings.article_recent_days)
+    return cutoff <= published_at <= current + timedelta(days=1)
+
+
+def _filter_recent_items(
+    items: list[tuple[NormalizedNewsItem, str, str]],
+    *,
+    now: datetime | None = None,
+) -> list[tuple[NormalizedNewsItem, str, str]]:
+    return [item_tuple for item_tuple in items if _is_recent_item(item_tuple[0], now=now)]
+
+
+def _is_current_roster_item(
+    item: NormalizedNewsItem,
+    alias_index: PlayerAliasIndex,
+    active_ids: frozenset[int],
+) -> bool:
+    """Return True unless the title matches only inactive players.
+
+    Articles with no player match (general team news) are always kept.
+    Articles mentioning at least one active player are kept.
+    Articles that only match inactive players (e.g. released foreign players) are dropped.
+    """
+    matched = alias_index.match_player_ids(item.title)
+    if not matched:
+        return True
+    return any(pid in active_ids for pid in matched)
+
+
+def _filter_current_roster_items(
+    items: list[tuple[NormalizedNewsItem, str, str]],
+    alias_index: PlayerAliasIndex,
+    active_ids: frozenset[int],
+) -> list[tuple[NormalizedNewsItem, str, str]]:
+    return [t for t in items if _is_current_roster_item(t[0], alias_index, active_ids)]
+
+
 def _run_inference(items: list[NormalizedNewsItem]) -> list[dict]:
     total = len(items)
     logger.info("Inference started: %d items", total)
@@ -100,7 +159,7 @@ def _run_inference(items: list[NormalizedNewsItem]) -> list[dict]:
     logger.info("is_lotte_related: %d/%d items", len(lotte_indices), total)
 
     related_articles = [articles[i] for i in lotte_indices]
-    related_label_results = classify_batch(related_articles) if related_articles else []
+    related_label_results = gpt_classify_labels_batch(related_articles) if related_articles else []
     logger.info("Classification done: %d items", len(related_articles))
 
     label_results: list[dict] = [
@@ -140,14 +199,12 @@ def _run_inference(items: list[NormalizedNewsItem]) -> list[dict]:
         item = items[i]
         player_ids = alias_index.match_player_ids(item.title)
         detected_players[i] = player_ids
-        event_summary = gpt_results[i].get("event_summary", "")
         for pid in player_ids:
             ps_meta.append((i, pid))
             ps_inputs.append(
                 {
                     "title": item.title,
                     "description_snippet": item.description_snippet,
-                    "event_summary": event_summary,
                     "player_name": id_to_name.get(pid, ""),
                 }
             )
@@ -241,6 +298,8 @@ def _save_labels_and_players(enriched: list[dict], id_map: dict[str, int]) -> No
             continue
 
         label_result = e["label_result"]
+        if label_result.get("source") == "gpt_error":
+            continue
         label_rows.append(
             {
                 "article_id": article_id,
@@ -352,11 +411,17 @@ def run() -> int:
     all_unique_urls = [normalized_url for _, _, normalized_url in unique_items_with_source]
     existing_urls = _query_existing_urls(all_unique_urls)
     new_items_with_source = [t for t in unique_items_with_source if t[2] not in existing_urls]
+    new_items_with_source = _filter_recent_items(new_items_with_source)
+    full_alias_index = build_player_alias_index()
+    active_player_ids = get_active_player_ids()
+    new_items_with_source = _filter_current_roster_items(
+        new_items_with_source, full_alias_index, active_player_ids
+    )
     logger.info(
-        "DB filter: %d unique -> %d new (skipping %d existing)",
+        "DB/recent/roster filter: %d unique -> %d new (skipping %d existing, stale, or inactive-player-only)",
         len(unique_items_with_source),
         len(new_items_with_source),
-        len(existing_urls),
+        len(unique_items_with_source) - len(new_items_with_source),
     )
 
     enriched: list[dict] = []
@@ -380,8 +445,8 @@ def run() -> int:
     except (RuntimeError, ValueError, RequestException) as exc:
         logger.warning("경기 데이터 동기화 실패 (무시): %s", exc)
 
-    logger.info("News collection completed: %d unique items", len(unique_items))
-    return len(unique_items)
+    logger.info("News collection completed: %d items processed", len(new_items_with_source))
+    return len(new_items_with_source)
 
 
 if __name__ == "__main__":

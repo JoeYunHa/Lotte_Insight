@@ -2,13 +2,12 @@
 Upload fine-tuned models to HuggingFace Hub.
 
 Models uploaded:
-  - classifier_koelectra      → <username>/lotte-classifier-koelectra
   - lotte_related_koelectra   → <username>/lotte-related-koelectra
   - stance_koelectra          → <username>/lotte-stance-koelectra
   - player_stance_koelectra   → <username>/lotte-player-stance-koelectra
 
 Usage:
-    python push_to_hub.py --username <hf-username> [--private] [--model all|classifier|lotte_related|stance|player_stance]
+    python push_to_hub.py --username <hf-username> [--private] [--model all|lotte_related|stance|player_stance]
 """
 
 import argparse
@@ -19,7 +18,6 @@ from huggingface_hub import HfApi
 MODELS_DIR = Path(__file__).parent / "models"
 
 MODEL_REGISTRY: dict[str, tuple[str, str]] = {
-    "classifier":     ("classifier_koelectra",    "lotte-classifier-koelectra"),
     "lotte_related":  ("lotte_related_koelectra",  "lotte-related-koelectra"),
     "stance":         ("stance_koelectra",          "lotte-stance-koelectra"),
     "player_stance":  ("player_stance_koelectra",   "lotte-player-stance-koelectra"),
