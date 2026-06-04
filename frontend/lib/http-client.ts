@@ -12,8 +12,12 @@ export class HttpError extends Error {
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? ''
 
+export function hasApiBase(): boolean {
+  return API_BASE.length > 0
+}
+
 function ensureApiBase(): string {
-  if (!API_BASE) {
+  if (!hasApiBase()) {
     throw new Error('NEXT_PUBLIC_API_URL is not configured')
   }
   return API_BASE

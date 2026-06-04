@@ -76,14 +76,14 @@ export default async function HomePage() {
     null;
 
   const headline = lead_label
-    ? `오늘 롯데 여론은 ${LABEL_HEADLINE[lead_label]} 중심입니다`
+    ? `오늘 롯데 여론은 ${LABEL_HEADLINE[lead_label]} 집중입니다`
     : article_count > 0
       ? "오늘의 롯데 데스크 보드"
       : "다음 롯데 브리핑을 준비 중입니다";
 
   const subcopy =
     article_count > 0
-      ? `오늘 ${article_count}건의 기사가 수집되었습니다. 주요 이슈, 선수 순위, 기사 피드 순으로 빠르게 스캔할 수 있습니다.`
+      ? `오늘 ${article_count}건의 기사가 수집되었습니다. 주요 이슈, 선수 순위, 기사 피드를 한 화면에서 빠르게 확인할 수 있습니다.`
       : "아직 수집된 기사가 없습니다. 파이프라인이 완료되면 히어로 카드와 순위가 자동으로 채워집니다.";
 
   const gameKicker = game_context
@@ -111,13 +111,13 @@ export default async function HomePage() {
     <PageShell
       headerActions={[
         { href: "/players", label: "선수단" },
-        { href: "/topics", label: "토픽" },
+        { href: "/topics", label: "토픽맵" },
         { href: "/archive", label: "아카이브" },
       ]}
       seasonBadge="2026 KBO"
       footer={
         <p className="text-xs" style={{ color: "var(--dim)" }}>
-          메타데이터 기반 팬 브리핑 서비스. 전체 맥락은 원문 기사를 확인하세요.
+          메타데이터 기반 AI 브리핑 서비스입니다. 전체 맥락은 원문 기사와 함께 확인하세요.
         </p>
       }
     >
@@ -194,7 +194,7 @@ export default async function HomePage() {
             rows={latestArticleRows}
             accent="red"
             emptyTitle="아직 헤드라인이 없습니다"
-            emptyBody="수집이 완료되면 최신 기사 큐가 채워집니다."
+            emptyBody="수집이 완료되면 최신 기사 목록이 채워집니다."
           />
         </div>
       </section>

@@ -9,6 +9,7 @@ import {
 } from "@/lib/fan-voice/fan-voice-api";
 import { FAN_VOICE_POLLING } from "@/lib/fan-voice/fan-voice-constants";
 import { startFanVoiceSse } from "@/lib/fan-voice/fan-voice-stream-client";
+import { hasApiBase } from "@/lib/http-client";
 import type {
   FanVoiceContextType,
   FanVoiceMessage,
@@ -27,8 +28,14 @@ export function useFanVoiceStream({
 }: UseFanVoiceStreamProps) {
   const [streamMessages, setStreamMessages] = useState<FanVoiceMessage[]>([]);
   const [slowMode, setSlowMode] = useState(false);
+  const [fanVoiceAvailable, setFanVoiceAvailable] = useState(true);
 
   useEffect(() => {
+    if (!hasApiBase()) {
+      setFanVoiceAvailable(false);
+      return;
+    }
+
     let cancelled = false;
     let stopSse: (() => void) | null = null;
     let startedFallbackPolling = false;
@@ -52,10 +59,11 @@ export function useFanVoiceStream({
             : FAN_VOICE_POLLING.DEFAULT_INTERVAL_MS;
           await new Promise((resolve) => setTimeout(resolve, waitMs));
         } catch (error) {
-          console.error("[fan-voice] polling fallback failed", error);
+          setFanVoiceAvailable(false);
           await new Promise((resolve) =>
             setTimeout(resolve, FAN_VOICE_POLLING.ERROR_RETRY_MS),
           );
+          return;
         }
       }
     }
@@ -63,8 +71,10 @@ export function useFanVoiceStream({
     async function bootstrapAndSubscribe() {
       try {
         await initFanVoiceSession();
-      } catch (error) {
-        console.error("[fan-voice] init session failed", error);
+        setFanVoiceAvailable(true);
+      } catch {
+        setFanVoiceAvailable(false);
+        return;
       }
 
       if (typeof window === "undefined" || typeof EventSource === "undefined") {
@@ -92,7 +102,6 @@ export function useFanVoiceStream({
           },
         });
       } catch (error) {
-        console.error("[fan-voice] sse bootstrap failed", error);
         runPollingFallback();
       }
     }
@@ -105,5 +114,5 @@ export function useFanVoiceStream({
     };
   }, [contextId, contextType, limit]);
 
-  return { streamMessages, setStreamMessages, slowMode };
+  return { streamMessages, setStreamMessages, slowMode, fanVoiceAvailable };
 }

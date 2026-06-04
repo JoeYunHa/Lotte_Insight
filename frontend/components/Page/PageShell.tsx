@@ -28,6 +28,7 @@ export function PageShell({ children, footer, headerActions, seasonBadge }: Page
               width={56}
               height={42}
               className="shrink-0 object-contain"
+              style={{ height: 'auto' }}
               priority
             />
             <div className="flex min-w-0 flex-col">

@@ -39,32 +39,29 @@ function resolveLaneCount(width: number): number {
   return FAN_VOICE_LIMITS.DESKTOP_LANES;
 }
 
-function getInitialCleanMode(): boolean {
-  if (typeof window === "undefined") return false;
-  return readCleanMode();
-}
-
-function getInitialLaneCount(): number {
-  if (typeof window === "undefined") return 5;
-  return resolveLaneCount(window.innerWidth);
-}
+const DEFAULT_LANE_COUNT = FAN_VOICE_LIMITS.DESKTOP_LANES;
 
 export function FanVoiceLayer({ contextType, contextId }: FanVoiceLayerProps) {
-  const { streamMessages, setStreamMessages, slowMode } = useFanVoiceStream({
-    contextType,
-    contextId,
-  });
+  const { streamMessages, setStreamMessages, slowMode, fanVoiceAvailable } =
+    useFanVoiceStream({
+      contextType,
+      contextId,
+    });
   const [activeBubbles, setActiveBubbles] = useState<ActiveFanVoiceBubble[]>(
     [],
   );
-  const [cleanMode, setCleanMode] = useState(getInitialCleanMode);
-  const [laneCount, setLaneCount] = useState(getInitialLaneCount);
+  const [cleanMode, setCleanMode] = useState(false);
+  const [laneCount, setLaneCount] = useState<number>(DEFAULT_LANE_COUNT);
+  const [mounted, setMounted] = useState(false);
   const schedulerRef = useRef<SchedulerState>(
-    createSchedulerState(getInitialLaneCount()),
+    createSchedulerState(DEFAULT_LANE_COUNT),
   );
   const reactingIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
+    setMounted(true);
+    setCleanMode(readCleanMode());
+
     function handleResize() {
       const count = resolveLaneCount(window.innerWidth);
       setLaneCount((prev) => {
@@ -184,13 +181,18 @@ export function FanVoiceLayer({ contextType, contextId }: FanVoiceLayerProps) {
           </p>
           <FanVoiceToggle cleanMode={cleanMode} onToggle={toggleCleanMode} />
         </div>
+        {!fanVoiceAvailable ? (
+          <p className="mb-2 text-xs" style={{ color: "var(--dim)" }}>
+            Fan voice feed is temporarily unavailable.
+          </p>
+        ) : null}
         <FanVoiceHighlights messages={streamMessages} />
         {/* spacer so page content isn't obscured by the fixed composer bar */}
         <div style={{ height: 72 }} aria-hidden="true" />
       </section>
 
       {/* Viewport-fixed bubble overlay — pointer-events disabled except on bubbles */}
-      {!cleanMode && (
+      {mounted && fanVoiceAvailable && !cleanMode && (
         <div className="fan-voice-overlay">
           {laneBubbles.map((bubbles, laneIndex) => (
             <FanVoiceLane
@@ -208,7 +210,7 @@ export function FanVoiceLayer({ contextType, contextId }: FanVoiceLayerProps) {
         <FanVoiceComposer
           contextType={contextType}
           contextId={contextId}
-          disabled={slowMode}
+          disabled={slowMode || !fanVoiceAvailable}
           onSubmitted={() => {}}
         />
       </div>
