@@ -5,11 +5,15 @@ from __future__ import annotations
 import argparse
 
 from collect.collect_utils import (
+    CHEERLEADER_KEYWORDS,
+    RSS_TRAINING_FEEDS,
     add_structured_summaries,
     apply_label_cap,
     auto_label,
     build_days_cutoff,
     collect_news_by_keywords,
+    collect_news_from_rss,
+    fetch_google_news_rss_query,
     load_csv_rows,
     load_existing_label_counts,
     load_existing_titles,
@@ -81,8 +85,15 @@ def filter_rows_by_primary_labels(rows: list[dict], labels: list[str]) -> list[d
     return [row for row in rows if row.get("primary_label") in allowed]
 
 
+
+
+
 def filter_photo_captions(rows: list[dict]) -> list[dict]:
-    return [row for row in rows if not row.get("title", "").startswith(PHOTO_PREFIXES)]
+    return [
+        row for row in rows
+        if not row.get("title", "").startswith(PHOTO_PREFIXES)
+        and not any(kw in row.get("title", "") for kw in CHEERLEADER_KEYWORDS)
+    ]
 
 
 def main() -> None:
@@ -114,6 +125,17 @@ def main() -> None:
     )
     parser.add_argument("--no-label", action="store_true", help="Skip GPT labeling")
     parser.add_argument("--overwrite", action="store_true", help="Overwrite the output CSV")
+    parser.add_argument(
+        "--rss",
+        action="store_true",
+        help="표준 RSS 피드 전체(Google News + 스포츠경향 + 연합뉴스 + 동아)에서 추가 수집",
+    )
+    parser.add_argument(
+        "--rss-query",
+        type=str,
+        default="",
+        help="Google News RSS 커스텀 쿼리 (쉼표 구분, 예: 롯데관전평,롯데 직관)",
+    )
     parser.add_argument(
         "--add-summaries",
         action="store_true",
@@ -165,6 +187,23 @@ def main() -> None:
     if len(rows) != before_photo_filter:
         print(f"Removed photo-caption rows: {before_photo_filter - len(rows)}")
     print(f"Collected rows: {len(rows)}")
+
+    if args.rss:
+        merged_existing = existing_titles | {r["title"] for r in rows}
+        print("\n[RSS] 표준 피드 수집")
+        rss_rows = collect_news_from_rss(merged_existing)
+        rss_rows = filter_photo_captions(rss_rows)
+        print(f"RSS 수집 합계: {len(rss_rows)}건")
+        rows.extend(rss_rows)
+
+    if args.rss_query:
+        queries = [q.strip() for q in args.rss_query.split(",") if q.strip()]
+        merged_existing = existing_titles | {r["title"] for r in rows}
+        print(f"\n[RSS Query] 쿼리: {queries}")
+        q_rows = fetch_google_news_rss_query(queries, merged_existing)
+        q_rows = filter_photo_captions(q_rows)
+        print(f"RSS Query 수집: {len(q_rows)}건")
+        rows.extend(q_rows)
 
     if not rows:
         print("No new articles were collected.")

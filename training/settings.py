@@ -34,6 +34,7 @@ TEAM_SEARCH_KEYWORDS = [
     "자이언츠",
     "사직 야구",
     # MATCH_RELATED
+    "롯데관전평",
     f"{TEAM_FULL_NAME_KO} 경기",
     f"{TEAM_FULL_NAME_KO} 선발",
     f"{TEAM_FULL_NAME_KO} 승리",

@@ -7,6 +7,8 @@ import html
 import re
 import sys
 import time
+import urllib.parse
+import xml.etree.ElementTree as ET
 from collections import Counter
 from collections.abc import Callable, Iterable
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -1181,6 +1183,139 @@ def print_stats(rows: list[dict]) -> None:
     print(f"\nconfidence < 0.7 review count: {low_confidence_count}")
 
 
+_GOOGLE_NEWS_RSS_BASE = "https://news.google.com/rss/search?q={q}&hl=ko&gl=KR&ceid=KR:ko"
+_RSS_USER_AGENT = "LotteInsightBot/1.0"
+
+# (name, url) — 백엔드 RSS_FEEDS와 동일한 소스 목록
+RSS_TRAINING_FEEDS: list[tuple[str, str]] = [
+    ("google_news_lotte", "https://news.google.com/rss/search?q=%EB%A1%AF%EB%8D%B0+%EC%9E%90%EC%9D%B4%EC%96%B8%EC%B8%A0&hl=ko&gl=KR&ceid=KR:ko"),
+    ("google_news_kbo",   "https://news.google.com/rss/search?q=KBO+%EB%A1%AF%EB%8D%B0&hl=ko&gl=KR&ceid=KR:ko"),
+    ("donga_sports",      "http://rss.donga.com/sports.xml"),
+    ("khan_baseball",     "https://sports.khan.co.kr/rss/baseball"),
+    ("yonhap_sports",     "https://www.yna.co.kr/rss/sports.xml"),
+]
+
+_LOTTE_RSS_FILTER_KEYWORDS = ("롯데", "자이언츠", "사직")
+
+# Google News RSS가 제목 끝에 붙이는 " - 언론사명" 패턴 (공백 없는 단어 1개, 최대 3회 반복)
+_GOOGLE_SOURCE_SUFFIX_RE = re.compile(r"\s+-\s+\S{1,25}\s*$")
+
+
+def _strip_google_source_suffix(title: str) -> str:
+    """Google News RSS 제목 끝 ' - 언론사명' 접미어 반복 제거."""
+    result = title
+    for _ in range(3):
+        m = _GOOGLE_SOURCE_SUFFIX_RE.search(result)
+        if m:
+            result = result[: m.start()].strip()
+        else:
+            break
+    return result or title
+
+
+def _rss_item_to_row(title: str, link: str, description: str, pub_date: str) -> dict:
+    try:
+        source = link.split("/")[2]
+    except IndexError:
+        source = ""
+    return {
+        "title": title,
+        "description_snippet": description[:ARTICLE_SNIPPET_LENGTH],
+        "source_name": source,
+        "published_at": parse_pub_date(pub_date),
+        "query_player": "",
+        "primary_label": "",
+        "secondary_labels": "",
+        "confidence_score": "",
+        "confidence_note": "",
+        "detected_players": "",
+        "is_lotte_related": "",
+        "_url": link,
+    }
+
+
+def fetch_rss_feed_items(
+    url: str,
+    existing_titles: set[str],
+    *,
+    lotte_filter: bool = True,
+    strip_source_suffix: bool = False,
+) -> list[dict]:
+    """RSS URL에서 기사를 수집해 training row 포맷으로 반환.
+
+    lotte_filter=True이면 제목+설명에 롯데 관련 키워드가 없는 항목을 제거한다.
+    strip_source_suffix=True이면 Google News가 붙이는 ' - 언론사명' 접미어를 제거해
+    동일 기사의 다매체 중복을 방지한다.
+    """
+    try:
+        resp = requests.get(url, headers={"User-Agent": _RSS_USER_AGENT}, timeout=10)
+        resp.raise_for_status()
+    except Exception as exc:
+        print(f"[WARN] RSS 수집 실패 ({url}): {exc}")
+        return []
+
+    try:
+        root = ET.fromstring(resp.content)
+    except ET.ParseError as exc:
+        print(f"[WARN] RSS 파싱 실패 ({url}): {exc}")
+        return []
+
+    rows: list[dict] = []
+    seen = set(existing_titles)
+    for item in root.findall(".//item"):
+        raw_title = clean_html(item.findtext("title") or "")
+        if not raw_title:
+            continue
+        title = _strip_google_source_suffix(raw_title) if strip_source_suffix else raw_title
+        if title in seen:
+            continue
+        link = item.findtext("link") or ""
+        description = clean_html(item.findtext("description") or "")
+        pub_date = item.findtext("pubDate") or ""
+        combined = f"{title} {description}".lower()
+        if lotte_filter and not any(kw in combined for kw in _LOTTE_RSS_FILTER_KEYWORDS):
+            continue
+        rows.append(_rss_item_to_row(title, link, description, pub_date))
+        seen.add(title)
+    return rows
+
+
+def fetch_google_news_rss_query(
+    queries: list[str],
+    existing_titles: set[str],
+) -> list[dict]:
+    """Google News RSS를 커스텀 쿼리로 수집 (관전평 등 특정 키워드 전용)."""
+    rows: list[dict] = []
+    seen: set[str] = set(existing_titles)
+    for query in queries:
+        url = _GOOGLE_NEWS_RSS_BASE.format(q=urllib.parse.quote(query))
+        new_rows = fetch_rss_feed_items(url, seen, lotte_filter=True, strip_source_suffix=True)
+        rows.extend(new_rows)
+        seen.update(r["title"] for r in new_rows)
+    return rows
+
+
+def collect_news_from_rss(
+    existing_titles: set[str],
+    *,
+    feeds: list[tuple[str, str]] | None = None,
+) -> list[dict]:
+    """표준 RSS 피드 전체에서 롯데 관련 기사 수집."""
+    feed_list = feeds if feeds is not None else RSS_TRAINING_FEEDS
+    rows: list[dict] = []
+    seen: set[str] = set(existing_titles)
+    for name, url in feed_list:
+        # Google Search RSS는 이미 쿼리 필터됨 → lotte_filter 불필요
+        is_search_feed = "rss/search" in url
+        new_rows = fetch_rss_feed_items(
+            url, seen, lotte_filter=not is_search_feed, strip_source_suffix=is_search_feed
+        )
+        print(f"  [{name}] {len(new_rows)}건")
+        rows.extend(new_rows)
+        seen.update(r["title"] for r in new_rows)
+    return rows
+
+
 __all__ = [
     "BASEBALL_KEYWORDS",
     "CSV_HEADERS",
@@ -1199,8 +1334,12 @@ __all__ = [
     "add_player_stances",
     "add_structured_summaries",
     "build_game_context_for_row",
+    "RSS_TRAINING_FEEDS",
+    "collect_news_from_rss",
+    "fetch_google_news_rss_query",
     "fetch_naver",
     "fetch_naver_all",
+    "fetch_rss_feed_items",
     "item_to_row",
     "is_mlb_giants_article",
     "load_csv_rows",
