@@ -18,9 +18,9 @@ from huggingface_hub import HfApi
 MODELS_DIR = Path(__file__).parent / "models"
 
 MODEL_REGISTRY: dict[str, tuple[str, str]] = {
-    "lotte_related":  ("lotte_related_koelectra",  "lotte-related-koelectra"),
-    "stance":         ("stance_koelectra",          "lotte-stance-koelectra"),
-    "player_stance":  ("player_stance_koelectra",   "lotte-player-stance-koelectra"),
+    "lotte_related":  ("lotte_related_model",       "lotte-related-koelectra"),
+    "stance":         ("stance_koelectra",           "lotte-stance-koelectra"),
+    "player_stance":  ("player_stance_koelectra",    "lotte-player-stance-koelectra"),
 }
 
 
