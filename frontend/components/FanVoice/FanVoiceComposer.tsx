@@ -57,9 +57,9 @@ export function FanVoiceComposer({
       setMessage("");
       setEmotion("");
       onSubmitted?.();
-    } catch (error) {
-      console.error("[fan-voice] post message failed", error);
-      setError("메시지 전송에 실패했습니다");
+    } catch (submitError) {
+      console.error("[fan-voice] post message failed", submitError);
+      setError("메시지 전송에 실패했습니다.");
     } finally {
       setSubmitting(false);
     }
@@ -69,13 +69,18 @@ export function FanVoiceComposer({
     <div
       className="flex flex-wrap items-center gap-2 rounded-2xl border p-2"
       style={{
-        borderColor: "var(--border)",
-        background: "var(--surface-glass-soft)",
+        borderColor: "rgba(var(--lotte-navy-rgb), 0.16)",
+        background: "#ffffff",
+        boxShadow: "0 10px 24px rgba(var(--lotte-navy-rgb), 0.1)",
       }}
     >
       <select
         className="rounded-md border px-2 py-1 text-xs"
-        style={{ borderColor: "var(--border)", color: "var(--muted)" }}
+        style={{
+          borderColor: "rgba(var(--lotte-navy-rgb), 0.14)",
+          color: "var(--text)",
+          background: "#ffffff",
+        }}
         value={emotion}
         onChange={(e) => setEmotion(e.target.value as FanVoiceEmotion | "")}
         disabled={disabled || submitting}
@@ -94,9 +99,9 @@ export function FanVoiceComposer({
         placeholder="팬 의견을 남겨주세요..."
         className="min-w-[180px] flex-1 rounded-md border px-3 py-1.5 text-sm"
         style={{
-          borderColor: "var(--border)",
+          borderColor: "rgba(var(--lotte-navy-rgb), 0.14)",
           color: "var(--text)",
-          background: "var(--surface)",
+          background: "#ffffff",
         }}
         disabled={disabled || submitting}
       />
@@ -105,7 +110,10 @@ export function FanVoiceComposer({
         onClick={submit}
         disabled={!canSubmit}
         className="rounded-md px-3 py-1.5 text-xs font-semibold transition disabled:opacity-50"
-        style={{ background: "var(--red)", color: "var(--text-on-accent)" }}
+        style={{
+          background: "var(--red)",
+          color: "var(--lotte-white)",
+        }}
       >
         보내기
       </button>

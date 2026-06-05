@@ -1,24 +1,26 @@
 'use client'
 
 interface FanVoiceToggleProps {
-  cleanMode: boolean
+  open: boolean
   onToggle: (next: boolean) => void
 }
 
-export function FanVoiceToggle({ cleanMode, onToggle }: FanVoiceToggleProps) {
+export function FanVoiceToggle({ open, onToggle }: FanVoiceToggleProps) {
   return (
     <button
       type="button"
-      onClick={() => onToggle(!cleanMode)}
-      className="rounded-full border px-3 py-1 text-xs font-medium transition"
+      onClick={() => onToggle(!open)}
+      className="fixed right-5 bottom-5 z-50 inline-flex h-12 w-12 items-center justify-center rounded-full border text-xl transition hover:-translate-y-px"
       style={{
-        borderColor: 'var(--border)',
-        background: cleanMode ? 'var(--surface-2)' : 'var(--surface-glass-muted)',
-        color: 'var(--muted)',
+        borderColor: 'rgba(var(--lotte-navy-rgb), 0.18)',
+        background: '#ffffff',
+        color: 'var(--text)',
+        boxShadow: '0 14px 30px rgba(var(--lotte-navy-rgb), 0.18)',
       }}
-      aria-pressed={cleanMode}
+      aria-label={open ? '팬 보이스 채팅 닫기' : '팬 보이스 채팅 열기'}
+      aria-pressed={open}
     >
-      {cleanMode ? '팬 보이스 끄기' : '팬 보이스 켜기'}
+      <span aria-hidden="true">{open ? '✕' : '💬'}</span>
     </button>
   )
 }

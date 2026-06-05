@@ -27,8 +27,7 @@ export function ArticleFeed({ articles }: Props) {
       <div
         className="sticky top-14 z-40 -mx-4 px-4 pt-3 pb-1"
         style={{
-          background: 'var(--surface-glass-strong)',
-          backdropFilter: 'blur(8px)',
+          background: 'var(--surface-cream-strong)',
           borderBottom: '1px solid var(--border)',
         }}
       >

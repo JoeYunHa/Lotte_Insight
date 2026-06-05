@@ -25,7 +25,7 @@ export function FeaturedArticleCard({
           className="px-6 py-5 md:px-7"
           style={{ background: 'linear-gradient(135deg, rgba(var(--lotte-blue-rgb), 0.22) 0%, rgba(var(--lotte-navy-rgb), 0.82) 100%)' }}
         >
-          <p className="inline-flex rounded-full bg-[rgba(255,255,255,0.12)] px-2.5 py-1 text-xs font-mono-code uppercase tracking-[0.24em]" style={{ color: 'rgba(var(--lotte-cream-rgb), 0.94)' }}>
+          <p className="inline-flex rounded-full bg-[rgba(255,255,255,0.12)] px-2.5 py-1 text-xs font-mono-code uppercase tracking-[0.24em]" style={{ color: 'var(--lotte-navy)' }}>
             {eyebrow}
           </p>
         </div>
@@ -57,7 +57,7 @@ export function FeaturedArticleCard({
         }}
       >
         <div className="flex flex-wrap items-center gap-2">
-          <p className="rounded-full bg-[rgba(255,255,255,0.12)] px-2.5 py-1 text-xs font-mono-code uppercase tracking-[0.24em]" style={{ color: 'rgba(var(--lotte-cream-rgb), 0.94)' }}>
+          <p className="rounded-full bg-[rgba(255,255,255,0.12)] px-2.5 py-1 text-xs font-mono-code uppercase tracking-[0.24em]" style={{ color: 'var(--lotte-navy)' }}>
             {eyebrow}
           </p>
           {article.primary_label ? <LabelBadge label={article.primary_label} /> : null}

@@ -34,9 +34,9 @@ export function RankingPanel({
           row: 'rgba(var(--lotte-white-rgb), 0.08)',
           badge: 'rgba(var(--lotte-white-rgb), 0.14)',
           border: 'rgba(var(--lotte-blue-rgb), 0.22)',
-          accent: 'var(--text-on-accent)',
-          title: 'var(--text-on-accent)',
-          meta: 'rgba(var(--lotte-cream-rgb), 0.74)',
+          accent: 'var(--lotte-navy)',
+          title: 'var(--lotte-navy)',
+          meta: 'rgba(var(--lotte-navy-rgb), 0.74)',
         }
       : accent === 'red'
         ? {

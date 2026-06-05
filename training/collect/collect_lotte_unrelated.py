@@ -139,6 +139,10 @@ _LOTTE_MAIN_SUBJECT_IN_TITLE: frozenset[str] = frozenset({
     "롯데 부상",
     "롯데 콜업",
     "롯데 코치",
+    # 롯데 주체 기사 — 제목에 롯데 자이언츠가 주어인 패턴
+    "위기의 롯데",
+    "롯데 라인업",
+    "롯데 관전평",
     # 롯데가 경기 참여자인 결과 기사 (타팀 주체여도 True)
     "롯데전",
     "롯데 꺾고",
@@ -148,10 +152,36 @@ _LOTTE_MAIN_SUBJECT_IN_TITLE: frozenset[str] = frozenset({
     "롯데 이기고",
     "롯데에 패",
     "롯데에 승",
+    "롯데에 대승",
+    "롯데 대파",
+    "롯데 완파",
+    "롯데 완패",
+    "롯데 대승",
     "롯데와의",
     "롯데를 상대",
     "롯데를 꺾",
     "롯데를 잡",
+    "롯데를 누",
+    "롯데를 이",
+    # 경기 프리뷰/분석 — 롯데가 경기 당사자
+    "롯데-한화",
+    "롯데-삼성",
+    "롯데-두산",
+    "롯데-KIA",
+    "롯데-LG",
+    "롯데-NC",
+    "롯데-키움",
+    "롯데-SSG",
+    "롯데-KT",
+    "한화-롯데",
+    "삼성-롯데",
+    "두산-롯데",
+    "KIA-롯데",
+    "LG-롯데",
+    "NC-롯데",
+    "키움-롯데",
+    "SSG-롯데",
+    "KT-롯데",
 })
 
 # 타팀 vs 롯데 경기 키워드 — 타팀 주체이면서 롯데가 상대로 등장하는 hard negative 수집용
@@ -177,6 +207,22 @@ LOTTE_OPPONENT_KEYWORDS: list[str] = [
     "롯데전 안타",
     "롯데와의",
     "롯데를 상대로",
+    # 리그 라운드업: 비-롯데 팀 조합 → 여러 경기 결과 묶음 기사에서 롯데가 한 경기로 등장
+    "두산 삼성",
+    "KIA LG",
+    "NC 한화",
+    "SSG KT",
+    "키움 한화",
+    "LG 삼성",
+    "KBO 스윕",
+    "KBO 선두",
+    # 타팀 선수/이슈 분석: 롯데 경기가 배경으로만 언급
+    "KIA 외인",
+    "KIA 부상",
+    "두산 대체 외인",
+    "한화 트레이드",
+    "LG 부상",
+    "KT 이탈",
 ]
 
 # 비-롯데 KBO 팀 키워드
@@ -259,17 +305,23 @@ def _filter_lotte_mention_rows(rows: list[dict]) -> tuple[list[dict], int]:
       - title 또는 description_snippet 어딘가에 "롯데"/"자이언츠" 언급 있음
     스니펫에 "롯데 자이언츠"가 등장하는 것은 허용 —
     타팀 주체 기사에서 "롯데 자이언츠와의 경기"처럼 상대로 언급되는 전형적 패턴이기 때문.
+
+    추가 필터 (제목 + 스니펫 결합 검사):
+      - 제목에 "롯데"가 포함되고 스니펫에 롯데 자이언츠 주체 지시어가 강하게 등장하면 제거.
+        예) "'9위 롯데'의 희망된 김진욱", "속 타는 8위 롯데" 처럼 제목에 수식어+롯데 패턴으로
+        _LOTTE_MAIN_SUBJECT_IN_TITLE을 통과한 True 기사를 잡기 위함.
     """
     kept: list[dict] = []
     removed = 0
     for row in rows:
         title = row.get("title", "")
-        full_text = f"{title} {row.get('description_snippet', '')}"
+        snippet = row.get("description_snippet", "")
+        full_text = f"{title} {snippet}"
 
         if title.startswith(PHOTO_PREFIXES):
             removed += 1
             continue
-        # 고정 키워드 검사
+        # 제목 고정 키워드 검사
         if any(kw in title for kw in _LOTTE_MAIN_SUBJECT_IN_TITLE):
             removed += 1
             continue
@@ -280,12 +332,17 @@ def _filter_lotte_mention_rows(rows: list[dict]) -> tuple[list[dict], int]:
         if any(kw in title for kw in CHEERLEADER_KEYWORDS):
             removed += 1
             continue
+        # 제목에 "롯데" 있고 스니펫에 롯데 자이언츠 주체 지시어가 강하면 제거
+        # (수식어+롯데 패턴: "'9위 롯데'", "속 타는 롯데", "위기의 롯데" 등이 title-only 필터를 우회하는 경우 대응)
+        if "롯데" in title and _has_lotte_giants_indicator(snippet):
+            removed += 1
+            continue
         # 어딘가에 롯데 언급이 없으면 hard negative 조건 미충족
         if not any(kw in full_text for kw in ("롯데", "자이언츠", "사직")):
             removed += 1
             continue
         # 야구 맥락 또는 롯데 그룹사 언급이 없는 기사는 유의미한 False 샘플이 아님
-        if not _has_sports_or_lotte_brand_signal(title, row.get("description_snippet", "")):
+        if not _has_sports_or_lotte_brand_signal(title, snippet):
             removed += 1
             continue
         kept.append(row)

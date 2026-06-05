@@ -11,20 +11,20 @@ export function SectionHeader({ label, accent = 'blue', dense = false }: Section
     accent === 'red'
       ? {
           plate: 'linear-gradient(135deg, rgba(var(--lotte-red-rgb), 0.92) 0%, rgba(var(--lotte-red-rgb), 0.78) 100%)',
-          text: 'var(--text-on-accent)',
+          text: 'var(--lotte-navy)',
           field: 'rgba(var(--lotte-red-rgb), 0.08)',
           border: 'var(--red-border)',
         }
       : accent === 'navy'
         ? {
             plate: 'linear-gradient(135deg, rgba(var(--lotte-navy-rgb), 0.98) 0%, rgba(var(--lotte-blue-rgb), 0.82) 100%)',
-            text: 'var(--text-on-accent)',
+            text: 'var(--lotte-navy)',
             field: 'rgba(var(--lotte-blue-rgb), 0.08)',
             border: 'var(--navy-border)',
           }
         : {
             plate: 'linear-gradient(135deg, rgba(var(--lotte-blue-rgb), 0.94) 0%, rgba(var(--lotte-navy-rgb), 0.82) 100%)',
-            text: 'var(--text-on-accent)',
+            text: 'var(--lotte-navy)',
             field: 'rgba(var(--lotte-blue-rgb), 0.08)',
             border: 'var(--blue-border)',
           }

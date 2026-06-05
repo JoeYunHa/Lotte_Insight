@@ -37,6 +37,7 @@ BATCH_SIZE = 32
 
 VALID_POS = {"true", "1", "yes"}
 VALID_NEG = {"false", "0", "no"}
+FILTER_GPT_MISSING = True
 
 # ── 모델 로드 ──────────────────────────────────────────────────────────────────
 def load_model():
@@ -77,22 +78,37 @@ def load_data():
 
     raw = df["is_lotte_related"].astype(str).str.strip().str.lower()
     valid_mask = raw.isin(VALID_POS | VALID_NEG)
-    df = df[valid_mask].reset_index(drop=True)
-    raw = raw[valid_mask].reset_index(drop=True)
+    if not valid_mask.all():
+        print(f"  DROP {(~valid_mask).sum()}행 (유효하지 않은 값)")
+        df = df[valid_mask].reset_index(drop=True)
+        raw = raw[valid_mask].reset_index(drop=True)
+    else:
+        df = df.reset_index(drop=True)
+        raw = raw.reset_index(drop=True)
 
-    # 충돌 제거
-    conflicts = df.groupby("title")["is_lotte_related"].transform(
-        lambda s: s.astype(str).str.lower().map(lambda v: "pos" if v in VALID_POS else "neg").nunique()
-    )
-    df = df[conflicts == 1].reset_index(drop=True)
-    raw = raw[df.index] if len(raw) > len(df) else raw.iloc[: len(df)]
+    # gpt_missing_index 행 제거 (학습과 동일 조건)
+    if FILTER_GPT_MISSING and "confidence_note" in df.columns:
+        is_false = raw.isin(VALID_NEG)
+        is_gpt_missing = df["confidence_note"].astype(str).str.contains("gpt_missing_index", na=False)
+        drop_mask = is_false & is_gpt_missing
+        dropped = drop_mask.sum()
+        if dropped:
+            df = df[~drop_mask].reset_index(drop=True)
+            raw = raw[~drop_mask].reset_index(drop=True)
+            print(f"  DROP {dropped}행 (gpt_missing_index False 샘플 제거)")
+
+    # 충돌 제거 (동일 제목 다른 레이블)
+    df = df.assign(_raw=raw.values)
+    conflict_titles = df.groupby("title")["_raw"].nunique()
+    conflict_titles = conflict_titles[conflict_titles > 1].index
+    if len(conflict_titles):
+        print(f"  DROP {len(conflict_titles)}개 충돌 타이틀")
+        df = df[~df["title"].isin(conflict_titles)].reset_index(drop=True)
 
     dedup_cols = ["title", "source_name"] if "source_name" in df.columns else ["title"]
     df = df.drop_duplicates(subset=dedup_cols).reset_index(drop=True)
 
-    labels = df["is_lotte_related"].astype(str).str.strip().str.lower().map(
-        lambda v: 1 if v in VALID_POS else 0
-    ).tolist()
+    labels = df["_raw"].map(lambda v: 1 if v in VALID_POS else 0).tolist()
     pos = sum(labels)
     print(f"  최종: {len(labels)}행  True={pos}  False={len(labels)-pos}\n")
     return df["title"].tolist(), df["description_snippet"].tolist(), labels
@@ -121,19 +137,28 @@ def run_inference(model, tokenizer, device, titles, snippets):
 
 # ── 스모크 테스트 ──────────────────────────────────────────────────────────────
 SMOKE_TRUE = [
+    # 기본 롯데 자이언츠 기사
     ("롯데 나균안, 시즌 5승…선발 로테이션 안정화", "나균안이 두산전 6이닝 2실점 호투로 시즌 5승을 달성했다."),
     ("롯데 전준우 햄스트링 부상, 2주 결장", "전준우가 1군 엔트리에서 말소됐다."),
     ("사직구장 개막전 팬 3만 명 몰려", "롯데 자이언츠 홈 개막전 이벤트 성황리에 마무리됐다."),
     ("롯데, 외국인 투수 교체 결정", "롯데가 부진한 외국인 투수를 방출하고 새 용병을 물색 중이다."),
-    ("롯데 구단, 스프링캠프 일정 발표", "롯데 자이언츠가 2026 스프링캠프 일정을 공개했다."),
-    ("자이언츠 타선, 최근 5경기 연속 5점 이상", "롯데 타선이 최근 5경기에서 안정적인 득점력을 보여주고 있다."),
+    # 타팀 주체지만 롯데 경기 참여 기사 (3차 핵심)
+    ("롯데 김태형 감독, 통산 800승 달성", "롯데 자이언츠 김태형 감독이 한국 역대 7번째 통산 800승 고지에 올랐다."),
+    ("KIA, 무너진 집중력에 롯데에 3:8 패", "실책에 주루사까지 겹친 KIA가 롯데에 완패했다. 롯데 선발 김진욱이 7이닝 호투."),
+    ("롯데 쿄야마, 1군 복귀 임박", "2군에서 조정을 마친 쿄야마가 이번 주 1군 합류가 예상된다."),
+    ("[롯데 관전평] 김진욱 승·최준용 세이브", "사직 홈경기에서 롯데가 삼성을 꺾고 3연승을 달렸다."),
+    ("한준수 끝내기 희생플라이, KIA 롯데 5-4로 제압", "KIA가 롯데를 꺾고 3연패에서 탈출했다. 손성빈 실책이 결정적이었다."),
 ]
 SMOKE_FALSE = [
+    # 롯데 그룹사 (야구 무관)
     ("롯데백화점, 봄 세일 시작", "롯데백화점이 봄 할인 행사를 시작했다."),
     ("롯데월드, 신규 어트랙션 공개", "롯데월드가 여름 신규 놀이기구를 선보였다."),
+    ("롯데칠성음료, 온실가스 6400톤 감축", "롯데칠성이 2040 탄소중립 목표를 향해 온실가스를 감축했다."),
+    # 타팀 단독 기사 (롯데 언급 없음)
     ("삼성 라이온즈, KIA 잡고 선두 탈환", "KIA 타이거즈가 삼성에 패해 2위로 내려앉았다."),
-    ("두산 베어스, FA 대어 영입 확정", "두산이 거액의 FA 계약을 체결했다."),
-    ("롯데칠성음료 실적 개선…주가 반등", "롯데칠성음료가 2분기 깜짝 실적으로 주가가 상승세를 보이고 있다."),
+    # 타팀 분석 기사 (롯데는 비교·상대 대상으로만 잠깐 등장)
+    ("KIA 양창섭, 대롯데 완봉…삼성 선발진 기둥으로", "양창섭이 삼성의 선발 에이스로 인정받았다. 롯데 타선을 상대로 완봉승."),
+    ("차기 여신금융협회장에 이동철 전 KB금융 부회장 내정", "여신금융협회가 이동철 후보를 차기 회장으로 추천했다."),
 ]
 
 

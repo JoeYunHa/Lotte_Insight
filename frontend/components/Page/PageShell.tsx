@@ -35,7 +35,7 @@ export function PageShell({ children, footer, headerActions, seasonBadge }: Page
               <span className="font-bold text-sm tracking-wide leading-none" style={{ color: 'var(--text-on-accent)' }}>
                 Lotte Insight
               </span>
-              <span className="text-[10px] font-mono-code leading-none mt-0.5" style={{ color: 'rgba(var(--lotte-cream-rgb), 0.68)' }}>
+              <span className="text-[10px] font-mono-code leading-none mt-0.5" style={{ color: 'var(--lotte-navy)' }}>
                 LOTTE GIANTS MATCHDAY DESK
               </span>
             </div>

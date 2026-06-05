@@ -58,7 +58,7 @@
   --win: var(--lotte-navy);
   --loss: var(--lotte-red);
   --neutral: var(--lotte-blue-deep);
-  --text-on-accent: var(--lotte-cream);
+  --text-on-accent: var(--lotte-navy);
   --red-soft: rgba(var(--lotte-red-rgb), 0.1);
   --red-soft-strong: rgba(var(--lotte-red-rgb), 0.16);
   --red-border: rgba(var(--lotte-red-rgb), 0.28);
@@ -255,8 +255,8 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 .fan-voice-bubble:hover {
@@ -296,18 +296,19 @@ body {
   background: rgba(255, 255, 255, 0.25);
 }
 
-/* Fixed composer bar at viewport bottom */
-.fan-voice-composer-bar {
+/* Floating chat panel anchored above the toggle button */
+.fan-voice-chat-panel {
   position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
+  right: 20px;
+  bottom: 76px;
   z-index: 50;
-  padding: 10px 16px 12px;
-  background: var(--surface-glass-strong);
-  border-top: 1px solid var(--border);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  width: 340px;
+  max-width: calc(100vw - 40px);
+  padding: 12px;
+  background: #ffffff;
+  border: 1px solid rgba(4, 30, 66, 0.14);
+  border-radius: 16px;
+  box-shadow: 0 12px 36px rgba(4, 30, 66, 0.16);
 }
 
 @media (prefers-reduced-motion: reduce) {

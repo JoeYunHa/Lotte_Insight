@@ -13,17 +13,12 @@ import {
   type ActiveFanVoiceBubble,
   type SchedulerState,
 } from "@/lib/fan-voice/fan-voice-lane-scheduler";
-import {
-  readCleanMode,
-  writeCleanMode,
-} from "@/lib/fan-voice/fan-voice-storage";
 import type {
   FanVoiceContextType,
   FanVoiceMessage,
 } from "@/lib/fan-voice/fan-voice-types";
 
 import { FanVoiceComposer } from "./FanVoiceComposer";
-import { FanVoiceHighlights } from "./FanVoiceHighlights";
 import { FanVoiceLane } from "./FanVoiceLane";
 import { FanVoiceToggle } from "./FanVoiceToggle";
 import { useFanVoiceStream } from "./useFanVoiceStream";
@@ -50,18 +45,14 @@ export function FanVoiceLayer({ contextType, contextId }: FanVoiceLayerProps) {
   const [activeBubbles, setActiveBubbles] = useState<ActiveFanVoiceBubble[]>(
     [],
   );
-  const [cleanMode, setCleanMode] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
   const [laneCount, setLaneCount] = useState<number>(DEFAULT_LANE_COUNT);
-  const [mounted, setMounted] = useState(false);
   const schedulerRef = useRef<SchedulerState>(
     createSchedulerState(DEFAULT_LANE_COUNT),
   );
   const reactingIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
-    setMounted(true);
-    setCleanMode(readCleanMode());
-
     function handleResize() {
       const count = resolveLaneCount(window.innerWidth);
       setLaneCount((prev) => {
@@ -70,13 +61,14 @@ export function FanVoiceLayer({ contextType, contextId }: FanVoiceLayerProps) {
         return count;
       });
     }
+
     handleResize();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
   useEffect(() => {
-    if (cleanMode) return;
+    if (chatOpen) return;
     const timer = window.setInterval(() => {
       setActiveBubbles((prev) => {
         const next = prev.slice();
@@ -97,7 +89,7 @@ export function FanVoiceLayer({ contextType, contextId }: FanVoiceLayerProps) {
       });
     }, 900);
     return () => window.clearInterval(timer);
-  }, [cleanMode, streamMessages]);
+  }, [chatOpen, streamMessages]);
 
   const laneBubbles = useMemo(() => {
     const grouped: ActiveFanVoiceBubble[][] = Array.from(
@@ -109,12 +101,6 @@ export function FanVoiceLayer({ contextType, contextId }: FanVoiceLayerProps) {
     }
     return grouped;
   }, [activeBubbles, laneCount]);
-
-  function toggleCleanMode(next: boolean) {
-    setCleanMode(next);
-    writeCleanMode(next);
-    if (next) setActiveBubbles([]);
-  }
 
   async function handleReact(messageId: string) {
     if (reactingIdsRef.current.has(messageId)) return;
@@ -168,31 +154,14 @@ export function FanVoiceLayer({ contextType, contextId }: FanVoiceLayerProps) {
     }
   }
 
+  function toggleChat(next: boolean) {
+    setChatOpen(next);
+    if (next) setActiveBubbles([]);
+  }
+
   return (
     <>
-      {/* Inline section: header + highlights */}
-      <section className="fan-voice-shell mb-8">
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <p
-            className="text-xs font-semibold uppercase tracking-[0.16em]"
-            style={{ color: "var(--muted)" }}
-          >
-            팬 보이스 {slowMode ? "(느린 모드)" : ""}
-          </p>
-          <FanVoiceToggle cleanMode={cleanMode} onToggle={toggleCleanMode} />
-        </div>
-        {!fanVoiceAvailable ? (
-          <p className="mb-2 text-xs" style={{ color: "var(--dim)" }}>
-            Fan voice feed is temporarily unavailable.
-          </p>
-        ) : null}
-        <FanVoiceHighlights messages={streamMessages} />
-        {/* spacer so page content isn't obscured by the fixed composer bar */}
-        <div style={{ height: 72 }} aria-hidden="true" />
-      </section>
-
-      {/* Viewport-fixed bubble overlay — pointer-events disabled except on bubbles */}
-      {mounted && fanVoiceAvailable && !cleanMode && (
+      {fanVoiceAvailable && !chatOpen ? (
         <div className="fan-voice-overlay">
           {laneBubbles.map((bubbles, laneIndex) => (
             <FanVoiceLane
@@ -203,17 +172,25 @@ export function FanVoiceLayer({ contextType, contextId }: FanVoiceLayerProps) {
             />
           ))}
         </div>
-      )}
+      ) : null}
 
-      {/* Fixed composer bar at viewport bottom */}
-      <div className="fan-voice-composer-bar">
-        <FanVoiceComposer
-          contextType={contextType}
-          contextId={contextId}
-          disabled={slowMode || !fanVoiceAvailable}
-          onSubmitted={() => {}}
-        />
-      </div>
+      {chatOpen ? (
+        <div className="fan-voice-chat-panel">
+          {!fanVoiceAvailable ? (
+            <p className="mb-2 text-xs" style={{ color: "var(--dim)" }}>
+              Fan voice feed is temporarily unavailable.
+            </p>
+          ) : null}
+          <FanVoiceComposer
+            contextType={contextType}
+            contextId={contextId}
+            disabled={slowMode || !fanVoiceAvailable}
+            onSubmitted={() => {}}
+          />
+        </div>
+      ) : null}
+
+      <FanVoiceToggle open={chatOpen} onToggle={toggleChat} />
     </>
   );
 }

@@ -28,11 +28,10 @@ export function useFanVoiceStream({
 }: UseFanVoiceStreamProps) {
   const [streamMessages, setStreamMessages] = useState<FanVoiceMessage[]>([]);
   const [slowMode, setSlowMode] = useState(false);
-  const [fanVoiceAvailable, setFanVoiceAvailable] = useState(true);
+  const [fanVoiceAvailable, setFanVoiceAvailable] = useState(hasApiBase);
 
   useEffect(() => {
     if (!hasApiBase()) {
-      setFanVoiceAvailable(false);
       return;
     }
 
@@ -58,7 +57,7 @@ export function useFanVoiceStream({
             ? FAN_VOICE_POLLING.SLOW_MODE_INTERVAL_MS
             : FAN_VOICE_POLLING.DEFAULT_INTERVAL_MS;
           await new Promise((resolve) => setTimeout(resolve, waitMs));
-        } catch (error) {
+        } catch {
           setFanVoiceAvailable(false);
           await new Promise((resolve) =>
             setTimeout(resolve, FAN_VOICE_POLLING.ERROR_RETRY_MS),
@@ -101,7 +100,7 @@ export function useFanVoiceStream({
             runPollingFallback();
           },
         });
-      } catch (error) {
+      } catch {
         runPollingFallback();
       }
     }
